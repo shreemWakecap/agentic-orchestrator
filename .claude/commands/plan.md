@@ -34,7 +34,7 @@ PLAN_OUTPUT_DIRECTORY: `specs/`
 3. Design Solution - Develop technical approach including architecture decisions and implementation strategy
 4. Document Plan - Structure a comprehensive markdown document with problem statement, implementation steps, and testing approach
 5. Generate Filename - Create a descriptive kebab-case filename based on the plan's main topic
-6. Save & Report - Follow the `Report` section to write the plan to `PLAN_OUTPUT_DIRECTORY/<filename>.plan.md` and provide a summary of key components
+6. Save & Report - Follow the `Report` section to write the plan to `PLAN_OUTPUT_DIRECTORY/<filename>.md` and provide a summary of key components
 
 ## Plan Format
 
@@ -114,7 +114,7 @@ After creating and saving the implementation plan, provide a concise report with
 ```
 ✅ Implementation Plan Created
 
-File: PLAN_OUTPUT_DIRECTORY/<filename>.plan.md
+File: PLAN_OUTPUT_DIRECTORY/<filename>.md
 Topic: <brief description of what the plan covers>
 Key Components:
 - <main component 1>

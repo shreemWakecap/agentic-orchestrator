@@ -1,0 +1,18 @@
+[project]
+name = "sdlc-orchestrator"
+version = "1.0.0"
+description = "Self-improving SDLC orchestration system"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+plan = "workflows.planning:main"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0.0",
+]

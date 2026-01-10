@@ -1,5 +1,5 @@
 # SDLC Orchestrator Setup Script
-# Prepares the environment for Claude Code SDLC workflow
+# Prepares the environment for SDLC workflows
 
 param(
     [switch]$Force
@@ -9,15 +9,41 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "`n=== SDLC Orchestrator Setup ===" -ForegroundColor Cyan
 
-# Check if Claude Code CLI is installed
-Write-Host "`nChecking Claude Code CLI..." -ForegroundColor Yellow
-$claudeCmd = Get-Command "claude" -ErrorAction SilentlyContinue
-if (-not $claudeCmd) {
-    Write-Host "Claude Code CLI not found!" -ForegroundColor Red
-    Write-Host "Install it with: npm install -g @anthropic-ai/claude-code" -ForegroundColor Yellow
-    exit 1
+# Check for UV (Python package manager)
+Write-Host "`nChecking UV..." -ForegroundColor Yellow
+$uvCmd = Get-Command "uv" -ErrorAction SilentlyContinue
+if (-not $uvCmd) {
+    Write-Host "UV not found! Installing..." -ForegroundColor Yellow
+    irm https://astral.sh/uv/install.ps1 | iex
 }
-Write-Host "Found: $($claudeCmd.Source)" -ForegroundColor Green
+Write-Host "UV ready" -ForegroundColor Green
+
+# Install orchestrator dependencies
+Write-Host "`nInstalling orchestrator dependencies..." -ForegroundColor Yellow
+Push-Location ".orchestrator"
+try {
+    uv sync 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        uv pip install anthropic python-dotenv rich
+    }
+    Write-Host "  Dependencies installed" -ForegroundColor Green
+} finally {
+    Pop-Location
+}
+
+# Check for .env file
+Write-Host "`nChecking environment..." -ForegroundColor Yellow
+if (-not (Test-Path ".env")) {
+    if (Test-Path ".env.sample") {
+        Copy-Item ".env.sample" ".env"
+        Write-Host "  Created .env from .env.sample" -ForegroundColor Yellow
+        Write-Host "  IMPORTANT: Add your ANTHROPIC_API_KEY to .env" -ForegroundColor Red
+    } else {
+        Write-Host "  Warning: No .env file found. Create one with ANTHROPIC_API_KEY" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "  .env exists" -ForegroundColor Green
+}
 
 # Create required directories
 Write-Host "`nCreating directories..." -ForegroundColor Yellow
@@ -40,7 +66,7 @@ $registry = ".orchestrator/registry.json"
 if (-not (Test-Path $registry) -or $Force) {
     $registryContent = @{
         version = "1.0"
-        description = "Registry of domain experts created by meta-expert"
+        description = "Registry of domain experts"
         experts = @()
     } | ConvertTo-Json -Depth 3
 
@@ -48,51 +74,23 @@ if (-not (Test-Path $registry) -or $Force) {
     Write-Host "  Initialized: $registry" -ForegroundColor Green
 }
 
-# Verify .claude structure
-Write-Host "`nVerifying .claude structure..." -ForegroundColor Yellow
-$requiredFiles = @(
-    ".claude/settings.json",
-    ".claude/agents/meta-expert.md",
-    ".claude/agents/build-agent.md",
-    ".claude/agents/tester.md",
-    ".claude/agents/reviewer.md",
-    ".claude/commands/plan.md",
-    ".claude/commands/build.md",
-    ".claude/commands/test.md",
-    ".claude/commands/review.md",
-    ".claude/commands/meta.md"
-)
-
-$missing = @()
-foreach ($file in $requiredFiles) {
-    if (Test-Path $file) {
-        Write-Host "  Found: $file" -ForegroundColor Green
-    } else {
-        Write-Host "  Missing: $file" -ForegroundColor Red
-        $missing += $file
-    }
-}
-
-if ($missing.Count -gt 0) {
-    Write-Host "`nWarning: Some files are missing. The SDLC system may not work correctly." -ForegroundColor Yellow
-}
-
 # Summary
 Write-Host "`n=== Setup Complete ===" -ForegroundColor Cyan
 Write-Host @"
 
-SDLC Commands Available:
-  /plan   "description"  - Create implementation plan
-  /build  path/to/spec   - Build from spec
-  /test   [spec-path]    - Run tests
-  /review [target]       - Code review
-  /meta   "domain"       - Create new expert
+SDLC Workflows:
 
-Usage:
-  claude               # Start interactive session
-  claude "/plan Add user authentication"
+  Standalone Scripts (run from project root):
+    uv run python scripts/plan.py "Add user authentication"
 
-The system will automatically create domain experts as it
-encounters new technology stacks in your codebase.
+  Or use Claude Code directly:
+    claude "/plan Add user authentication"
+
+Workflow Output:
+  Plans are saved to .specs/
+
+Next Steps:
+  1. Ensure ANTHROPIC_API_KEY is set in .env
+  2. Run: uv run python scripts/plan.py "Your feature request"
 
 "@ -ForegroundColor White

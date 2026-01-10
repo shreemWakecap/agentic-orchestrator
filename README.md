@@ -1,34 +1,32 @@
 # SDLC Orchestrator
 
-Orchestrates Claude Code agents to create implementation plans.
+Orchestrates Claude Code agents through the full SDLC: Plan → Build → Test → Review.
 
 ## Architecture
 
 ```
 .claude/                         .orchestrator/
 ├── agents/                      ├── workflows/
-│   ├── scout.md      <──────────┤   └── planning.py
-│   ├── architect.md  <──────────┤       - step 1: load scout
-│   ├── planner.md    <──────────┤       - step 2: load architect
-│   └── validator.md  <──────────┤       - step 3: load planner
-│                                │       - step 4: load validator
-├── commands/                    │
-│   └── (interactive commands)   ├── core/
-│                                │   ├── agent.py    (loads from .claude/agents/)
-└── settings.json                │   └── workflow.py (base class)
-    (permissions)                │
-                                 └── run.py (entry point)
+│   ├── scout.md                 │   ├── planning.py
+│   ├── architect.md             │   │   └── Smart planning with decomposition
+│   ├── planner.md               │   │
+│   ├── validator.md             │   └── building.py
+│   ├── analyzer.md              │       └── Parallel building with coordination
+│   ├── decomposer.md            │
+│   ├── synthesizer.md           ├── core/
+│   ├── parser.md                │   ├── agent.py    (loads from .claude/agents/)
+│   ├── builder.md               │   └── workflow.py (base class)
+│   ├── tester.md                │
+│   ├── reviewer.md              └── run.py (entry point)
+│   ├── coordinator.md
+│   └── integrator.md
+│
+├── commands/                    .specs/
+│   └── (interactive commands)   ├── pending/      ← New plans land here
+│                                ├── in-progress/  ← Currently building
+└── settings.json                ├── completed/    ← Successfully built
+                                 └── failed/       ← Build failures
 ```
-
-**`.claude/`** = Knowledge Base (WHAT agents know)
-- Agent definitions with system prompts
-- Commands for interactive use
-- Settings and permissions
-
-**`.orchestrator/`** = Workflow Engine (HOW agents work together)
-- Python code that orchestrates steps
-- Loads agents from `.claude/agents/`
-- Coordinates multi-agent workflows
 
 ## Quick Start
 
@@ -36,62 +34,106 @@ Orchestrates Claude Code agents to create implementation plans.
 # Setup
 ./.orchestrator/setup.ps1
 
-# Run planning workflow
+# Create a plan
 uv run python .orchestrator/run.py plan "Add user authentication with JWT"
+
+# List all plans
+uv run python .orchestrator/run.py list
+
+# Build a plan
+uv run python .orchestrator/run.py build .specs/pending/user-authentication.md
 ```
 
-## How It Works
+## Workflows
+
+### Planning Workflow
+
+Creates implementation plans with smart complexity analysis.
 
 ```
-uv run python .orchestrator/run.py plan "Add user auth"
-                         │
-                         ▼
-┌────────────────────────────────────────────────────────┐
-│  .orchestrator/run.py                                  │
-│                                                        │
-│  1. Load scout agent from .claude/agents/scout.md      │
-│     → Run: claude --print -p "<scout system prompt>"   │
-│     → Output: codebase context                         │
-│                                                        │
-│  2. Load architect from .claude/agents/architect.md    │
-│     → Run: claude --print -p "<architect prompt>"      │
-│     → Output: architecture design                      │
-│                                                        │
-│  3. Load planner from .claude/agents/planner.md        │
-│     → Run: claude --print -p "<planner prompt>"        │
-│     → Output: implementation steps                     │
-│                                                        │
-│  4. Load validator from .claude/agents/validator.md    │
-│     → Run: claude --print -p "<validator prompt>"      │
-│     → Output: plan approval                            │
-│                                                        │
-│  5. Compile and save to .specs/<plan>.md               │
-└────────────────────────────────────────────────────────┘
+Simple/Medium Features:
+  Scout → Architect → Planner → Validator
+
+Complex/Massive Features:
+  Analyzer → Decomposer → [Parallel Sub-Plans] → Synthesizer → Validator
 ```
 
-## Structure
+**Agents:**
+- `scout` - Explores codebase structure
+- `architect` - Designs high-level approach
+- `planner` - Creates implementation steps
+- `validator` - Validates plan completeness
+- `analyzer` - Determines complexity
+- `decomposer` - Breaks into sub-features
+- `synthesizer` - Combines sub-plans
+
+### Building Workflow
+
+Executes plans with parallel building and progress tracking.
+
+```
+Simple Plans:
+  Parser → Builder (per step) → Tester → Reviewer
+
+Complex/Master Plans:
+  Parser → Coordinator → [Parallel Builders] → Integrator → Tester → Reviewer
+```
+
+**Agents:**
+- `parser` - Extracts structured steps from plan
+- `builder` - Implements code
+- `tester` - Runs tests and validation
+- `reviewer` - Reviews code quality
+- `coordinator` - Manages parallel execution
+- `integrator` - Merges sub-feature builds
+
+**Features:**
+- Incremental building with checkpoints
+- Resume from failure
+- Parallel step execution
+- Automatic file organization
+
+## Plan Lifecycle
+
+```
+Plan Created          Building           Outcome
+     │                   │                  │
+     ▼                   ▼                  ▼
+┌──────────┐      ┌─────────────┐     ┌───────────┐
+│ pending/ │  →   │ in-progress/│  →  │ completed/│
+└──────────┘      └─────────────┘     └───────────┘
+                                            │
+                                      or    ▼
+                                      ┌─────────┐
+                                      │ failed/ │
+                                      └─────────┘
+```
+
+## Project Structure
 
 ```
 .
 ├── .claude/                  # Knowledge Base
-│   ├── agents/
-│   │   ├── scout.md         # Codebase exploration
-│   │   ├── architect.md     # Architecture design
-│   │   ├── planner.md       # Implementation steps
-│   │   └── validator.md     # Plan validation
+│   ├── agents/              # Agent definitions (13 agents)
 │   ├── commands/            # Interactive commands
 │   └── settings.json        # Permissions
 │
-├── .orchestrator/            # Workflow Engine
+├── .orchestrator/           # Workflow Engine
 │   ├── core/
-│   │   ├── agent.py         # Loads agents from .claude/
-│   │   └── workflow.py      # Workflow base class
+│   │   ├── agent.py        # Loads agents from .claude/
+│   │   └── workflow.py     # Workflow base class
 │   ├── workflows/
-│   │   └── planning.py      # Planning workflow
-│   ├── run.py               # Entry point
-│   └── setup.ps1            # Setup script
+│   │   ├── planning.py     # Smart planning workflow
+│   │   └── building.py     # Smart building workflow
+│   ├── run.py              # Entry point
+│   └── setup.ps1           # Setup script
 │
-├── .specs/                   # Generated plans
+├── .specs/                  # Plan Storage
+│   ├── pending/            # Awaiting build
+│   ├── in-progress/        # Currently building
+│   ├── completed/          # Successfully built
+│   └── failed/             # Build failures
+│
 └── README.md
 ```
 
@@ -115,10 +157,33 @@ You are a specialized agent that...
 ...
 ```
 
-2. Load in workflow:
+2. Register in workflow:
 ```python
 self.register_agent(Agent.load("my-agent", project_root))
 ```
+
+## Commands
+
+```bash
+# Planning
+uv run python .orchestrator/run.py plan "Your feature request"
+
+# Building
+uv run python .orchestrator/run.py build <plan-file>
+uv run python .orchestrator/run.py build user-auth.md  # Searches in .specs/
+
+# List Plans
+uv run python .orchestrator/run.py list
+```
+
+## Context Protection
+
+Both workflows implement context protection to prevent data loss:
+
+- **Truncation**: Large content is truncated before passing to agents
+- **Isolated Contexts**: Each sub-task runs in isolated subprocess
+- **Summarized Handoff**: Only essential context passed between agents
+- **Checkpointing**: Build state saved after each step
 
 ## Requirements
 

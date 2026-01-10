@@ -85,7 +85,7 @@ class Workflow(ABC):
 
         # Log result
         if result.success:
-            self.console.print(f"  [green]✓[/green] {agent_name} complete ({result.tokens_used} tokens)")
+            self.console.print(f"  [green]✓[/green] {agent_name} complete")
         else:
             self.console.print(f"  [red]✗[/red] {agent_name} failed: {result.error}")
 

@@ -23,3 +23,6 @@ logs/
 # Environment
 .env
 .env.local
+
+# AI Docs cache
+ai_docs/.cache/

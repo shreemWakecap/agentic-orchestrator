@@ -1,17 +1,14 @@
 """
-Agent: A wrapper around Claude API calls.
+Agent: Runs Claude Code CLI as a subprocess.
 
-Each agent has a system prompt and can process messages.
-Agents are the building blocks of workflows.
+Each agent spawns a Claude Code process with a specific system prompt.
+This uses Claude Code directly - no API keys needed in the orchestrator.
 """
-import os
+import subprocess
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-import anthropic
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 @dataclass
@@ -21,18 +18,16 @@ class AgentResult:
     agent_name: str
     success: bool
     error: Optional[str] = None
-    tokens_used: int = 0
 
 
 class Agent:
     """
-    A Claude-powered agent with a specific system prompt.
+    A Claude Code subprocess agent.
 
     Usage:
         agent = Agent(
             name="scout",
             system_prompt="You are a codebase explorer...",
-            model="claude-sonnet-4-20250514"
         )
         result = agent.run("Explore the authentication code")
     """
@@ -41,50 +36,15 @@ class Agent:
         self,
         name: str,
         system_prompt: str,
-        model: str = "claude-sonnet-4-20250514",
-        max_tokens: int = 4096,
+        cwd: Optional[Path] = None,
     ):
         self.name = name
         self.system_prompt = system_prompt
-        self.model = model
-        self.max_tokens = max_tokens
-        self.client = anthropic.Anthropic()
-
-    @classmethod
-    def from_file(cls, agent_file: Path, **kwargs) -> "Agent":
-        """
-        Load an agent from a markdown file in .claude/agents/.
-
-        The file should have YAML frontmatter with name and description,
-        followed by the system prompt content.
-        """
-        content = agent_file.read_text(encoding="utf-8")
-
-        # Parse frontmatter
-        if content.startswith("---"):
-            parts = content.split("---", 2)
-            if len(parts) >= 3:
-                frontmatter = parts[1].strip()
-                body = parts[2].strip()
-
-                # Extract name from frontmatter
-                name = None
-                for line in frontmatter.split("\n"):
-                    if line.startswith("name:"):
-                        name = line.split(":", 1)[1].strip()
-                        break
-
-                if not name:
-                    name = agent_file.stem
-
-                return cls(name=name, system_prompt=body, **kwargs)
-
-        # No frontmatter, use filename as name
-        return cls(name=agent_file.stem, system_prompt=content, **kwargs)
+        self.cwd = cwd or Path.cwd()
 
     def run(self, message: str, context: Optional[str] = None) -> AgentResult:
         """
-        Run the agent with a message.
+        Run the agent using Claude Code CLI.
 
         Args:
             message: The user message to process
@@ -99,26 +59,54 @@ class Agent:
             if context:
                 full_message = f"## Context\n\n{context}\n\n## Task\n\n{message}"
 
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
-                system=self.system_prompt,
-                messages=[{"role": "user", "content": full_message}]
+            # Combine system prompt with message
+            prompt = f"""<system>
+{self.system_prompt}
+</system>
+
+{full_message}"""
+
+            # Run Claude Code CLI
+            result = subprocess.run(
+                [
+                    "claude",
+                    "--print",  # Non-interactive, print output
+                    "-p", prompt,  # The prompt
+                ],
+                cwd=str(self.cwd),
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minute timeout
             )
 
-            # Extract text content
-            content = ""
-            for block in response.content:
-                if hasattr(block, "text"):
-                    content += block.text
+            if result.returncode != 0:
+                return AgentResult(
+                    content="",
+                    agent_name=self.name,
+                    success=False,
+                    error=result.stderr or f"Exit code: {result.returncode}"
+                )
 
             return AgentResult(
-                content=content,
+                content=result.stdout.strip(),
                 agent_name=self.name,
                 success=True,
-                tokens_used=response.usage.input_tokens + response.usage.output_tokens
             )
 
+        except subprocess.TimeoutExpired:
+            return AgentResult(
+                content="",
+                agent_name=self.name,
+                success=False,
+                error="Agent timed out after 5 minutes"
+            )
+        except FileNotFoundError:
+            return AgentResult(
+                content="",
+                agent_name=self.name,
+                success=False,
+                error="Claude Code CLI not found. Install with: npm install -g @anthropic-ai/claude-code"
+            )
         except Exception as e:
             return AgentResult(
                 content="",
@@ -128,4 +116,4 @@ class Agent:
             )
 
     def __repr__(self) -> str:
-        return f"Agent(name={self.name!r}, model={self.model!r})"
+        return f"Agent(name={self.name!r})"

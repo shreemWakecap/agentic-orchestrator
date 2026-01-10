@@ -161,33 +161,32 @@ class PlanningWorkflow(Workflow):
         self,
         project_root: Path,
         output_dir: Optional[Path] = None,
-        model: str = "claude-sonnet-4-20250514"
     ):
         self.project_root = project_root
         output_dir = output_dir or project_root / ".specs"
 
         super().__init__(name="Planning Workflow", output_dir=output_dir)
 
-        # Register agents
+        # Register agents (they use Claude Code CLI, not direct API)
         self.register_agent(Agent(
             name="scout",
             system_prompt=SCOUT_PROMPT,
-            model=model
+            cwd=project_root,
         ))
         self.register_agent(Agent(
             name="architect",
             system_prompt=ARCHITECT_PROMPT,
-            model=model
+            cwd=project_root,
         ))
         self.register_agent(Agent(
             name="planner",
             system_prompt=PLANNER_PROMPT,
-            model=model
+            cwd=project_root,
         ))
         self.register_agent(Agent(
             name="validator",
             system_prompt=VALIDATOR_PROMPT,
-            model=model
+            cwd=project_root,
         ))
 
     def _get_codebase_context(self) -> str:

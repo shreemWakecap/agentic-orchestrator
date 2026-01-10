@@ -1,11 +1,11 @@
 # Self-Evolving SDLC Orchestrator
 
-A minimal, self-improving development system with **actual workflow code** that orchestrates multiple Claude agents.
+A workflow system that orchestrates multiple **Claude Code CLI** subprocesses to create implementation plans.
 
 ## Quick Start
 
 ```powershell
-# Setup (installs dependencies)
+# Setup (installs rich for console output)
 ./scripts/setup.ps1
 
 # Run the planning workflow
@@ -16,34 +16,40 @@ uv run python scripts/plan.py "Add user authentication with JWT"
 
 ## How It Works
 
-The orchestrator runs **workflows** that coordinate multiple **agents**:
+The orchestrator spawns **4 Claude Code CLI processes** sequentially:
 
 ```
-User: "Add user authentication"
+"Add User Authentication with JWT"
               │
               ▼
-┌─────────────────────────────────────────────────┐
-│           PLANNING WORKFLOW                      │
-│                                                 │
-│  ┌──────────┐      ┌──────────┐                │
-│  │  Scout   │─────▶│ Architect│                │
-│  │ (explore │      │ (design  │                │
-│  │ codebase)│      │ approach)│                │
-│  └──────────┘      └────┬─────┘                │
-│                         │                       │
-│                         ▼                       │
-│  ┌──────────┐      ┌──────────┐                │
-│  │ Validator│◀─────│ Planner  │                │
-│  │ (check   │      │ (create  │                │
-│  │  plan)   │      │  steps)  │                │
-│  └────┬─────┘      └──────────┘                │
-│       │                                         │
-│       ▼                                         │
-│  .specs/user-authentication-jwt.md              │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────┐
+│  claude --print -p "Scout prompt"   │  ← Process 1
+│  Output: codebase context           │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  claude --print -p "Architect..."   │  ← Process 2
+│  Output: architecture design        │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  claude --print -p "Planner..."     │  ← Process 3
+│  Output: implementation steps       │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  claude --print -p "Validator..."   │  ← Process 4
+│  Output: plan approval              │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+         .specs/plan.md
 ```
 
-Each agent has a specific role and returns structured output to the next agent.
+**No API keys in the orchestrator** - it uses Claude Code CLI which handles authentication.
 
 ## Project Structure
 
@@ -51,16 +57,11 @@ Each agent has a specific role and returns structured output to the next agent.
 .
 ├── .orchestrator/           # Workflow code
 │   ├── core/
-│   │   ├── agent.py        # Agent wrapper (calls Claude API)
+│   │   ├── agent.py        # Spawns Claude Code subprocess
 │   │   └── workflow.py     # Workflow base class
 │   ├── workflows/
 │   │   └── planning.py     # Planning workflow (4 agents)
-│   ├── experts/            # Generated domain expertise
-│   └── pyproject.toml      # Dependencies
-│
-├── .claude/                 # Claude Code config (optional)
-│   ├── agents/             # Agent definitions
-│   └── commands/           # Slash commands
+│   └── pyproject.toml      # Just needs: rich
 │
 ├── .specs/                  # Generated implementation plans
 │
@@ -71,62 +72,39 @@ Each agent has a specific role and returns structured output to the next agent.
 └── README.md
 ```
 
-## The Planning Workflow
+## The 4 Agents
 
-The planning workflow uses 4 specialized agents:
+| Agent | System Prompt Focus | Output |
+|-------|---------------------|--------|
+| **Scout** | Explore codebase structure | Project context |
+| **Architect** | Design high-level approach | Architecture |
+| **Planner** | Create implementation steps | Task list |
+| **Validator** | Verify plan completeness | Approval |
 
-| Agent | Role | Output |
-|-------|------|--------|
-| **Scout** | Explores codebase structure | Context about project |
-| **Architect** | Designs high-level approach | Architecture design |
-| **Planner** | Creates implementation steps | Detailed task list |
-| **Validator** | Ensures plan is complete | Approval/feedback |
+Each agent runs as a separate `claude --print -p "..."` subprocess.
 
-Each agent receives context from previous agents, creating a **chain of specialized reasoning**.
+## Requirements
 
-## Creating Custom Workflows
+- **Claude Code CLI** installed: `npm install -g @anthropic-ai/claude-code`
+- **Python 3.11+** with UV
+- **rich** (for console output)
 
-```python
-from orchestrator.core import Agent, Workflow, WorkflowResult
+## Usage
 
-class MyWorkflow(Workflow):
-    def __init__(self, project_root):
-        super().__init__(name="My Workflow", output_dir=project_root / ".output")
+```powershell
+# Run planning
+uv run python scripts/plan.py "Add user authentication with JWT"
 
-        # Register agents
-        self.register_agent(Agent(
-            name="analyzer",
-            system_prompt="You analyze code...",
-            model="claude-sonnet-4-20250514"
-        ))
-
-    def execute(self, request: str) -> WorkflowResult:
-        result = self.run_agent("analyzer", message=request)
-        # ... orchestration logic
-        return WorkflowResult(success=True, ...)
+# Check output
+cat .specs/user-authentication-jwt.md
 ```
-
-## Environment Setup
-
-Requires `ANTHROPIC_API_KEY` in `.env`:
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `uv run python scripts/plan.py "..."` | Run planning workflow |
-| `./scripts/setup.ps1` | Install dependencies |
 
 ## Philosophy
 
-- **Real workflow code** - Not just configuration, actual Python orchestration
-- **Multiple specialized agents** - Each agent does one thing well
-- **Composable** - Build new workflows from existing agents
-- **Self-improving** - Create domain experts as you encounter new stacks
+- **Uses Claude Code directly** - No API wrappers
+- **Subprocess-based** - Each agent is a Claude Code process
+- **Simple orchestration** - Python coordinates the sequence
+- **Human-readable output** - Plans saved as markdown
 
 ## License
 

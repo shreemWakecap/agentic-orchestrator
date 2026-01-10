@@ -1,110 +1,97 @@
-# Self-Evolving SDLC Orchestrator
+# SDLC Orchestrator
 
-A workflow system that orchestrates multiple **Claude Code CLI** subprocesses to create implementation plans.
+Orchestrates multiple Claude Code CLI subprocesses to create implementation plans.
 
 ## Quick Start
 
 ```powershell
-# Setup (installs rich for console output)
-./scripts/setup.ps1
+# Setup
+./.orchestrator/setup.ps1
 
-# Run the planning workflow
-uv run python scripts/plan.py "Add user authentication with JWT"
-
-# Output saved to .specs/
+# Run planning workflow
+uv run python .orchestrator/run.py plan "Add user authentication with JWT"
 ```
 
 ## How It Works
 
-The orchestrator spawns **4 Claude Code CLI processes** sequentially:
-
 ```
-"Add User Authentication with JWT"
-              │
-              ▼
-┌─────────────────────────────────────┐
-│  claude --print -p "Scout prompt"   │  ← Process 1
-│  Output: codebase context           │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│  claude --print -p "Architect..."   │  ← Process 2
-│  Output: architecture design        │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│  claude --print -p "Planner..."     │  ← Process 3
-│  Output: implementation steps       │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-┌─────────────────────────────────────┐
-│  claude --print -p "Validator..."   │  ← Process 4
-│  Output: plan approval              │
-└──────────────┬──────────────────────┘
-               │
-               ▼
-         .specs/plan.md
+uv run python .orchestrator/run.py plan "Add user authentication"
+                         │
+                         ▼
+┌──────────────────────────────────────────────────────┐
+│  .orchestrator/run.py                                │
+│                                                      │
+│  Spawns 4 Claude Code CLI processes sequentially:    │
+│                                                      │
+│  1. Scout     → claude --print -p "explore codebase" │
+│  2. Architect → claude --print -p "design approach"  │
+│  3. Planner   → claude --print -p "create steps"     │
+│  4. Validator → claude --print -p "check plan"       │
+│                                                      │
+│  Output: .specs/<plan>.md                            │
+└──────────────────────────────────────────────────────┘
 ```
 
-**No API keys in the orchestrator** - it uses Claude Code CLI which handles authentication.
-
-## Project Structure
+## Structure
 
 ```
 .
-├── .orchestrator/           # Workflow code
+├── .orchestrator/
 │   ├── core/
-│   │   ├── agent.py        # Spawns Claude Code subprocess
-│   │   └── workflow.py     # Workflow base class
+│   │   ├── agent.py      # Spawns claude CLI subprocess
+│   │   └── workflow.py   # Workflow base class
 │   ├── workflows/
-│   │   └── planning.py     # Planning workflow (4 agents)
-│   └── pyproject.toml      # Just needs: rich
-│
-├── .specs/                  # Generated implementation plans
-│
-├── scripts/
-│   ├── setup.ps1           # Setup script
-│   └── plan.py             # Run planning workflow
-│
+│   │   └── planning.py   # 4-agent planning workflow
+│   ├── experts/          # Generated domain expertise
+│   ├── run.py            # Entry point
+│   ├── setup.ps1         # Setup script
+│   └── pyproject.toml
+├── .specs/               # Generated plans
 └── README.md
 ```
 
-## The 4 Agents
-
-| Agent | System Prompt Focus | Output |
-|-------|---------------------|--------|
-| **Scout** | Explore codebase structure | Project context |
-| **Architect** | Design high-level approach | Architecture |
-| **Planner** | Create implementation steps | Task list |
-| **Validator** | Verify plan completeness | Approval |
-
-Each agent runs as a separate `claude --print -p "..."` subprocess.
-
 ## Requirements
 
-- **Claude Code CLI** installed: `npm install -g @anthropic-ai/claude-code`
+- **Claude Code CLI**: `npm install -g @anthropic-ai/claude-code`
 - **Python 3.11+** with UV
-- **rich** (for console output)
+- **rich** package (installed by setup)
 
 ## Usage
 
 ```powershell
-# Run planning
-uv run python scripts/plan.py "Add user authentication with JWT"
+# Planning workflow
+uv run python .orchestrator/run.py plan "Add user authentication"
+uv run python .orchestrator/run.py plan "Build a REST API for products"
+uv run python .orchestrator/run.py plan "Refactor database layer"
 
-# Check output
-cat .specs/user-authentication-jwt.md
+# Output
+cat .specs/user-authentication.md
 ```
 
-## Philosophy
+## Adding Workflows
 
-- **Uses Claude Code directly** - No API wrappers
-- **Subprocess-based** - Each agent is a Claude Code process
-- **Simple orchestration** - Python coordinates the sequence
-- **Human-readable output** - Plans saved as markdown
+Create a new workflow in `.orchestrator/workflows/`:
+
+```python
+from core import Agent, Workflow, WorkflowResult
+
+class MyWorkflow(Workflow):
+    def __init__(self, project_root):
+        super().__init__(name="My Workflow", output_dir=project_root / ".output")
+
+        self.register_agent(Agent(
+            name="analyzer",
+            system_prompt="You analyze code...",
+            cwd=project_root,
+        ))
+
+    def execute(self, request: str) -> WorkflowResult:
+        result = self.run_agent("analyzer", message=request)
+        # ... orchestration logic
+        return WorkflowResult(success=True, output_file=...)
+```
+
+Then add it to `run.py`.
 
 ## License
 

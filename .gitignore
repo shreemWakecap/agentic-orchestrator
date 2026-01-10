@@ -1,66 +1,25 @@
-# === Python ===
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
 .venv/
 venv/
-env/
 *.egg-info/
-.pytest_cache/
-.coverage
-.mypy_cache/
 
-# === UV / Astral ===
+# UV
 .uv/
-uv.lock
 
-# === IDE / Editors ===
+# IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
 
-# === OS Files ===
+# OS
 .DS_Store
 Thumbs.db
-desktop.ini
 
-# === Logs ===
-logs/
+# Logs
 *.log
+logs/
 
-# === Environment ===
+# Environment
 .env
 .env.local
-.env.*.local
-*.pem
-*.key
-
-# === Temporary ===
-*.tmp
-*.bak
-tmp/
-temp/
-
-# === Claude Code ===
-.claude/data/
-.claude/settings.status-lined.json
-
-# === Build artifacts ===
-dist/
-build/
-out/
-node_modules/
-
-# === Old directories (legacy) ===
-apps/
-ai_docs/
-app_docs/
-legacy/
-legacy_docs/
-videos/
-data/
-.playwright-mcp/

@@ -1,31 +1,36 @@
 # SDLC Orchestrator
 
-Orchestrates Claude Code agents through the full SDLC: Plan → Build → Test → Review.
+Orchestrates Claude Code agents through the full SDLC: **Plan → Build → Test → Review**.
 
 ## Architecture
 
 ```
-.claude/                         .orchestrator/
-├── agents/                      ├── workflows/
-│   ├── scout.md                 │   ├── planning.py
-│   ├── architect.md             │   │   └── Smart planning with decomposition
-│   ├── planner.md               │   │
-│   ├── validator.md             │   └── building.py
-│   ├── analyzer.md              │       └── Parallel building with coordination
-│   ├── decomposer.md            │
-│   ├── synthesizer.md           ├── core/
-│   ├── parser.md                │   ├── agent.py    (loads from .claude/agents/)
-│   ├── builder.md               │   └── workflow.py (base class)
-│   ├── tester.md                │
-│   ├── reviewer.md              └── run.py (entry point)
+.claude/                              .orchestrator/
+├── agents/                           ├── workflows/
+│   ├── scout.md                      │   ├── planning.py    (smart decomposition)
+│   ├── architect.md                  │   ├── building.py    (parallel building)
+│   ├── planner.md                    │   └── reviewing.py   (expert reviews)
+│   ├── validator.md                  │
+│   ├── analyzer.md                   ├── core/
+│   ├── decomposer.md                 │   ├── agent.py       (print + agentic modes)
+│   ├── synthesizer.md                │   ├── workflow.py    (base class)
+│   ├── parser.md                     │   ├── docs_loader.py (freshness checking)
+│   ├── builder.md                    │   └── expert_loader.py
+│   ├── tester.md                     │
+│   ├── reviewer.md                   └── run.py (CLI entry point)
 │   ├── coordinator.md
-│   └── integrator.md
-│
-├── commands/                    .specs/
-│   └── (interactive commands)   ├── pending/      ← New plans land here
-│                                ├── in-progress/  ← Currently building
-└── settings.json                ├── completed/    ← Successfully built
-                                 └── failed/       ← Build failures
+│   ├── integrator.md
+│   ├── stack_detector.md             ai_docs/
+│   ├── compliance_checker.md         ├── README.md (URLs to fetch)
+│   ├── standards_checker.md          └── *.md (cached docs)
+│   ├── report_generator.md
+│   └── experts/                      .specs/
+│       ├── _meta.md                  ├── pending/
+│       ├── python.md                 ├── in-progress/
+│       ├── typescript.md             ├── completed/
+│       └── react.md                  ├── failed/
+│                                     └── reviews/
+└── settings.json
 ```
 
 ## Quick Start
@@ -37,45 +42,25 @@ Orchestrates Claude Code agents through the full SDLC: Plan → Build → Test �
 # Create a plan
 uv run python .orchestrator/run.py plan "Add user authentication with JWT"
 
+# Build the plan
+uv run python .orchestrator/run.py build .specs/pending/user-authentication.md
+
+# Review the build
+uv run python .orchestrator/run.py review .specs/completed/user-authentication.md
+
 # List all plans
 uv run python .orchestrator/run.py list
 
-# Build a plan
-uv run python .orchestrator/run.py build .specs/pending/user-authentication.md
+# Check AI docs freshness
+uv run python .orchestrator/run.py docs
+
+# List available experts
+uv run python .orchestrator/run.py experts
 ```
-
-## Agent Execution Modes
-
-Agents run in two modes depending on their purpose:
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Print Mode (read-only)           │  Agentic Mode (can write)      │
-│  claude --print -p "..."          │  claude -p "..." --yes         │
-│                                   │  --allowedTools "Write,..."    │
-├───────────────────────────────────┼─────────────────────────────────┤
-│  • scout                          │  • builder                      │
-│  • architect                      │  • tester                       │
-│  • planner                        │  • integrator                   │
-│  • validator                      │                                 │
-│  • analyzer                       │                                 │
-│  • decomposer                     │                                 │
-│  • synthesizer                    │                                 │
-│  • parser                         │                                 │
-│  • coordinator                    │                                 │
-│  • reviewer                       │                                 │
-└───────────────────────────────────┴─────────────────────────────────┘
-```
-
-**Agentic agents** spawn Claude Code subprocesses that can:
-- Create files (Write tool)
-- Modify files (Edit tool)
-- Run commands (Bash tool)
-- Search codebase (Glob, Grep tools)
 
 ## Workflows
 
-### Planning Workflow
+### 1. Planning Workflow
 
 Creates implementation plans with smart complexity analysis.
 
@@ -87,16 +72,7 @@ Complex/Massive Features:
   Analyzer → Decomposer → [Parallel Sub-Plans] → Synthesizer → Validator
 ```
 
-**Agents:**
-- `scout` - Explores codebase structure
-- `architect` - Designs high-level approach
-- `planner` - Creates implementation steps
-- `validator` - Validates plan completeness
-- `analyzer` - Determines complexity
-- `decomposer` - Breaks into sub-features
-- `synthesizer` - Combines sub-plans
-
-### Building Workflow
+### 2. Building Workflow
 
 Executes plans with parallel subagents that actually write code.
 
@@ -108,141 +84,178 @@ Complex/Master Plans:
   Parser → Coordinator → [Parallel Builders] → Integrator → Tester → Reviewer
 ```
 
-**Agents:**
-- `parser` - Extracts structured steps from plan
-- `builder` - **AGENTIC** - Actually writes code using tools
-- `tester` - **AGENTIC** - Runs tests and validation
-- `reviewer` - Reviews code quality
-- `coordinator` - Manages parallel execution
-- `integrator` - **AGENTIC** - Merges sub-feature builds
+### 3. Review Workflow (NEW)
+
+Reviews completed builds for quality and compliance.
+
+```
+Review Flow:
+  1. Load AI Docs (freshness check)
+  2. Stack Detector → Identify technologies
+  3. Compliance Checker → Did we build what was planned?
+  4. [Parallel Expert Reviews] → Tech-specific code review
+  5. Standards Checker → Universal best practices
+  6. Report Generator → Actionable report
+```
+
+## Tech Experts System
+
+Dynamic tech-specific experts that can be used across Plan/Build/Review:
+
+```
+.claude/agents/experts/
+├── _meta.md          # Creates new experts dynamically
+├── python.md         # Python best practices
+├── typescript.md     # TypeScript best practices
+├── react.md          # React patterns & hooks
+└── (more as needed)
+```
 
 **Features:**
-- Parallel subagent execution via ThreadPoolExecutor
-- Each builder runs as independent Claude subprocess
-- Incremental building with checkpoints
-- Resume from failure
-- Automatic file organization
+- Auto-detection of project tech stack
+- Meta-expert creates new experts on-the-fly
+- Experts provide tech-specific code reviews
+- Reusable across all SDLC phases
+
+```bash
+# List available experts
+uv run python .orchestrator/run.py experts
+```
+
+## AI Documentation System
+
+Loads and manages documentation for agents:
+
+```
+ai_docs/
+├── README.md           # URLs to fetch
+├── .cache/
+│   └── freshness.json  # Tracks file ages
+└── *.md                # Cached documentation
+```
+
+**Freshness Policy:**
+- Docs older than **2 days** are marked stale
+- Warnings shown during workflow execution
+- Auto-refresh available with `--refresh` flag
+
+```bash
+# Check docs status
+uv run python .orchestrator/run.py docs
+
+# Refresh stale docs
+uv run python .orchestrator/run.py docs --refresh
+
+# Refresh during review
+uv run python .orchestrator/run.py review plan.md --refresh-docs
+```
+
+## Agent Execution Modes
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Print Mode (read-only)           │  Agentic Mode (can write)      │
+│  claude --print -p "..."          │  claude -p "..." --yes         │
+│                                   │  --allowedTools "Write,..."    │
+├───────────────────────────────────┼─────────────────────────────────┤
+│  • scout, architect, planner      │  • builder                      │
+│  • analyzer, decomposer           │  • tester                       │
+│  • parser, coordinator            │  • integrator                   │
+│  • compliance_checker             │                                 │
+│  • standards_checker              │                                 │
+│  • report_generator               │                                 │
+│  • all experts (python, etc.)     │                                 │
+└───────────────────────────────────┴─────────────────────────────────┘
+```
 
 ## Plan Lifecycle
 
 ```
-Plan Created          Building           Outcome
-     │                   │                  │
-     ▼                   ▼                  ▼
-┌──────────┐      ┌─────────────┐     ┌───────────┐
-│ pending/ │  →   │ in-progress/│  →  │ completed/│
-└──────────┘      └─────────────┘     └───────────┘
-                                            │
-                                      or    ▼
-                                      ┌─────────┐
-                                      │ failed/ │
-                                      └─────────┘
+                    Plan → Build → Review
+
+┌──────────┐   ┌─────────────┐   ┌───────────┐   ┌─────────┐
+│ pending/ │ → │ in-progress/│ → │ completed/│ → │ reviews/│
+└──────────┘   └─────────────┘   └───────────┘   └─────────┘
+                                       │
+                                 or    ▼
+                                 ┌─────────┐
+                                 │ failed/ │
+                                 └─────────┘
 ```
 
-## How Subagents Work
+## Commands Reference
 
-When building a plan, the orchestrator spawns Claude Code subprocesses:
+```bash
+# Workflows
+uv run python .orchestrator/run.py plan "Your feature request"
+uv run python .orchestrator/run.py build <plan-file>
+uv run python .orchestrator/run.py review <plan-file> [--refresh-docs]
 
-```python
-# Planning agents (print mode - read only)
-subprocess.run(["claude", "--print", "-p", prompt])
-
-# Building agents (agentic mode - can write files)
-subprocess.run([
-    "claude", "-p", prompt,
-    "--yes",                              # Auto-accept prompts
-    "--output-format", "json",            # Structured output
-    "--allowedTools", "Read,Write,Edit,Bash,Glob,Grep"
-])
+# Utilities
+uv run python .orchestrator/run.py list              # List all plans
+uv run python .orchestrator/run.py docs [--refresh]  # Check/refresh docs
+uv run python .orchestrator/run.py experts           # List tech experts
 ```
 
-Each subagent:
-- Runs in isolated context (no context overflow)
-- Can execute tools to modify the codebase
-- Reports files created/modified back to orchestrator
-- Can run in parallel with other independent steps
+## Adding New Experts
+
+1. Create expert in `.claude/agents/experts/<name>.md`:
+```markdown
+---
+name: fastapi
+description: Expert in FastAPI best practices
+---
+
+# FastAPI Expert
+
+You are an expert in FastAPI with deep knowledge of...
+
+## Review Checklist
+...
+
+## Common Issues
+...
+```
+
+2. The expert will be auto-discovered and used when FastAPI is detected.
 
 ## Project Structure
 
 ```
 .
 ├── .claude/                  # Knowledge Base
-│   ├── agents/              # Agent definitions (13 agents)
+│   ├── agents/              # Agent definitions (17+ agents)
+│   │   └── experts/         # Tech-specific experts
 │   ├── commands/            # Interactive commands
 │   └── settings.json        # Permissions
 │
 ├── .orchestrator/           # Workflow Engine
 │   ├── core/
-│   │   ├── agent.py        # Agent runner (print + agentic modes)
-│   │   └── workflow.py     # Workflow base class
+│   │   ├── agent.py        # Agent runner (print + agentic)
+│   │   ├── workflow.py     # Workflow base class
+│   │   ├── docs_loader.py  # AI docs with freshness
+│   │   └── expert_loader.py # Tech expert discovery
 │   ├── workflows/
-│   │   ├── planning.py     # Smart planning workflow
-│   │   └── building.py     # Smart building workflow
-│   ├── run.py              # Entry point
+│   │   ├── planning.py     # Smart planning
+│   │   ├── building.py     # Smart building
+│   │   └── reviewing.py    # Expert reviewing
+│   ├── run.py              # CLI entry point
 │   └── setup.ps1           # Setup script
 │
 ├── .specs/                  # Plan Storage
 │   ├── pending/            # Awaiting build
 │   ├── in-progress/        # Currently building
 │   ├── completed/          # Successfully built
-│   └── failed/             # Build failures
+│   ├── failed/             # Build failures
+│   └── reviews/            # Review reports
+│
+├── ai_docs/                 # AI Documentation
+│   ├── README.md           # URLs to fetch
+│   ├── .cache/             # Freshness tracking
+│   └── *.md                # Cached docs
 │
 └── README.md
 ```
-
-## Adding New Agents
-
-1. Create agent in `.claude/agents/<name>.md`:
-```markdown
----
-name: my-agent
-description: What this agent does
----
-
-# My Agent
-
-You are a specialized agent that...
-
-## Responsibilities
-...
-
-## Output Format
-...
-```
-
-2. Register in workflow:
-```python
-self.register_agent(Agent.load("my-agent", project_root))
-```
-
-3. For agentic agents (need to write files), add to `AGENTIC_AGENTS`:
-```python
-# In agent.py
-AGENTIC_AGENTS = {"builder", "tester", "integrator", "my-agent"}
-```
-
-## Commands
-
-```bash
-# Planning
-uv run python .orchestrator/run.py plan "Your feature request"
-
-# Building
-uv run python .orchestrator/run.py build <plan-file>
-uv run python .orchestrator/run.py build user-auth.md  # Searches in .specs/
-
-# List Plans
-uv run python .orchestrator/run.py list
-```
-
-## Context Protection
-
-Both workflows implement context protection to prevent data loss:
-
-- **Truncation**: Large content is truncated before passing to agents
-- **Isolated Contexts**: Each subagent runs in isolated subprocess
-- **Summarized Handoff**: Only essential context passed between agents
-- **Checkpointing**: Build state saved after each step
 
 ## Requirements
 

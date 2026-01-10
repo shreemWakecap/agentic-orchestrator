@@ -239,7 +239,7 @@ class BuildingWorkflow(Workflow):
         return "\n\n".join(context_parts) if context_parts else ""
 
     def _execute_step(self, step: BuildStep, phase_context: str) -> StepResult:
-        """Execute a single build step."""
+        """Execute a single build step using agentic builder."""
         step_context = self._get_relevant_context(step)
 
         full_context = f"""## Phase Context
@@ -252,6 +252,7 @@ class BuildingWorkflow(Workflow):
 {step.code_hint[:1000] if step.code_hint else 'None provided'}
 """
 
+        # Builder runs in agentic mode - it can actually write files
         result = self.run_agent(
             "builder",
             message=f"""Execute this build step:
@@ -260,7 +261,9 @@ class BuildingWorkflow(Workflow):
 **Target:** {step.target}
 **Description:** {step.description}
 
-Complete this step and report what you did.""",
+IMPORTANT: Actually create/modify the files as specified. Use the Write tool to create files, Edit tool to modify existing files.
+
+After completing, summarize what you did.""",
             context=full_context,
             show_progress=False
         )
@@ -275,17 +278,30 @@ Complete this step and report what you did.""",
                 error=result.error
             )
 
-        # Parse builder response
-        response_data = self._parse_json_from_response(result.content)
+        # Get files from agentic result
+        files_affected = []
+        if result.files_created:
+            files_affected.extend(result.files_created)
+        if result.files_modified:
+            files_affected.extend(result.files_modified)
+        if not files_affected:
+            files_affected = [step.target] if step.target else []
+
+        # Determine action taken
+        action_taken = step.action
+        if result.files_created:
+            action_taken = "created"
+        elif result.files_modified:
+            action_taken = "modified"
 
         return StepResult(
             step_id=step.id,
-            status=response_data.get("status", "completed"),
-            action_taken=response_data.get("action_taken", step.action),
+            status="completed",
+            action_taken=action_taken,
             target=step.target,
-            summary=response_data.get("summary", result.content[:200]),
-            files_affected=response_data.get("files_affected", [step.target]),
-            error=response_data.get("error")
+            summary=result.content[:200] if result.content else f"Completed {step.action} on {step.target}",
+            files_affected=files_affected,
+            error=None
         )
 
     def _run_simple_build(self, plan: ParsedPlan, plan_path: Path) -> WorkflowResult:

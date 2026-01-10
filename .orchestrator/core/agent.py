@@ -1,11 +1,10 @@
 """
-Agent: Runs Claude Code CLI as a subprocess.
+Agent: Loads agent definitions from .claude/agents/ and runs via Claude CLI.
 
-Each agent spawns a Claude Code process with a specific system prompt.
-This uses Claude Code directly - no API keys needed in the orchestrator.
+The agent definitions (system prompts) live in .claude/agents/*.md
+The orchestrator loads these and runs them via Claude Code CLI.
 """
 import subprocess
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -22,39 +21,68 @@ class AgentResult:
 
 class Agent:
     """
-    A Claude Code subprocess agent.
+    A Claude Code agent that loads its definition from .claude/agents/.
 
     Usage:
-        agent = Agent(
-            name="scout",
-            system_prompt="You are a codebase explorer...",
-        )
-        result = agent.run("Explore the authentication code")
+        # Load agent from .claude/agents/scout.md
+        agent = Agent.load("scout", project_root=Path("."))
+        result = agent.run("Explore the codebase")
     """
 
     def __init__(
         self,
         name: str,
         system_prompt: str,
-        cwd: Optional[Path] = None,
+        cwd: Path,
     ):
         self.name = name
         self.system_prompt = system_prompt
-        self.cwd = cwd or Path.cwd()
+        self.cwd = cwd
+
+    @classmethod
+    def load(cls, name: str, project_root: Path) -> "Agent":
+        """
+        Load an agent from .claude/agents/<name>.md
+
+        Args:
+            name: Agent name (e.g., "scout" loads .claude/agents/scout.md)
+            project_root: Project root directory
+
+        Returns:
+            Agent instance with loaded system prompt
+        """
+        agent_file = project_root / ".claude" / "agents" / f"{name}.md"
+
+        if not agent_file.exists():
+            raise FileNotFoundError(f"Agent not found: {agent_file}")
+
+        content = agent_file.read_text(encoding="utf-8")
+
+        # Parse frontmatter and extract body as system prompt
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                system_prompt = parts[2].strip()
+            else:
+                system_prompt = content
+        else:
+            system_prompt = content
+
+        return cls(name=name, system_prompt=system_prompt, cwd=project_root)
 
     def run(self, message: str, context: Optional[str] = None) -> AgentResult:
         """
         Run the agent using Claude Code CLI.
 
         Args:
-            message: The user message to process
-            context: Optional additional context to prepend
+            message: The task/message for the agent
+            context: Optional context from previous agents
 
         Returns:
             AgentResult with the agent's response
         """
         try:
-            # Build the full message
+            # Build the full prompt
             full_message = message
             if context:
                 full_message = f"## Context\n\n{context}\n\n## Task\n\n{message}"
@@ -68,11 +96,7 @@ class Agent:
 
             # Run Claude Code CLI
             result = subprocess.run(
-                [
-                    "claude",
-                    "--print",  # Non-interactive, print output
-                    "-p", prompt,  # The prompt
-                ],
+                ["claude", "--print", "-p", prompt],
                 cwd=str(self.cwd),
                 capture_output=True,
                 text=True,
@@ -105,7 +129,7 @@ class Agent:
                 content="",
                 agent_name=self.name,
                 success=False,
-                error="Claude Code CLI not found. Install with: npm install -g @anthropic-ai/claude-code"
+                error="Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
             )
         except Exception as e:
             return AgentResult(

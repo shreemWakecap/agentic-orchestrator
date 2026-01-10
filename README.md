@@ -1,6 +1,34 @@
 # SDLC Orchestrator
 
-Orchestrates multiple Claude Code CLI subprocesses to create implementation plans.
+Orchestrates Claude Code agents to create implementation plans.
+
+## Architecture
+
+```
+.claude/                         .orchestrator/
+├── agents/                      ├── workflows/
+│   ├── scout.md      <──────────┤   └── planning.py
+│   ├── architect.md  <──────────┤       - step 1: load scout
+│   ├── planner.md    <──────────┤       - step 2: load architect
+│   └── validator.md  <──────────┤       - step 3: load planner
+│                                │       - step 4: load validator
+├── commands/                    │
+│   └── (interactive commands)   ├── core/
+│                                │   ├── agent.py    (loads from .claude/agents/)
+└── settings.json                │   └── workflow.py (base class)
+    (permissions)                │
+                                 └── run.py (entry point)
+```
+
+**`.claude/`** = Knowledge Base (WHAT agents know)
+- Agent definitions with system prompts
+- Commands for interactive use
+- Settings and permissions
+
+**`.orchestrator/`** = Workflow Engine (HOW agents work together)
+- Python code that orchestrates steps
+- Loads agents from `.claude/agents/`
+- Coordinates multi-agent workflows
 
 ## Quick Start
 
@@ -15,83 +43,88 @@ uv run python .orchestrator/run.py plan "Add user authentication with JWT"
 ## How It Works
 
 ```
-uv run python .orchestrator/run.py plan "Add user authentication"
+uv run python .orchestrator/run.py plan "Add user auth"
                          │
                          ▼
-┌──────────────────────────────────────────────────────┐
-│  .orchestrator/run.py                                │
-│                                                      │
-│  Spawns 4 Claude Code CLI processes sequentially:    │
-│                                                      │
-│  1. Scout     → claude --print -p "explore codebase" │
-│  2. Architect → claude --print -p "design approach"  │
-│  3. Planner   → claude --print -p "create steps"     │
-│  4. Validator → claude --print -p "check plan"       │
-│                                                      │
-│  Output: .specs/<plan>.md                            │
-└──────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│  .orchestrator/run.py                                  │
+│                                                        │
+│  1. Load scout agent from .claude/agents/scout.md      │
+│     → Run: claude --print -p "<scout system prompt>"   │
+│     → Output: codebase context                         │
+│                                                        │
+│  2. Load architect from .claude/agents/architect.md    │
+│     → Run: claude --print -p "<architect prompt>"      │
+│     → Output: architecture design                      │
+│                                                        │
+│  3. Load planner from .claude/agents/planner.md        │
+│     → Run: claude --print -p "<planner prompt>"        │
+│     → Output: implementation steps                     │
+│                                                        │
+│  4. Load validator from .claude/agents/validator.md    │
+│     → Run: claude --print -p "<validator prompt>"      │
+│     → Output: plan approval                            │
+│                                                        │
+│  5. Compile and save to .specs/<plan>.md               │
+└────────────────────────────────────────────────────────┘
 ```
 
 ## Structure
 
 ```
 .
-├── .orchestrator/
+├── .claude/                  # Knowledge Base
+│   ├── agents/
+│   │   ├── scout.md         # Codebase exploration
+│   │   ├── architect.md     # Architecture design
+│   │   ├── planner.md       # Implementation steps
+│   │   └── validator.md     # Plan validation
+│   ├── commands/            # Interactive commands
+│   └── settings.json        # Permissions
+│
+├── .orchestrator/            # Workflow Engine
 │   ├── core/
-│   │   ├── agent.py      # Spawns claude CLI subprocess
-│   │   └── workflow.py   # Workflow base class
+│   │   ├── agent.py         # Loads agents from .claude/
+│   │   └── workflow.py      # Workflow base class
 │   ├── workflows/
-│   │   └── planning.py   # 4-agent planning workflow
-│   ├── experts/          # Generated domain expertise
-│   ├── run.py            # Entry point
-│   ├── setup.ps1         # Setup script
-│   └── pyproject.toml
-├── .specs/               # Generated plans
+│   │   └── planning.py      # Planning workflow
+│   ├── run.py               # Entry point
+│   └── setup.ps1            # Setup script
+│
+├── .specs/                   # Generated plans
 └── README.md
+```
+
+## Adding New Agents
+
+1. Create agent in `.claude/agents/<name>.md`:
+```markdown
+---
+name: my-agent
+description: What this agent does
+---
+
+# My Agent
+
+You are a specialized agent that...
+
+## Responsibilities
+...
+
+## Output Format
+...
+```
+
+2. Load in workflow:
+```python
+self.register_agent(Agent.load("my-agent", project_root))
 ```
 
 ## Requirements
 
 - **Claude Code CLI**: `npm install -g @anthropic-ai/claude-code`
 - **Python 3.11+** with UV
-- **rich** package (installed by setup)
-
-## Usage
-
-```powershell
-# Planning workflow
-uv run python .orchestrator/run.py plan "Add user authentication"
-uv run python .orchestrator/run.py plan "Build a REST API for products"
-uv run python .orchestrator/run.py plan "Refactor database layer"
-
-# Output
-cat .specs/user-authentication.md
-```
-
-## Adding Workflows
-
-Create a new workflow in `.orchestrator/workflows/`:
-
-```python
-from core import Agent, Workflow, WorkflowResult
-
-class MyWorkflow(Workflow):
-    def __init__(self, project_root):
-        super().__init__(name="My Workflow", output_dir=project_root / ".output")
-
-        self.register_agent(Agent(
-            name="analyzer",
-            system_prompt="You analyze code...",
-            cwd=project_root,
-        ))
-
-    def execute(self, request: str) -> WorkflowResult:
-        result = self.run_agent("analyzer", message=request)
-        # ... orchestration logic
-        return WorkflowResult(success=True, output_file=...)
-```
-
-Then add it to `run.py`.
+- **rich** package
 
 ## License
 

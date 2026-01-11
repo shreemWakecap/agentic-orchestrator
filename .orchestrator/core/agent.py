@@ -9,10 +9,48 @@ Two modes:
 - Agentic mode: For builder agents that need to write files using tools
 """
 import json
+import logging
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# Transient errors that warrant retry
+TRANSIENT_ERRORS = (
+    "timeout",
+    "connection refused",
+    "temporarily unavailable",
+    "rate limit",
+    "503",
+    "502",
+    "429",
+)
+
+
+def _is_transient_error(error: str) -> bool:
+    """Check if an error is transient and should be retried."""
+    error_lower = error.lower()
+    return any(te in error_lower for te in TRANSIENT_ERRORS)
+
+
+def _validate_cwd(cwd: Path) -> Path:
+    """Validate working directory for subprocess execution."""
+    resolved = cwd.resolve()
+    if not resolved.exists():
+        raise ValueError(f"Working directory does not exist: {resolved}")
+    if not resolved.is_dir():
+        raise ValueError(f"Working directory is not a directory: {resolved}")
+    return resolved
+
+
+def _safe_get(data: dict | list, key: str, default=None):
+    """Safely get a value from a dict, returning default if not a dict or key missing."""
+    if isinstance(data, dict):
+        return data.get(key, default)
+    return default
 
 
 @dataclass
@@ -105,7 +143,13 @@ class Agent:
 
 {full_message}"""
 
-    def run(self, message: str, context: Optional[str] = None) -> AgentResult:
+    def run(
+        self,
+        message: str,
+        context: Optional[str] = None,
+        max_retries: int = 3,
+        retry_delay: float = 1.0,
+    ) -> AgentResult:
         """
         Run the agent in print mode (read-only, no tool execution).
 
@@ -114,61 +158,112 @@ class Agent:
         Args:
             message: The task/message for the agent
             context: Optional context from previous agents
+            max_retries: Maximum retry attempts for transient failures
+            retry_delay: Base delay between retries (exponential backoff)
 
         Returns:
             AgentResult with the agent's response
         """
         # Auto-detect if this agent should run in agentic mode
         if self.name in self.AGENTIC_AGENTS:
-            return self.run_agentic(message, context)
+            return self.run_agentic(message, context, max_retries=max_retries)
 
-        try:
-            prompt = self._build_prompt(message, context)
+        last_error: Optional[str] = None
 
-            # Run Claude Code CLI in print mode
-            result = subprocess.run(
-                ["claude", "--print", "-p", prompt],
-                cwd=str(self.cwd),
-                capture_output=True,
-                text=True,
-                timeout=300,  # 5 minute timeout
-            )
+        for attempt in range(max_retries):
+            try:
+                # Validate working directory
+                validated_cwd = _validate_cwd(self.cwd)
+                prompt = self._build_prompt(message, context)
 
-            if result.returncode != 0:
+                # Run Claude Code CLI in print mode
+                # shell=False is default with list args, but explicit for security
+                result = subprocess.run(
+                    ["claude", "--print", "-p", prompt],
+                    cwd=str(validated_cwd),
+                    capture_output=True,
+                    text=True,
+                    timeout=300,  # 5 minute timeout
+                    shell=False,  # Explicit for security - prevents shell injection
+                )
+
+                if result.returncode != 0:
+                    error_msg = result.stderr or f"Exit code: {result.returncode}"
+                    # Check if transient and should retry
+                    if _is_transient_error(error_msg) and attempt < max_retries - 1:
+                        last_error = error_msg
+                        delay = retry_delay * (2 ** attempt)  # Exponential backoff
+                        logger.warning(
+                            f"Agent {self.name} transient error (attempt {attempt + 1}/{max_retries}): "
+                            f"{error_msg}. Retrying in {delay:.1f}s..."
+                        )
+                        time.sleep(delay)
+                        continue
+
+                    return AgentResult(
+                        content="",
+                        agent_name=self.name,
+                        success=False,
+                        error=error_msg
+                    )
+
+                return AgentResult(
+                    content=result.stdout.strip(),
+                    agent_name=self.name,
+                    success=True,
+                )
+
+            except subprocess.TimeoutExpired:
+                last_error = "Agent timed out after 5 minutes"
+                if attempt < max_retries - 1:
+                    delay = retry_delay * (2 ** attempt)
+                    logger.warning(
+                        f"Agent {self.name} timeout (attempt {attempt + 1}/{max_retries}). "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                    continue
+            except FileNotFoundError:
+                # Non-transient error - don't retry
                 return AgentResult(
                     content="",
                     agent_name=self.name,
                     success=False,
-                    error=result.stderr or f"Exit code: {result.returncode}"
+                    error="Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
+                )
+            except ValueError as e:
+                # CWD validation error - non-transient
+                return AgentResult(
+                    content="",
+                    agent_name=self.name,
+                    success=False,
+                    error=str(e)
+                )
+            except Exception as e:
+                last_error = str(e)
+                if _is_transient_error(last_error) and attempt < max_retries - 1:
+                    delay = retry_delay * (2 ** attempt)
+                    logger.warning(
+                        f"Agent {self.name} error (attempt {attempt + 1}/{max_retries}): "
+                        f"{last_error}. Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                    continue
+
+                return AgentResult(
+                    content="",
+                    agent_name=self.name,
+                    success=False,
+                    error=last_error
                 )
 
-            return AgentResult(
-                content=result.stdout.strip(),
-                agent_name=self.name,
-                success=True,
-            )
-
-        except subprocess.TimeoutExpired:
-            return AgentResult(
-                content="",
-                agent_name=self.name,
-                success=False,
-                error="Agent timed out after 5 minutes"
-            )
-        except FileNotFoundError:
-            return AgentResult(
-                content="",
-                agent_name=self.name,
-                success=False,
-                error="Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
-            )
-        except Exception as e:
-            return AgentResult(
-                content="",
-                agent_name=self.name,
-                success=False,
-                error=str(e)
-            )
+        # All retries exhausted
+        return AgentResult(
+            content="",
+            agent_name=self.name,
+            success=False,
+            error=f"Failed after {max_retries} attempts. Last error: {last_error}"
+        )
 
     def run_agentic(
         self,
@@ -176,6 +271,8 @@ class Agent:
         context: Optional[str] = None,
         allowed_tools: Optional[list[str]] = None,
         timeout: int = 600,  # 10 minutes for agentic tasks
+        max_retries: int = 3,
+        retry_delay: float = 2.0,
     ) -> AgentResult:
         """
         Run the agent in agentic mode (can execute tools, write files).
@@ -187,97 +284,204 @@ class Agent:
             context: Optional context from previous agents
             allowed_tools: List of allowed tools (defaults to ALLOWED_TOOLS)
             timeout: Timeout in seconds
+            max_retries: Maximum retry attempts for transient failures
+            retry_delay: Base delay between retries (exponential backoff)
 
         Returns:
             AgentResult with the agent's response and file changes
         """
-        try:
-            prompt = self._build_prompt(message, context)
-            tools = allowed_tools or self.ALLOWED_TOOLS
+        last_error: Optional[str] = None
 
-            # Build command with agentic flags
-            cmd = [
-                "claude",
-                "-p", prompt,
-                "--yes",  # Auto-accept prompts for unattended execution
-                "--output-format", "json",  # Get structured output
-                "--allowedTools", ",".join(tools),
-            ]
+        for attempt in range(max_retries):
+            try:
+                # Validate working directory
+                validated_cwd = _validate_cwd(self.cwd)
+                prompt = self._build_prompt(message, context)
+                tools = allowed_tools or self.ALLOWED_TOOLS
 
-            # Run Claude Code CLI in agentic mode
-            result = subprocess.run(
-                cmd,
-                cwd=str(self.cwd),
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
+                # Build command with agentic flags
+                cmd = [
+                    "claude",
+                    "-p", prompt,
+                    "--yes",  # Auto-accept prompts for unattended execution
+                    "--output-format", "json",  # Get structured output
+                    "--allowedTools", ",".join(tools),
+                ]
 
-            if result.returncode != 0:
+                # Run Claude Code CLI in agentic mode
+                # shell=False is default with list args, but explicit for security
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(validated_cwd),
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                    shell=False,  # Explicit for security - prevents shell injection
+                )
+
+                if result.returncode != 0:
+                    error_msg = result.stderr or f"Exit code: {result.returncode}"
+                    # Check if transient and should retry
+                    if _is_transient_error(error_msg) and attempt < max_retries - 1:
+                        last_error = error_msg
+                        delay = retry_delay * (2 ** attempt)
+                        logger.warning(
+                            f"Agent {self.name} transient error (attempt {attempt + 1}/{max_retries}): "
+                            f"{error_msg}. Retrying in {delay:.1f}s..."
+                        )
+                        time.sleep(delay)
+                        continue
+
+                    return AgentResult(
+                        content="",
+                        agent_name=self.name,
+                        success=False,
+                        error=error_msg
+                    )
+
+                # Parse JSON output with robust error handling
+                output = result.stdout.strip()
+                files_created: list[str] = []
+                files_modified: list[str] = []
+                commands_run: list[str] = []
+                content = output
+
+                parsed_ok, content, files_created, files_modified, commands_run = (
+                    self._parse_agentic_output(output)
+                )
+
+                if not parsed_ok:
+                    logger.debug(f"Agent {self.name}: Output was not valid JSON, using raw output")
+
+                return AgentResult(
+                    content=content,
+                    agent_name=self.name,
+                    success=True,
+                    files_created=files_created,
+                    files_modified=files_modified,
+                    commands_run=commands_run,
+                )
+
+            except subprocess.TimeoutExpired:
+                last_error = f"Agent timed out after {timeout} seconds"
+                if attempt < max_retries - 1:
+                    delay = retry_delay * (2 ** attempt)
+                    logger.warning(
+                        f"Agent {self.name} timeout (attempt {attempt + 1}/{max_retries}). "
+                        f"Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                    continue
+            except FileNotFoundError:
+                # Non-transient error - don't retry
                 return AgentResult(
                     content="",
                     agent_name=self.name,
                     success=False,
-                    error=result.stderr or f"Exit code: {result.returncode}"
+                    error="Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
+                )
+            except ValueError as e:
+                # CWD validation error - non-transient
+                return AgentResult(
+                    content="",
+                    agent_name=self.name,
+                    success=False,
+                    error=str(e)
+                )
+            except Exception as e:
+                last_error = str(e)
+                if _is_transient_error(last_error) and attempt < max_retries - 1:
+                    delay = retry_delay * (2 ** attempt)
+                    logger.warning(
+                        f"Agent {self.name} error (attempt {attempt + 1}/{max_retries}): "
+                        f"{last_error}. Retrying in {delay:.1f}s..."
+                    )
+                    time.sleep(delay)
+                    continue
+
+                return AgentResult(
+                    content="",
+                    agent_name=self.name,
+                    success=False,
+                    error=last_error
                 )
 
-            # Parse JSON output
-            output = result.stdout.strip()
-            files_created = []
-            files_modified = []
-            commands_run = []
-            content = output
+        # All retries exhausted
+        return AgentResult(
+            content="",
+            agent_name=self.name,
+            success=False,
+            error=f"Failed after {max_retries} attempts. Last error: {last_error}"
+        )
 
-            try:
-                # Try to parse as JSON to extract file operations
-                data = json.loads(output)
-                if isinstance(data, dict):
-                    content = data.get("result", data.get("content", output))
-                    # Extract file operations from tool calls if available
-                    for msg in data.get("messages", []):
-                        if msg.get("type") == "tool_use":
-                            tool_name = msg.get("name", "")
-                            tool_input = msg.get("input", {})
-                            if tool_name == "Write":
-                                files_created.append(tool_input.get("file_path", ""))
-                            elif tool_name in ("Edit", "MultiEdit"):
-                                files_modified.append(tool_input.get("file_path", ""))
-                            elif tool_name == "Bash":
-                                commands_run.append(tool_input.get("command", ""))
-            except json.JSONDecodeError:
-                # Not JSON, use raw output
-                content = output
+    def _parse_agentic_output(
+        self, output: str
+    ) -> tuple[bool, str, list[str], list[str], list[str]]:
+        """
+        Parse agentic output JSON with robust type checking.
 
-            return AgentResult(
-                content=content,
-                agent_name=self.name,
-                success=True,
-                files_created=files_created,
-                files_modified=files_modified,
-                commands_run=commands_run,
-            )
+        Returns:
+            Tuple of (parsed_ok, content, files_created, files_modified, commands_run)
+        """
+        files_created: list[str] = []
+        files_modified: list[str] = []
+        commands_run: list[str] = []
+        content = output
 
-        except subprocess.TimeoutExpired:
-            return AgentResult(
-                content="",
-                agent_name=self.name,
-                success=False,
-                error=f"Agent timed out after {timeout} seconds"
-            )
-        except FileNotFoundError:
-            return AgentResult(
-                content="",
-                agent_name=self.name,
-                success=False,
-                error="Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
-            )
+        try:
+            data = json.loads(output)
+
+            if not isinstance(data, dict):
+                logger.debug(f"Agent {self.name}: JSON output is not a dict: {type(data)}")
+                return (False, output, [], [], [])
+
+            # Extract content with fallback chain
+            content = _safe_get(data, "result") or _safe_get(data, "content") or output
+
+            # Extract file operations from tool calls if available
+            messages = _safe_get(data, "messages", [])
+            if not isinstance(messages, list):
+                logger.debug(f"Agent {self.name}: 'messages' is not a list: {type(messages)}")
+                messages = []
+
+            for msg in messages:
+                if not isinstance(msg, dict):
+                    continue
+
+                if _safe_get(msg, "type") != "tool_use":
+                    continue
+
+                tool_name = _safe_get(msg, "name", "")
+                tool_input = _safe_get(msg, "input", {})
+
+                if not isinstance(tool_input, dict):
+                    logger.debug(
+                        f"Agent {self.name}: tool_input is not a dict for {tool_name}: {type(tool_input)}"
+                    )
+                    continue
+
+                # Extract file paths, filtering empty strings
+                if tool_name == "Write":
+                    file_path = _safe_get(tool_input, "file_path", "")
+                    if file_path:
+                        files_created.append(file_path)
+                elif tool_name in ("Edit", "MultiEdit"):
+                    file_path = _safe_get(tool_input, "file_path", "")
+                    if file_path:
+                        files_modified.append(file_path)
+                elif tool_name == "Bash":
+                    command = _safe_get(tool_input, "command", "")
+                    if command:
+                        commands_run.append(command)
+
+            return (True, content, files_created, files_modified, commands_run)
+
+        except json.JSONDecodeError as e:
+            logger.debug(f"Agent {self.name}: JSON parse error: {e}")
+            return (False, output, [], [], [])
         except Exception as e:
-            return AgentResult(
-                content="",
-                agent_name=self.name,
-                success=False,
-                error=str(e)
-            )
+            logger.warning(f"Agent {self.name}: Unexpected error parsing output: {e}")
+            return (False, output, [], [], [])
 
     def __repr__(self) -> str:
         return f"Agent(name={self.name!r}, agentic={self.name in self.AGENTIC_AGENTS})"

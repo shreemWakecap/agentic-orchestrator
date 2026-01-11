@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from ..core import Agent, Workflow, WorkflowResult
 
@@ -359,7 +359,7 @@ After completing, summarize what you did.""",
             self.console.print(f"\n  [bold]Testing phase {phase_idx + 1}...[/bold]")
             test_result = self._run_phase_tests(plan, phase_idx)
             if not test_result:
-                self.console.print(f"  [yellow]⚠[/yellow] Tests had issues (continuing)")
+                self.console.print("  [yellow]⚠[/yellow] Tests had issues (continuing)")
 
         # Final review
         self.console.print("\n[bold]Final Review...[/bold]")
@@ -467,7 +467,7 @@ After completing, summarize what you did.""",
                     results.append(result)
 
                     if result.status == "completed":
-                        self.console.print(f"  [green]✓[/green] Done")
+                        self.console.print("  [green]✓[/green] Done")
                     else:
                         self.console.print(f"  [red]✗[/red] {result.error}")
 
@@ -630,7 +630,7 @@ Provide a quality assessment.""",
 
         parser_result = self.run_agent(
             "parser",
-            message=f"Parse this implementation plan and extract structured build steps.",
+            message="Parse this implementation plan and extract structured build steps.",
             context=f"## Plan File: {plan_path.name}\n\n{plan_content[:8000]}"
         )
 

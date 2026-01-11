@@ -20,11 +20,11 @@ SPECS_DIR = PROJECT_ROOT / ".specs"
 # Add .orchestrator to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from workflows.planning import PlanningWorkflow
-from workflows.building import BuildingWorkflow
-from workflows.reviewing import ReviewingWorkflow
-from core.docs_loader import DocsLoader
-from core.expert_loader import ExpertLoader
+from workflows.planning import PlanningWorkflow  # noqa: E402
+from workflows.building import BuildingWorkflow  # noqa: E402
+from workflows.reviewing import ReviewingWorkflow  # noqa: E402
+from core.docs_loader import DocsLoader  # noqa: E402
+from core.expert_loader import ExpertLoader  # noqa: E402
 
 
 def list_plans():

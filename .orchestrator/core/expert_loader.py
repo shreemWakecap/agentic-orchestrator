@@ -7,7 +7,6 @@ Loads experts from .claude/agents/experts/ directory:
 - Can trigger meta-expert to create new experts
 """
 import json
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional

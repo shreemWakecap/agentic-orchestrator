@@ -21,7 +21,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from ..core import Agent, Workflow, WorkflowResult
 from ..core.docs_loader import DocsLoader, DocsContext
@@ -178,7 +178,7 @@ class ReviewingWorkflow(Workflow):
         if result.success:
             data = self._parse_json_from_response(result.content)
             return TechStackInfo(
-                languages=[l.get("name", l) if isinstance(l, dict) else l for l in data.get("languages", [])],
+                languages=[lang.get("name", lang) if isinstance(lang, dict) else lang for lang in data.get("languages", [])],
                 frameworks=[f.get("name", f) if isinstance(f, dict) else f for f in data.get("frameworks", [])],
                 tools=[t.get("name", t) if isinstance(t, dict) else t for t in data.get("tools", [])],
                 recommended_experts=data.get("recommended_experts", []),

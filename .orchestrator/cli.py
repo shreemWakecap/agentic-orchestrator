@@ -331,6 +331,191 @@ def cmd_web(args):
     return 0
 
 
+def cmd_cost(args):
+    """Cost estimation and budget management."""
+    from pathlib import Path
+    from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
+
+    if not args:
+        print("Usage: cli.py cost <subcommand> [options]")
+        print("\nSubcommands:")
+        print("  estimate <workflow>  Estimate cost for a workflow")
+        print("  report <period>      Show cost report (daily|weekly|monthly)")
+        print("  budget show          Show budget status")
+        print("  budget set           Set budget limits")
+        print("\nExamples:")
+        print("  cli.py cost estimate plan --request 'Add authentication'")
+        print("  cli.py cost estimate build --plan .specs/pending/auth.md")
+        print("  cli.py cost report daily")
+        print("  cli.py cost budget show")
+        print("  cli.py cost budget set --daily 10.00 --monthly 100.00")
+        return 1
+
+    subcommand = args[0]
+    sub_args = args[1:]
+
+    estimator = CostEstimator(ORCHESTRATOR_DIR / "cost_history.json")
+    reporter = CostReporter(estimator)
+    budget_manager = BudgetManager(
+        ORCHESTRATOR_DIR / "config" / "budget.json",
+        estimator
+    )
+
+    if subcommand == "estimate":
+        return _cost_estimate(sub_args, estimator)
+    elif subcommand == "report":
+        return _cost_report(sub_args, reporter)
+    elif subcommand == "budget":
+        return _cost_budget(sub_args, budget_manager)
+    else:
+        print(f"Unknown subcommand: {subcommand}")
+        return 1
+
+
+def _cost_estimate(args, estimator):
+    """Handle cost estimate subcommand."""
+    if not args:
+        print("Usage: cli.py cost estimate <workflow> [options]")
+        print("  Workflows: plan, build, review")
+        return 1
+
+    workflow = args[0]
+    request = ""
+    plan_path = None
+    complexity = "medium"
+
+    # Parse options
+    for i, arg in enumerate(args):
+        if arg == "--request" and i + 1 < len(args):
+            request = args[i + 1]
+        elif arg == "--plan" and i + 1 < len(args):
+            plan_path = Path(args[i + 1])
+        elif arg == "--complexity" and i + 1 < len(args):
+            complexity = args[i + 1]
+
+    if workflow == "plan":
+        if not request:
+            print("Error: --request required for plan estimation")
+            return 1
+        estimate = estimator.estimate_planning(len(request), complexity)
+    elif workflow == "build":
+        if not plan_path:
+            print("Error: --plan required for build estimation")
+            return 1
+        estimate = estimator.estimate_building(plan_path)
+    elif workflow == "review":
+        if not plan_path:
+            print("Error: --plan required for review estimation")
+            return 1
+        estimate = estimator.estimate_reviewing(plan_path)
+    else:
+        print(f"Unknown workflow: {workflow}")
+        return 1
+
+    print(f"\nCost Estimate: {workflow}")
+    print("=" * 40)
+    print(f"Total tokens: {estimate.total_estimate.total_tokens:,}")
+    print(f"Estimated cost: ${estimate.total_cost:.4f}")
+    print(f"Confidence: {estimate.confidence:.0%}")
+    print(f"\nAgent breakdown:")
+    for agent, tokens in estimate.agents.items():
+        print(f"  {agent}: {tokens.total_tokens:,} tokens (${tokens.estimated_cost:.4f})")
+    return 0
+
+
+def _cost_report(args, reporter):
+    """Handle cost report subcommand."""
+    if not args:
+        print("Usage: cli.py cost report <period>")
+        print("  Periods: daily, weekly, monthly")
+        return 1
+
+    period = args[0]
+
+    if period == "daily":
+        report = reporter.daily_report()
+        title = f"Daily Cost Report ({report['date']})"
+    elif period == "weekly":
+        report = reporter.weekly_report()
+        title = f"Weekly Cost Report ({report['period']})"
+    elif period == "monthly":
+        report = reporter.monthly_report()
+        title = f"Monthly Cost Report ({report['month']})"
+    else:
+        print(f"Unknown period: {period}")
+        return 1
+
+    print(f"\n{title}")
+    print("=" * 40)
+    print(f"Total runs: {report['total_runs']}")
+    print(f"Total tokens: {report['total_tokens']:,}")
+    print(f"Total cost: ${report['total_cost']:.4f}")
+
+    if report['by_workflow']:
+        print(f"\nBy workflow:")
+        for wf, data in report["by_workflow"].items():
+            print(f"  {wf}: {data['runs']} runs, {data['tokens']:,} tokens, ${data['cost']:.4f}")
+    return 0
+
+
+def _cost_budget(args, budget_manager):
+    """Handle cost budget subcommand."""
+    if not args:
+        print("Usage: cli.py cost budget <action> [options]")
+        print("  Actions: show, set")
+        return 1
+
+    action = args[0]
+
+    if action == "show":
+        remaining = budget_manager.get_remaining_budget()
+        print("\nBudget Status")
+        print("=" * 40)
+        for period, data in remaining.items():
+            if data["limit"]:
+                pct = (data["used"] / data["limit"]) * 100 if data["limit"] else 0
+                print(f"{period.capitalize()}: ${data['used']:.2f} / ${data['limit']:.2f} ({pct:.0f}%)")
+                if data["remaining"]:
+                    print(f"  Remaining: ${data['remaining']:.2f}")
+            else:
+                print(f"{period.capitalize()}: ${data['used']:.2f} (no limit set)")
+        return 0
+
+    elif action == "set":
+        daily = None
+        weekly = None
+        monthly = None
+        per_workflow = None
+
+        for i, arg in enumerate(args):
+            if arg == "--daily" and i + 1 < len(args):
+                daily = float(args[i + 1])
+            elif arg == "--weekly" and i + 1 < len(args):
+                weekly = float(args[i + 1])
+            elif arg == "--monthly" and i + 1 < len(args):
+                monthly = float(args[i + 1])
+            elif arg == "--per-workflow" and i + 1 < len(args):
+                per_workflow = float(args[i + 1])
+
+        budget = Budget(
+            daily_limit=daily,
+            weekly_limit=weekly,
+            monthly_limit=monthly,
+            per_workflow_limit=per_workflow
+        )
+        budget_manager.save_budget(budget)
+        print("Budget updated successfully!")
+        print(f"  Daily: ${daily:.2f}" if daily else "  Daily: not set")
+        print(f"  Weekly: ${weekly:.2f}" if weekly else "  Weekly: not set")
+        print(f"  Monthly: ${monthly:.2f}" if monthly else "  Monthly: not set")
+        print(f"  Per-workflow: ${per_workflow:.2f}" if per_workflow else "  Per-workflow: not set")
+        return 0
+
+    else:
+        print(f"Unknown action: {action}")
+        return 1
+
+
 def cmd_test(args):
     """Run test suite."""
     import subprocess
@@ -378,6 +563,7 @@ COMMANDS = {
     'list': (cmd_list, "List all plans"),
     'docs': (cmd_docs, "Check documentation"),
     'experts': (cmd_experts, "List tech experts"),
+    'cost': (cmd_cost, "Cost estimation and budgets"),
     'test': (cmd_test, "Run test suite"),
     'web': (cmd_web, "Start web UI server"),
 }
@@ -404,6 +590,10 @@ def main():
         print("  cli.py test -v --cov                     # Verbose with coverage")
         print("  cli.py web                               # Start web UI")
         print("  cli.py web --port 8080                   # Custom port")
+        print("  cli.py cost estimate plan --request 'Add auth'")
+        print("  cli.py cost report daily                 # Daily cost report")
+        print("  cli.py cost budget show                  # Show budget status")
+        print("  cli.py cost budget set --daily 10.00     # Set daily limit")
         return 1
 
     cmd = sys.argv[1]

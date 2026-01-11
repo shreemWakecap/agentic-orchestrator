@@ -32,6 +32,7 @@ from workflows.planning import PlanningWorkflow
 from workflows.building import BuildingWorkflow
 from workflows.reviewing import ReviewingWorkflow
 from workflows.fixing import FixingWorkflow
+from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
 
 # FastAPI app
 app = FastAPI(
@@ -326,6 +327,91 @@ async def api_list_reviews():
     """List all review reports."""
     reviews = await _get_all_reviews()
     return {"reviews": reviews}
+
+
+# ============== Cost API Routes ==============
+
+@app.get("/api/cost/estimate/{workflow}")
+async def api_estimate_cost(workflow: str, request_text: str = "", plan_path: str = "", complexity: str = "medium"):
+    """Get cost estimate for a workflow."""
+    estimator = CostEstimator(ORCHESTRATOR_DIR / "cost_history.json")
+
+    if workflow == "plan":
+        estimate = estimator.estimate_planning(len(request_text or "medium request"), complexity)
+    elif workflow == "build":
+        path = Path(plan_path) if plan_path else ORCHESTRATOR_DIR / "dummy.md"
+        estimate = estimator.estimate_building(path)
+    elif workflow == "review":
+        path = Path(plan_path) if plan_path else ORCHESTRATOR_DIR / "dummy.md"
+        estimate = estimator.estimate_reviewing(path)
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown workflow: {workflow}")
+
+    return estimate.to_dict()
+
+
+@app.get("/api/cost/summary")
+async def api_cost_summary():
+    """Get cost summary for dashboard."""
+    estimator = CostEstimator(ORCHESTRATOR_DIR / "cost_history.json")
+    reporter = CostReporter(estimator)
+    budget_manager = BudgetManager(ORCHESTRATOR_DIR / "config" / "budget.json", estimator)
+
+    return {
+        "daily": reporter.daily_report(),
+        "weekly": reporter.weekly_report(),
+        "monthly": reporter.monthly_report(),
+        "budget": budget_manager.get_remaining_budget()
+    }
+
+
+@app.get("/api/cost/report/{period}")
+async def api_cost_report(period: str):
+    """Get cost report for a specific period."""
+    estimator = CostEstimator(ORCHESTRATOR_DIR / "cost_history.json")
+    reporter = CostReporter(estimator)
+
+    if period == "daily":
+        return reporter.daily_report()
+    elif period == "weekly":
+        return reporter.weekly_report()
+    elif period == "monthly":
+        return reporter.monthly_report()
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown period: {period}")
+
+
+@app.get("/api/cost/budget")
+async def api_get_budget():
+    """Get current budget status."""
+    estimator = CostEstimator(ORCHESTRATOR_DIR / "cost_history.json")
+    budget_manager = BudgetManager(ORCHESTRATOR_DIR / "config" / "budget.json", estimator)
+    return budget_manager.get_remaining_budget()
+
+
+class BudgetUpdateRequest(BaseModel):
+    """Request to update budget settings."""
+    daily_limit: Optional[float] = None
+    weekly_limit: Optional[float] = None
+    monthly_limit: Optional[float] = None
+    per_workflow_limit: Optional[float] = None
+
+
+@app.post("/api/cost/budget")
+async def api_set_budget(request: BudgetUpdateRequest):
+    """Update budget settings."""
+    estimator = CostEstimator(ORCHESTRATOR_DIR / "cost_history.json")
+    budget_manager = BudgetManager(ORCHESTRATOR_DIR / "config" / "budget.json", estimator)
+
+    budget = Budget(
+        daily_limit=request.daily_limit,
+        weekly_limit=request.weekly_limit,
+        monthly_limit=request.monthly_limit,
+        per_workflow_limit=request.per_workflow_limit
+    )
+    budget_manager.save_budget(budget)
+
+    return {"status": "updated", "budget": budget_manager.get_remaining_budget()}
 
 
 # ============== Helper Functions ==============

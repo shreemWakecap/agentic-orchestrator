@@ -43,6 +43,27 @@ class PlanningWorkflow(Workflow):
     Each sub-plan runs in isolated context to prevent data loss.
     """
 
+    # Context size limits - base values (scaled by _get_context_limits)
+    BASE_CODEBASE_LIMIT = 4000   # For sub-feature codebase overview
+    BASE_SCOUT_LIMIT = 3500      # For scout results in sub-features
+    BASE_ARCHITECT_LIMIT = 2500  # For architect results
+    MIN_CONTEXT_LIMIT = 1500     # Floor to ensure meaningful context
+
+    def _get_context_limits(self, num_sub_features: int = 1) -> tuple[int, int, int]:
+        """
+        Adaptive context limits based on parallelism.
+        More sub-features = smaller per-feature context to manage total tokens.
+        Fewer sub-features = richer context per feature.
+        """
+        # Scale factor: 1.0 for 1 feature, 0.6 for 5+ features
+        scale = max(0.6, 1.0 - (num_sub_features - 1) * 0.1)
+
+        return (
+            max(self.MIN_CONTEXT_LIMIT, int(self.BASE_CODEBASE_LIMIT * scale)),
+            max(self.MIN_CONTEXT_LIMIT, int(self.BASE_SCOUT_LIMIT * scale)),
+            max(self.MIN_CONTEXT_LIMIT, int(self.BASE_ARCHITECT_LIMIT * scale)),
+        )
+
     def __init__(
         self,
         project_root: Path,
@@ -90,6 +111,28 @@ class PlanningWorkflow(Workflow):
             context_parts.append(f"\nConfig files: {', '.join(found_configs)}")
 
         return "\n".join(context_parts)
+
+    def _smart_truncate(self, text: str, limit: int, preserve_start: int = 0) -> str:
+        """
+        Intelligently truncate text while preserving structure.
+
+        - If text fits within limit, return as-is
+        - Otherwise, preserve beginning (structure) and add truncation marker
+        - preserve_start: minimum chars to always keep from start
+        """
+        if len(text) <= limit:
+            return text
+
+        # Ensure we keep at least some meaningful content
+        preserve = max(preserve_start, limit // 3)
+        truncated = text[:limit - 50]  # Leave room for marker
+
+        # Try to break at a newline for cleaner output
+        last_newline = truncated.rfind('\n', preserve, len(truncated))
+        if last_newline > preserve:
+            truncated = truncated[:last_newline]
+
+        return truncated + f"\n\n... [truncated {len(text) - len(truncated)} chars]"
 
     def _generate_filename(self, request: str) -> str:
         """Generate a kebab-case filename."""
@@ -180,17 +223,38 @@ class PlanningWorkflow(Workflow):
             steps_completed=steps_completed
         )
 
-    def _plan_sub_feature(self, sub_feature: dict, codebase_context: str) -> SubFeaturePlan:
+    def _plan_sub_feature(
+        self,
+        sub_feature: dict,
+        codebase_context: str,
+        cached_scout: Optional[str] = None,
+        num_sub_features: int = 1
+    ) -> SubFeaturePlan:
         """
         Plan a single sub-feature in isolated context.
         Each sub-feature gets minimal, summarized context.
+
+        Args:
+            sub_feature: Feature definition from decomposer
+            codebase_context: Basic codebase structure
+            cached_scout: Optional pre-computed global scout result to avoid redundant exploration
+            num_sub_features: Total number of sub-features (for adaptive context sizing)
         """
         sf_id = sub_feature.get("id", "unknown")
         sf_name = sub_feature.get("name", "Unknown Feature")
         sf_description = sub_feature.get("description", "")
         sf_context = sub_feature.get("context_summary", "")
 
+        # Get adaptive limits based on parallelism
+        codebase_limit, scout_limit, architect_limit = self._get_context_limits(num_sub_features)
+
         # Build focused context for this sub-feature
+        codebase_summary = self._smart_truncate(
+            codebase_context,
+            codebase_limit,
+            preserve_start=500  # Keep directory structure
+        )
+
         focused_context = f"""## Sub-Feature Context
 
 **Feature:** {sf_name}
@@ -200,30 +264,41 @@ class PlanningWorkflow(Workflow):
 {sf_context}
 
 **Codebase Overview:**
-{codebase_context[:1000]}  # Truncated to save tokens
+{codebase_summary}
 """
 
-        # Scout for this sub-feature
+        # If we have cached global scout results, include them to avoid redundant exploration
+        if cached_scout:
+            cached_summary = self._smart_truncate(cached_scout, scout_limit)
+            focused_context += f"""
+**Global Codebase Insights (from initial scout):**
+{cached_summary}
+"""
+
+        # Scout for this sub-feature (now does targeted exploration, not full codebase scan)
         scout_result = self.run_agent(
             "scout",
-            message=f"Sub-feature: {sf_name}\n\n{sf_description}\n\nGather relevant context.",
+            message=f"Sub-feature: {sf_name}\n\n{sf_description}\n\nGather relevant context for THIS specific feature.",
             context=focused_context,
             show_progress=False
         )
 
         # Architect for this sub-feature
+        scout_for_architect = self._smart_truncate(scout_result.content, scout_limit)
         architect_result = self.run_agent(
             "architect",
             message=f"Sub-feature: {sf_name}\n\n{sf_description}\n\nDesign the approach.",
-            context=f"## Scout Context\n\n{scout_result.content[:2000]}",  # Truncated
+            context=f"## Scout Context\n\n{scout_for_architect}",
             show_progress=False
         )
 
         # Planner for this sub-feature
+        scout_for_planner = self._smart_truncate(scout_result.content, architect_limit)
+        arch_for_planner = self._smart_truncate(architect_result.content, architect_limit)
         planner_result = self.run_agent(
             "planner",
             message=f"Sub-feature: {sf_name}\n\n{sf_description}\n\nCreate implementation steps.",
-            context=f"## Context\n\n{scout_result.content[:1500]}\n\n## Architecture\n\n{architect_result.content[:1500]}",
+            context=f"## Context\n\n{scout_for_planner}\n\n## Architecture\n\n{arch_for_planner}",
             show_progress=False
         )
 
@@ -239,12 +314,32 @@ class PlanningWorkflow(Workflow):
         """Run decomposed planning for complex features."""
         steps_completed = []
 
-        # Decompose
-        self.console.print("\n[bold]Phase 2:[/bold] Decomposing into sub-features...")
+        # Phase 2a: Run global scout ONCE to cache common codebase context
+        # This avoids redundant full-codebase exploration in each sub-feature
+        self.console.print("\n[bold]Phase 2a:[/bold] Global codebase scouting...")
+        global_scout = self.run_agent(
+            "scout",
+            message=f"User request: {request}\n\nGather comprehensive context about this codebase for multi-feature planning.",
+            context=codebase_context
+        )
+        cached_scout_result = global_scout.content if global_scout.success else None
+        if global_scout.success:
+            steps_completed.append("global_scout")
+            self.console.print("  [green]✓[/green] Global scout cached")
+        else:
+            self.console.print("  [yellow]⚠[/yellow] Global scout failed, sub-features will scout independently")
+
+        # Phase 2b: Decompose
+        self.console.print("\n[bold]Phase 2b:[/bold] Decomposing into sub-features...")
+        decomposer_context = f"## Analysis\n\n{json.dumps(analysis, indent=2)}\n\n## Codebase\n\n{codebase_context}"
+        if cached_scout_result:
+            scout_summary = self._smart_truncate(cached_scout_result, self.BASE_SCOUT_LIMIT)
+            decomposer_context += f"\n\n## Scout Insights\n\n{scout_summary}"
+
         decomposer_result = self.run_agent(
             "decomposer",
             message=f"Original request: {request}\n\nBreak this into independent sub-features for parallel planning.",
-            context=f"## Analysis\n\n{json.dumps(analysis, indent=2)}\n\n## Codebase\n\n{codebase_context}"
+            context=decomposer_context
         )
         if not decomposer_result.success:
             return WorkflowResult(success=False, error=f"Decomposer failed: {decomposer_result.error}")
@@ -257,19 +352,25 @@ class PlanningWorkflow(Workflow):
             self.console.print("[yellow]No sub-features found, falling back to simple planning[/yellow]")
             return self._run_simple_planning(request, codebase_context)
 
-        # Plan each sub-feature
+        # Phase 3: Plan each sub-feature (with cached scout context)
         self.console.print(f"\n[bold]Phase 3:[/bold] Planning {len(sub_features)} sub-features...")
         sub_plans: list[SubFeaturePlan] = []
 
         strategy = analysis.get("strategy", "decompose_sequential")
 
-        if strategy == "decompose_parallel" and len(sub_features) > 1:
-            # Parallel planning with isolated contexts
+        num_features = len(sub_features)
+        codebase_limit, scout_limit, _ = self._get_context_limits(num_features)
+        self.console.print(f"  Context limits: codebase={codebase_limit}, scout={scout_limit} (scaled for {num_features} features)")
+
+        if strategy == "decompose_parallel" and num_features > 1:
+            # Parallel planning with isolated contexts (but shared cached scout)
             self.console.print(f"  Running up to {self.max_parallel} in parallel...")
 
             with ThreadPoolExecutor(max_workers=self.max_parallel) as executor:
                 futures = {
-                    executor.submit(self._plan_sub_feature, sf, codebase_context): sf
+                    executor.submit(
+                        self._plan_sub_feature, sf, codebase_context, cached_scout_result, num_features
+                    ): sf
                     for sf in sub_features
                 }
 
@@ -282,10 +383,10 @@ class PlanningWorkflow(Workflow):
                     except Exception as e:
                         self.console.print(f"  [red]✗[/red] {sf.get('name', 'Unknown')}: {e}")
         else:
-            # Sequential planning
+            # Sequential planning (with cached scout)
             for sf in sub_features:
                 self.console.print(f"  Planning: {sf.get('name', 'Unknown')}...")
-                plan = self._plan_sub_feature(sf, codebase_context)
+                plan = self._plan_sub_feature(sf, codebase_context, cached_scout_result, num_features)
                 sub_plans.append(plan)
                 self.console.print(f"  [green]✓[/green] {plan.name}")
 

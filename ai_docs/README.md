@@ -34,10 +34,10 @@
 
 ```bash
 # Check docs freshness
-uv run python .orchestrator/run.py docs
+uv run python .orchestrator/cli.py docs
 
 # Refresh stale/missing docs
-uv run python .orchestrator/run.py docs --refresh
+uv run python .orchestrator/cli.py docs --refresh
 ```
 
 ## Freshness Policy
@@ -45,4 +45,3 @@ uv run python .orchestrator/run.py docs --refresh
 - Docs older than **2 days** are marked as stale
 - Stale docs trigger warnings during workflow execution
 - Use `--refresh-docs` flag to auto-refresh during review workflow
-- Cache metadata stored in `.cache/freshness.json`

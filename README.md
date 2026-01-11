@@ -1,61 +1,81 @@
 # SDLC Orchestrator
 
-Orchestrates Claude Code agents through the full SDLC: **Plan → Build → Test → Review**.
+Orchestrates Claude Code agents through the full SDLC: **Plan → Build → Review**.
 
 ## Architecture
 
 ```
 .claude/                              .orchestrator/
-├── agents/                           ├── workflows/
-│   ├── scout.md                      │   ├── planning.py    (smart decomposition)
-│   ├── architect.md                  │   ├── building.py    (parallel building)
-│   ├── planner.md                    │   └── reviewing.py   (expert reviews)
-│   ├── validator.md                  │
-│   ├── analyzer.md                   ├── core/
-│   ├── decomposer.md                 │   ├── agent.py       (print + agentic modes)
-│   ├── synthesizer.md                │   ├── workflow.py    (base class)
-│   ├── parser.md                     │   ├── docs_loader.py (freshness checking)
-│   ├── builder.md                    │   └── expert_loader.py
-│   ├── tester.md                     │
-│   ├── reviewer.md                   └── run.py (CLI entry point)
-│   ├── coordinator.md
-│   ├── integrator.md
-│   ├── stack_detector.md             ai_docs/
-│   ├── compliance_checker.md         ├── README.md (URLs to fetch)
-│   ├── standards_checker.md          └── *.md (cached docs)
+├── agents/                           ├── cli.py            (unified CLI)
+│   ├── scout.md                      ├── setup.ps1         (setup script)
+│   ├── architect.md                  ├── pyproject.toml    (dependencies)
+│   ├── planner.md                    │
+│   ├── validator.md                  ├── workflows/
+│   ├── analyzer.md                   │   ├── planning.py   (smart decomposition)
+│   ├── decomposer.md                 │   ├── building.py   (parallel building)
+│   ├── synthesizer.md                │   └── reviewing.py  (expert reviews)
+│   ├── parser.md                     │
+│   ├── builder.md                    ├── core/
+│   ├── tester.md                     │   ├── agent.py      (print + agentic modes)
+│   ├── reviewer.md                   │   ├── workflow.py   (base class)
+│   ├── coordinator.md                │   ├── docs_loader.py (httpx fetcher)
+│   ├── integrator.md                 │   └── expert_loader.py
+│   ├── stack_detector.md             │
+│   ├── compliance_checker.md         └── config/
+│   ├── standards_checker.md              └── registry.json
 │   ├── report_generator.md
-│   └── experts/                      .specs/
-│       ├── _meta.md                  ├── pending/
-│       ├── python.md                 ├── in-progress/
-│       ├── typescript.md             ├── completed/
-│       └── react.md                  ├── failed/
-│                                     └── reviews/
-└── settings.json
+│   └── experts/                      ai_docs/
+│       ├── _meta.md                  ├── README.md (URLs to fetch)
+│       └── python.md                 └── *.md (cached docs)
+│
+└── commands/                         .specs/
+    ├── workflow.md                   ├── pending/
+    ├── docs.md                       ├── in-progress/
+    ├── experts.md                    ├── completed/
+    ├── setup.md                      ├── failed/
+    └── prime.md                      └── reviews/
 ```
 
 ## Quick Start
 
 ```powershell
-# Setup
-./.orchestrator/setup.ps1
+# 1. Setup (installs UV, syncs deps, fetches docs)
+.\.orchestrator\setup.ps1
 
-# Create a plan
-uv run python .orchestrator/run.py plan "Add user authentication with JWT"
+# 2. Create a plan
+uv run python .orchestrator/cli.py plan "Add user authentication with JWT"
 
-# Build the plan
-uv run python .orchestrator/run.py build .specs/pending/user-authentication.md
+# 3. Build the plan
+uv run python .orchestrator/cli.py build .specs/pending/user-authentication.md
 
-# Review the build
-uv run python .orchestrator/run.py review .specs/completed/user-authentication.md
+# 4. Review the build
+uv run python .orchestrator/cli.py review .specs/completed/user-authentication.md
+```
 
-# List all plans
-uv run python .orchestrator/run.py list
+## Commands
 
-# Check AI docs freshness
-uv run python .orchestrator/run.py docs
+| Command | Description | Example |
+|---------|-------------|---------|
+| `setup` | Initialize environment | `.\.orchestrator\setup.ps1` |
+| `plan` | Create implementation plan | `cli.py plan "Add feature X"` |
+| `build` | Execute a plan | `cli.py build .specs/pending/plan.md` |
+| `review` | Review completed build | `cli.py review .specs/completed/plan.md` |
+| `list` | List all plans by status | `cli.py list` |
+| `docs` | Check/refresh AI docs | `cli.py docs [--refresh]` |
+| `experts` | List available experts | `cli.py experts` |
 
-# List available experts
-uv run python .orchestrator/run.py experts
+**Full command syntax:**
+```powershell
+# All commands run via UV
+uv run python .orchestrator/cli.py <command> [args]
+
+# Examples
+uv run python .orchestrator/cli.py plan "Implement REST API for users"
+uv run python .orchestrator/cli.py build .specs/pending/rest-api.md
+uv run python .orchestrator/cli.py review .specs/completed/rest-api.md --refresh-docs
+uv run python .orchestrator/cli.py list
+uv run python .orchestrator/cli.py docs --refresh
+uv run python .orchestrator/cli.py experts
 ```
 
 ## Workflows
@@ -74,7 +94,7 @@ Complex/Massive Features:
 
 ### 2. Building Workflow
 
-Executes plans with parallel subagents that actually write code.
+Executes plans with parallel subagents that write code.
 
 ```
 Simple Plans:
@@ -84,31 +104,27 @@ Complex/Master Plans:
   Parser → Coordinator → [Parallel Builders] → Integrator → Tester → Reviewer
 ```
 
-### 3. Review Workflow (NEW)
+### 3. Review Workflow
 
 Reviews completed builds for quality and compliance.
 
 ```
 Review Flow:
-  1. Load AI Docs (freshness check)
-  2. Stack Detector → Identify technologies
-  3. Compliance Checker → Did we build what was planned?
-  4. [Parallel Expert Reviews] → Tech-specific code review
-  5. Standards Checker → Universal best practices
-  6. Report Generator → Actionable report
+  1. Stack Detector → Identify technologies
+  2. Compliance Checker → Did we build what was planned?
+  3. [Parallel Expert Reviews] → Tech-specific code review
+  4. Standards Checker → Universal best practices
+  5. Report Generator → Actionable report
 ```
 
 ## Tech Experts System
 
-Dynamic tech-specific experts that can be used across Plan/Build/Review:
+Dynamic tech-specific experts for Plan/Build/Review phases:
 
 ```
 .claude/agents/experts/
-├── _meta.md          # Creates new experts dynamically
-├── python.md         # Python best practices
-├── typescript.md     # TypeScript best practices
-├── react.md          # React patterns & hooks
-└── (more as needed)
+├── _meta.md     # Meta-expert (creates new experts dynamically)
+└── python.md    # Python best practices
 ```
 
 **Features:**
@@ -117,89 +133,7 @@ Dynamic tech-specific experts that can be used across Plan/Build/Review:
 - Experts provide tech-specific code reviews
 - Reusable across all SDLC phases
 
-```bash
-# List available experts
-uv run python .orchestrator/run.py experts
-```
-
-## AI Documentation System
-
-Loads and manages documentation for agents:
-
-```
-ai_docs/
-├── README.md           # URLs to fetch
-├── .cache/
-│   └── freshness.json  # Tracks file ages
-└── *.md                # Cached documentation
-```
-
-**Freshness Policy:**
-- Docs older than **2 days** are marked stale
-- Warnings shown during workflow execution
-- Auto-refresh available with `--refresh` flag
-
-```bash
-# Check docs status
-uv run python .orchestrator/run.py docs
-
-# Refresh stale docs
-uv run python .orchestrator/run.py docs --refresh
-
-# Refresh during review
-uv run python .orchestrator/run.py review plan.md --refresh-docs
-```
-
-## Agent Execution Modes
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Print Mode (read-only)           │  Agentic Mode (can write)      │
-│  claude --print -p "..."          │  claude -p "..." --yes         │
-│                                   │  --allowedTools "Write,..."    │
-├───────────────────────────────────┼─────────────────────────────────┤
-│  • scout, architect, planner      │  • builder                      │
-│  • analyzer, decomposer           │  • tester                       │
-│  • parser, coordinator            │  • integrator                   │
-│  • compliance_checker             │                                 │
-│  • standards_checker              │                                 │
-│  • report_generator               │                                 │
-│  • all experts (python, etc.)     │                                 │
-└───────────────────────────────────┴─────────────────────────────────┘
-```
-
-## Plan Lifecycle
-
-```
-                    Plan → Build → Review
-
-┌──────────┐   ┌─────────────┐   ┌───────────┐   ┌─────────┐
-│ pending/ │ → │ in-progress/│ → │ completed/│ → │ reviews/│
-└──────────┘   └─────────────┘   └───────────┘   └─────────┘
-                                       │
-                                 or    ▼
-                                 ┌─────────┐
-                                 │ failed/ │
-                                 └─────────┘
-```
-
-## Commands Reference
-
-```bash
-# Workflows
-uv run python .orchestrator/run.py plan "Your feature request"
-uv run python .orchestrator/run.py build <plan-file>
-uv run python .orchestrator/run.py review <plan-file> [--refresh-docs]
-
-# Utilities
-uv run python .orchestrator/run.py list              # List all plans
-uv run python .orchestrator/run.py docs [--refresh]  # Check/refresh docs
-uv run python .orchestrator/run.py experts           # List tech experts
-```
-
-## Adding New Experts
-
-1. Create expert in `.claude/agents/experts/<name>.md`:
+**Add new experts** by creating `.claude/agents/experts/<name>.md`:
 ```markdown
 ---
 name: fastapi
@@ -208,60 +142,76 @@ description: Expert in FastAPI best practices
 
 # FastAPI Expert
 
-You are an expert in FastAPI with deep knowledge of...
+You are an expert in FastAPI...
 
 ## Review Checklist
-...
-
-## Common Issues
-...
+- Dependency injection patterns
+- Response models
+- Error handling
 ```
 
-2. The expert will be auto-discovered and used when FastAPI is detected.
+The expert will be auto-discovered when FastAPI is detected.
 
-## Project Structure
+## AI Documentation System
+
+Manages documentation for agents with freshness tracking:
 
 ```
-.
-├── .claude/                  # Knowledge Base
-│   ├── agents/              # Agent definitions (17+ agents)
-│   │   └── experts/         # Tech-specific experts
-│   ├── commands/            # Interactive commands
-│   └── settings.json        # Permissions
-│
-├── .orchestrator/           # Workflow Engine
-│   ├── core/
-│   │   ├── agent.py        # Agent runner (print + agentic)
-│   │   ├── workflow.py     # Workflow base class
-│   │   ├── docs_loader.py  # AI docs with freshness
-│   │   └── expert_loader.py # Tech expert discovery
-│   ├── workflows/
-│   │   ├── planning.py     # Smart planning
-│   │   ├── building.py     # Smart building
-│   │   └── reviewing.py    # Expert reviewing
-│   ├── run.py              # CLI entry point
-│   └── setup.ps1           # Setup script
-│
-├── .specs/                  # Plan Storage
-│   ├── pending/            # Awaiting build
-│   ├── in-progress/        # Currently building
-│   ├── completed/          # Successfully built
-│   ├── failed/             # Build failures
-│   └── reviews/            # Review reports
-│
-├── ai_docs/                 # AI Documentation
-│   ├── README.md           # URLs to fetch
-│   ├── .cache/             # Freshness tracking
-│   └── *.md                # Cached docs
-│
-└── README.md
+ai_docs/
+├── README.md    # URLs to fetch (source of truth)
+└── *.md         # Cached documentation files
+```
+
+**Freshness Policy:**
+- Docs older than **2 days** are marked stale
+- Warnings shown during workflow execution
+- Setup auto-fetches missing docs
+
+```powershell
+# Check docs status
+uv run python .orchestrator/cli.py docs
+
+# Refresh stale/missing docs
+uv run python .orchestrator/cli.py docs --refresh
+```
+
+## Agent Execution Modes
+
+```
++-----------------------------------+---------------------------------+
+|  Print Mode (read-only)           |  Agentic Mode (can write)       |
+|  claude --print -p "..."          |  claude -p "..." --allowedTools |
++-----------------------------------+---------------------------------+
+|  scout, architect, planner        |  builder                        |
+|  analyzer, decomposer             |  tester                         |
+|  parser, coordinator              |  integrator                     |
+|  compliance_checker               |                                 |
+|  standards_checker                |                                 |
+|  report_generator                 |                                 |
+|  all experts                      |                                 |
++-----------------------------------+---------------------------------+
+```
+
+## Plan Lifecycle
+
+```
+                    Plan → Build → Review
+
++----------+   +-------------+   +-----------+   +---------+
+| pending/ | → | in-progress/| → | completed/| → | reviews/|
++----------+   +-------------+   +-----------+   +---------+
+                                       |
+                                  or   v
+                                 +---------+
+                                 | failed/ |
+                                 +---------+
 ```
 
 ## Requirements
 
 - **Claude Code CLI**: `npm install -g @anthropic-ai/claude-code`
-- **Python 3.11+** with UV
-- **rich** package
+- **Python 3.11+**
+- **UV**: Auto-installed by setup.ps1
 
 ## License
 

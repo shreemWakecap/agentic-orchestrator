@@ -6,6 +6,7 @@ Uses file modification time for staleness (>2 days = stale).
 """
 import re
 import time
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlparse
@@ -16,6 +17,9 @@ import httpx
 MAX_AGE_DAYS = 2
 RATE_LIMIT_SECONDS = 1.0
 TIMEOUT_SECONDS = 30
+
+# Keywords for documentation filtering (Python-focused)
+PYTHON_DOC_KEYWORDS = ["python", "pip", "pytest", "pep", "typing", "asyncio", "fastapi", "django", "flask"]
 
 
 def strip_html(html: str) -> str:
@@ -73,6 +77,124 @@ def fetch_url(url: str) -> str | None:
         return None
 
 
+@dataclass
+class DocsContext:
+    """
+    Context object for loaded documentation.
+
+    Provides methods for:
+    - Getting all docs as a context string
+    - Filtering docs by technology relevance
+    - Smart truncation that preserves section boundaries
+    """
+    docs: list[dict] = field(default_factory=list)
+    stale_docs: list[str] = field(default_factory=list)
+    missing_docs: list[str] = field(default_factory=list)
+
+    def get_context_string(self, max_chars: int = 10000) -> str:
+        """
+        Get all documentation as a context string.
+
+        Args:
+            max_chars: Maximum characters to return (default 10000)
+
+        Returns:
+            Formatted documentation string with smart truncation
+        """
+        if not self.docs:
+            return ""
+
+        sections = []
+        total_chars = 0
+
+        for doc in self.docs:
+            doc_header = f"### {doc['name']}\n"
+            doc_content = doc.get('content', '')[:3000]  # Cap individual docs
+            section = doc_header + doc_content
+
+            if total_chars + len(section) > max_chars:
+                # Add what fits, truncating at paragraph boundary
+                remaining = max_chars - total_chars
+                if remaining > 200:
+                    truncated = self._smart_truncate(section, remaining)
+                    sections.append(truncated)
+                break
+
+            sections.append(section)
+            total_chars += len(section)
+
+        return "\n\n".join(sections)
+
+    def get_docs_for_tech(self, tech: str, max_chars: int = 8000) -> str:
+        """
+        Get documentation filtered by relevance (Python-focused).
+
+        Args:
+            tech: Technology name (currently only python supported)
+            max_chars: Maximum characters for output
+
+        Returns:
+            Relevant documentation up to max_chars
+        """
+        # Score docs by Python keyword relevance
+        scored_docs = []
+        for doc in self.docs:
+            content_lower = (doc.get('content', '') + doc.get('name', '')).lower()
+            score = sum(1 for kw in PYTHON_DOC_KEYWORDS if kw in content_lower)
+            if score > 0:
+                scored_docs.append((score, doc))
+
+        # Sort by relevance (highest first)
+        scored_docs.sort(key=lambda x: -x[0])
+
+        # Build context with relevant docs first
+        sections = []
+        total_chars = 0
+
+        for _, doc in scored_docs:
+            doc_header = f"### {doc['name']}\n"
+            doc_content = doc.get('content', '')[:4000]
+            section = doc_header + doc_content
+
+            if total_chars + len(section) > max_chars:
+                remaining = max_chars - total_chars
+                if remaining > 300:
+                    sections.append(self._smart_truncate(section, remaining))
+                break
+
+            sections.append(section)
+            total_chars += len(section)
+
+        if not sections:
+            return self.get_context_string(max_chars=max_chars // 2)
+
+        return "\n\n".join(sections)
+
+    def _smart_truncate(self, text: str, max_chars: int) -> str:
+        """Truncate text at a natural boundary (paragraph or sentence)."""
+        if len(text) <= max_chars:
+            return text
+
+        truncated = text[:max_chars]
+
+        # Try to truncate at paragraph boundary
+        last_para = truncated.rfind('\n\n')
+        if last_para > max_chars * 0.6:
+            return truncated[:last_para] + "\n\n[...truncated...]"
+
+        # Try to truncate at sentence boundary
+        last_sentence = max(
+            truncated.rfind('. '),
+            truncated.rfind('.\n'),
+            truncated.rfind('? '),
+            truncated.rfind('! ')
+        )
+        if last_sentence > max_chars * 0.6:
+            return truncated[:last_sentence + 1] + "\n\n[...truncated...]"
+
+        return truncated + "\n\n[...truncated...]"
+
+
 class DocsLoader:
     """Simple docs loader for ai_docs/."""
 
@@ -126,6 +248,30 @@ class DocsLoader:
                     'fresh': not is_stale(path),
                 })
         return docs
+
+    def load_docs(self, refresh_stale: bool = False) -> DocsContext:
+        """
+        Load documentation and return a DocsContext object.
+
+        Args:
+            refresh_stale: If True, refresh stale/missing docs before loading
+
+        Returns:
+            DocsContext with loaded docs and status info
+        """
+        status = self.get_status()
+
+        if refresh_stale and (status['stale'] or status['missing']):
+            self.refresh(status['stale'] + status['missing'])
+            status = self.get_status()
+
+        docs = self.load()
+
+        return DocsContext(
+            docs=docs,
+            stale_docs=status['stale'],
+            missing_docs=status['missing']
+        )
 
     def refresh(self, urls: list[str] | None = None) -> dict:
         """Fetch and save docs. Returns {updated, failed} counts."""

@@ -49,6 +49,13 @@ class TechStackInfo:
     file_mapping: dict[str, list[str]] = field(default_factory=dict)
 
 
+# Python file extensions
+PYTHON_EXTENSIONS = [".py"]
+
+# Directories to skip when reading code
+SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".idea", ".vscode"}
+
+
 class ReviewingWorkflow(Workflow):
     """
     Smart review workflow with tech-specific experts.
@@ -193,6 +200,161 @@ class ReviewingWorkflow(Workflow):
             recommended_experts=[]
         )
 
+    def _should_skip_path(self, path: Path) -> bool:
+        """Check if a path should be skipped (node_modules, .git, etc.)."""
+        return any(skip_dir in path.parts for skip_dir in SKIP_DIRS)
+
+    def _get_python_files(self, max_files: int = 15) -> list[Path]:
+        """
+        Get Python files, prioritizing key modules.
+
+        Args:
+            max_files: Maximum number of files to return
+
+        Returns:
+            List of .py file paths, prioritized
+        """
+        all_files: list[tuple[int, Path]] = []  # (priority, path)
+
+        for file_path in self.project_root.glob("**/*.py"):
+            if self._should_skip_path(file_path):
+                continue
+            if not file_path.is_file():
+                continue
+
+            # Calculate priority (lower = higher priority)
+            priority = 100
+            rel_path = str(file_path.relative_to(self.project_root)).lower()
+
+            # Boost key files
+            if any(key in rel_path for key in ["main", "app", "__init__", "cli"]):
+                priority = 10
+            elif any(key in rel_path for key in ["config", "settings"]):
+                priority = 20
+            elif any(key in rel_path for key in ["core", "api", "model"]):
+                priority = 30
+            elif any(key in rel_path for key in ["workflow", "service", "util"]):
+                priority = 40
+            elif "test" in rel_path:
+                priority = 80  # Tests lower priority for review
+
+            all_files.append((priority, file_path))
+
+        all_files.sort(key=lambda x: x[0])
+        return [f[1] for f in all_files[:max_files]]
+
+    def _read_code_samples(
+        self,
+        tech: str,
+        stack_info: TechStackInfo,
+        max_chars: int = 12000
+    ) -> str:
+        """
+        Read actual Python code samples for expert review.
+
+        Args:
+            tech: Technology (currently only python)
+            stack_info: Stack info with file mappings
+            max_chars: Maximum total characters to read
+
+        Returns:
+            Formatted code samples with file paths
+        """
+        # Get files from stack detection or discover them
+        file_patterns = stack_info.file_mapping.get("python", [])
+        if file_patterns:
+            files = []
+            for pattern in file_patterns[:20]:
+                path = self.project_root / pattern
+                if path.exists() and path.is_file():
+                    files.append(path)
+        else:
+            files = self._get_python_files()
+
+        if not files:
+            return "No code files found for this technology."
+
+        # Read files up to max_chars
+        code_sections = []
+        total_chars = 0
+        files_read = 0
+        max_per_file = max_chars // min(len(files), 5)  # Distribute budget
+
+        for file_path in files:
+            if total_chars >= max_chars:
+                break
+
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+                rel_path = file_path.relative_to(self.project_root)
+
+                # Truncate large files intelligently
+                if len(content) > max_per_file:
+                    # For large files, take beginning and look for key sections
+                    content = self._smart_truncate_code(content, max_per_file)
+
+                section = f"### {rel_path}\n```{file_path.suffix[1:]}\n{content}\n```"
+
+                if total_chars + len(section) <= max_chars:
+                    code_sections.append(section)
+                    total_chars += len(section)
+                    files_read += 1
+                elif files_read == 0:
+                    # At least include one file, even if truncated
+                    remaining = max_chars - total_chars - 100
+                    truncated_content = content[:remaining]
+                    section = f"### {rel_path}\n```{file_path.suffix[1:]}\n{truncated_content}\n[...truncated...]\n```"
+                    code_sections.append(section)
+                    files_read += 1
+                    break
+
+            except Exception as e:
+                self.console.print(f"  [dim]Could not read {file_path}: {e}[/dim]")
+                continue
+
+        if not code_sections:
+            return "Could not read any code files."
+
+        header = f"## Code Samples ({files_read} files)\n\n"
+        return header + "\n\n".join(code_sections)
+
+    def _smart_truncate_code(self, content: str, max_chars: int) -> str:
+        """
+        Truncate Python code preserving imports and definitions.
+        """
+        if len(content) <= max_chars:
+            return content
+
+        lines = content.split('\n')
+
+        # Keep imports at the top
+        beginning_budget = max_chars // 3
+        beginning = []
+        chars = 0
+        for line in lines:
+            if chars + len(line) > beginning_budget:
+                break
+            beginning.append(line)
+            chars += len(line) + 1
+
+        # Find class/function definitions
+        important_lines = []
+        for i, line in enumerate(lines[len(beginning):], len(beginning)):
+            stripped = line.strip()
+            if stripped.startswith(("class ", "def ", "async def ", "@")):
+                context_end = min(i + 5, len(lines))
+                important_lines.extend(lines[i:context_end])
+                important_lines.append("    # ...")
+
+        result_lines = beginning
+        remaining = max_chars - chars - 50
+        if remaining > 0 and important_lines:
+            important_text = '\n'.join(important_lines)[:remaining]
+            result_lines.append("\n# ... (truncated) ...\n")
+            result_lines.append(important_text)
+
+        return '\n'.join(result_lines)
+
     def _check_compliance(self, plan_path: Path) -> ReviewResult:
         """Check if implementation matches the plan."""
         self.console.print("\n[bold]Phase 2:[/bold] Checking plan compliance...")
@@ -245,23 +407,45 @@ class ReviewingWorkflow(Workflow):
         expert: Agent,
         tech: str,
         stack_info: TechStackInfo,
-        docs_context: str
+        docs_context: DocsContext
     ) -> ReviewResult:
-        """Run a single expert review."""
-        # Get relevant files for this tech
-        file_patterns = stack_info.file_mapping.get(tech.lower(), [])
+        """
+        Run a single expert review with actual code and tech-specific docs.
 
-        result = expert.run(
-            message=f"Review the {tech} code in this project for best practices and issues.",
-            context=f"""## Tech Stack
+        Key improvements over original:
+        1. Reads actual code files instead of just listing file names
+        2. Filters documentation to tech-relevant content
+        3. Provides much larger context budget (20k chars vs 2k)
+        """
+        # Read actual code samples for this technology
+        code_samples = self._read_code_samples(tech, stack_info, max_chars=12000)
+
+        # Get tech-specific documentation (not generic truncated docs)
+        tech_docs = docs_context.get_docs_for_tech(tech, max_chars=6000)
+
+        # Build comprehensive context for the expert
+        context = f"""## Tech Stack Overview
 Languages: {', '.join(stack_info.languages)}
 Frameworks: {', '.join(stack_info.frameworks)}
+Tools: {', '.join(stack_info.tools)}
 
-## Relevant Files
-{', '.join(file_patterns[:20]) if file_patterns else 'All files with relevant extensions'}
+{code_samples}
 
-## Documentation
-{docs_context[:2000]}"""
+## Relevant Documentation
+{tech_docs if tech_docs else 'No specific documentation available for this technology.'}"""
+
+        result = expert.run(
+            message=f"""Review the Python code for best practices and issues.
+
+Focus on:
+1. Python best practices (PEP8, type hints, idioms)
+2. Potential bugs or error-prone patterns
+3. Security concerns
+4. Performance considerations
+5. Maintainability
+
+Provide specific feedback with file locations.""",
+            context=context
         )
 
         if result.success:
@@ -286,9 +470,16 @@ Frameworks: {', '.join(stack_info.frameworks)}
     def _run_expert_reviews(
         self,
         stack_info: TechStackInfo,
-        docs_context: str
+        docs_context: DocsContext
     ) -> list[ReviewResult]:
-        """Run expert reviews in parallel."""
+        """
+        Run expert reviews in parallel with real code and tech-specific docs.
+
+        Each expert receives:
+        - Actual code samples (not just file names)
+        - Documentation filtered to their technology
+        - A comprehensive prompt for thorough review
+        """
         self.console.print("\n[bold]Phase 3:[/bold] Running expert reviews...")
 
         # Get needed experts
@@ -299,7 +490,7 @@ Frameworks: {', '.join(stack_info.frameworks)}
             self.console.print("  [yellow]No matching experts found[/yellow]")
             return []
 
-        self.console.print(f"  Running {len(experts)} expert reviews...")
+        self.console.print(f"  Running {len(experts)} expert reviews with code analysis...")
         results = []
 
         # Run in parallel
@@ -310,7 +501,7 @@ Frameworks: {', '.join(stack_info.frameworks)}
                     expert,
                     expert.name,
                     stack_info,
-                    docs_context
+                    docs_context  # Now passing DocsContext object, not string
                 ): expert
                 for expert in experts
             }
@@ -328,16 +519,29 @@ Frameworks: {', '.join(stack_info.frameworks)}
         return results
 
     def _check_standards(self, stack_info: TechStackInfo) -> ReviewResult:
-        """Check universal standards."""
+        """Check universal standards with actual Python code samples."""
         self.console.print("\n[bold]Phase 4:[/bold] Checking universal standards...")
+
+        # Read Python code samples
+        code_samples = self._read_code_samples("python", stack_info, max_chars=8000)
 
         result = self.run_agent(
             "standards_checker",
-            message="Check this codebase against universal software engineering standards.",
+            message="""Check this Python codebase against software engineering standards.
+
+Evaluate:
+1. Code organization and structure
+2. Error handling patterns
+3. Security practices
+4. Documentation and type hints
+5. Testing patterns
+6. Dependency management""",
             context=f"""## Tech Stack
 Languages: {', '.join(stack_info.languages)}
 Frameworks: {', '.join(stack_info.frameworks)}
-Tools: {', '.join(stack_info.tools)}"""
+
+## Python Code Samples
+{code_samples[:10000]}"""
         )
 
         if result.success:
@@ -495,8 +699,8 @@ Score: {standards.score}/100
         self.console.print(f"  Compliance: [cyan]{compliance_result.score}%[/cyan]")
         steps_completed.append("compliance_checked")
 
-        # Phase 3: Expert reviews
-        expert_results = self._run_expert_reviews(stack_info, docs_context_str)
+        # Phase 3: Expert reviews (now with actual code reading!)
+        expert_results = self._run_expert_reviews(stack_info, self.docs_context)
         steps_completed.append("expert_reviews")
 
         # Phase 4: Standards check

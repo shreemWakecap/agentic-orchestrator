@@ -119,6 +119,50 @@ def cmd_review(args):
     return 0 if result.success else 1
 
 
+def cmd_fix(args):
+    """Fix issues from a review report."""
+    if not args:
+        print("Usage: cli.py fix <review-file> [options]")
+        print("\nOptions:")
+        print("  --dry-run         Show fixes without applying")
+        print("  --min-severity    Minimum severity (critical|high|medium|low)")
+        print("\nExample: cli.py fix .specs/reviews/review-auth-20240115.md")
+        cmd_list()
+        return 1
+
+    from workflows.fixing import FixingWorkflow
+
+    # Parse options
+    dry_run = "--dry-run" in args
+    min_severity = "low"
+
+    # Find min-severity value
+    for i, arg in enumerate(args):
+        if arg == "--min-severity" and i + 1 < len(args):
+            min_severity = args[i + 1]
+
+    # Get review file (first non-option arg)
+    review_path = [a for a in args if not a.startswith("--")][0]
+
+    workflow = FixingWorkflow(
+        project_root=PROJECT_ROOT,
+        dry_run=dry_run,
+        min_severity=min_severity
+    )
+    result = workflow.run(review_path)
+
+    if result.success and result.data:
+        print(f"\nFixes applied: {result.data.get('fixes_applied', 0)}")
+        if result.data.get('fixes_failed', 0) > 0:
+            print(f"Fixes failed: {result.data.get('fixes_failed', 0)}")
+        if result.data.get('unfixable', 0) > 0:
+            print(f"Unfixable issues: {result.data.get('unfixable', 0)}")
+        if result.output_file:
+            print(f"Report: {result.output_file}")
+
+    return 0 if result.success else 1
+
+
 # =============================================================================
 # Utility Commands
 # =============================================================================
@@ -129,7 +173,8 @@ def cmd_list():
 
     colors = {
         "pending": "\033[33m", "in-progress": "\033[36m",
-        "completed": "\033[32m", "failed": "\033[31m", "reviews": "\033[35m"
+        "completed": "\033[32m", "failed": "\033[31m",
+        "reviews": "\033[35m", "fixes": "\033[34m"
     }
 
     for status in colors:
@@ -195,6 +240,7 @@ COMMANDS = {
     'plan': (cmd_plan, "Create implementation plan"),
     'build': (cmd_build, "Execute a plan"),
     'review': (cmd_review, "Review completed build"),
+    'fix': (cmd_fix, "Fix issues from review"),
     'list': (cmd_list, "List all plans"),
     'docs': (cmd_docs, "Check documentation"),
     'experts': (cmd_experts, "List tech experts"),
@@ -212,6 +258,9 @@ def main():
         print("  cli.py setup")
         print("  cli.py plan 'Add user authentication'")
         print("  cli.py build .specs/pending/user-auth.md")
+        print("  cli.py review .specs/completed/user-auth.md")
+        print("  cli.py fix .specs/reviews/review-user-auth.md")
+        print("  cli.py fix .specs/reviews/review.md --dry-run")
         return 1
 
     cmd = sys.argv[1]

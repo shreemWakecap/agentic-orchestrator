@@ -1,0 +1,15 @@
+{
+  "server": {
+    "url": "http://localhost:3000",
+    "transport": "http-sse"
+  },
+  "agents": {
+    "default_timeout": 300,
+    "max_tokens": 4096,
+    "model": "claude-sonnet-4-20250514"
+  },
+  "streaming": {
+    "enabled": true,
+    "progress_interval_ms": 100
+  }
+}

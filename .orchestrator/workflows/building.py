@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from ..core import Agent, Workflow, WorkflowResult
+from core import Agent, Workflow, WorkflowResult
 
 
 @dataclass

@@ -1,0 +1,7 @@
+{
+  "daily_limit": null,
+  "weekly_limit": null,
+  "monthly_limit": null,
+  "per_workflow_limit": null,
+  "warning_threshold": 0.8
+}

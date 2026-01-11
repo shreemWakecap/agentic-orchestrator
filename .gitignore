@@ -24,5 +24,13 @@ logs/
 .env
 .env.local
 
-# AI Docs cache
+# AI Docs (fetched docs, keep only README.md)
+ai_docs/*.md
+!ai_docs/README.md
 ai_docs/.cache/
+
+# Generated
+.local_improvements/
+.ruff_cache/
+uv.lock
+*.lock

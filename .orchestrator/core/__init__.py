@@ -1,7 +1,7 @@
 """Core orchestrator components."""
 from .agent import Agent, AgentResult
 from .workflow import Workflow, WorkflowResult, WorkflowCancelledError
-from .docs_loader import DocsLoader, DocsContext, load_docs_context
+from .docs_loader import DocsLoader, load_docs
 from .expert_loader import ExpertLoader, ExpertInfo
 
 __all__ = [
@@ -11,8 +11,7 @@ __all__ = [
     "WorkflowResult",
     "WorkflowCancelledError",
     "DocsLoader",
-    "DocsContext",
-    "load_docs_context",
+    "load_docs",
     "ExpertLoader",
     "ExpertInfo",
 ]

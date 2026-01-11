@@ -63,6 +63,7 @@ class AgentResult:
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
     commands_run: list[str] = field(default_factory=list)
+    tokens_used: int = 0  # Total tokens consumed by this agent
 
 
 class Agent:
@@ -344,9 +345,10 @@ class Agent:
                 files_created: list[str] = []
                 files_modified: list[str] = []
                 commands_run: list[str] = []
+                tokens_used: int = 0
                 content = output
 
-                parsed_ok, content, files_created, files_modified, commands_run = (
+                parsed_ok, content, files_created, files_modified, commands_run, tokens_used = (
                     self._parse_agentic_output(output)
                 )
 
@@ -360,6 +362,7 @@ class Agent:
                     files_created=files_created,
                     files_modified=files_modified,
                     commands_run=commands_run,
+                    tokens_used=tokens_used,
                 )
 
             except subprocess.TimeoutExpired:
@@ -416,16 +419,17 @@ class Agent:
 
     def _parse_agentic_output(
         self, output: str
-    ) -> tuple[bool, str, list[str], list[str], list[str]]:
+    ) -> tuple[bool, str, list[str], list[str], list[str], int]:
         """
         Parse agentic output JSON with robust type checking.
 
         Returns:
-            Tuple of (parsed_ok, content, files_created, files_modified, commands_run)
+            Tuple of (parsed_ok, content, files_created, files_modified, commands_run, tokens_used)
         """
         files_created: list[str] = []
         files_modified: list[str] = []
         commands_run: list[str] = []
+        tokens_used: int = 0
         content = output
 
         try:
@@ -433,10 +437,28 @@ class Agent:
 
             if not isinstance(data, dict):
                 logger.debug(f"Agent {self.name}: JSON output is not a dict: {type(data)}")
-                return (False, output, [], [], [])
+                return (False, output, [], [], [], 0)
 
             # Extract content with fallback chain
             content = _safe_get(data, "result") or _safe_get(data, "content") or output
+
+            # Extract token usage from various possible locations in JSON
+            # Claude CLI may include usage stats at different places
+            usage = _safe_get(data, "usage", {})
+            if isinstance(usage, dict):
+                input_tokens = _safe_get(usage, "input_tokens", 0) or 0
+                output_tokens = _safe_get(usage, "output_tokens", 0) or 0
+                tokens_used = input_tokens + output_tokens
+
+            # Alternative: check for total_tokens directly
+            if tokens_used == 0:
+                tokens_used = _safe_get(data, "total_tokens", 0) or 0
+
+            # Check in stats section
+            if tokens_used == 0:
+                stats = _safe_get(data, "stats", {})
+                if isinstance(stats, dict):
+                    tokens_used = _safe_get(stats, "total_tokens", 0) or 0
 
             # Extract file operations from tool calls if available
             messages = _safe_get(data, "messages", [])
@@ -474,14 +496,14 @@ class Agent:
                     if command:
                         commands_run.append(command)
 
-            return (True, content, files_created, files_modified, commands_run)
+            return (True, content, files_created, files_modified, commands_run, tokens_used)
 
         except json.JSONDecodeError as e:
             logger.debug(f"Agent {self.name}: JSON parse error: {e}")
-            return (False, output, [], [], [])
+            return (False, output, [], [], [], 0)
         except Exception as e:
             logger.warning(f"Agent {self.name}: Unexpected error parsing output: {e}")
-            return (False, output, [], [], [])
+            return (False, output, [], [], [], 0)
 
     def __repr__(self) -> str:
         return f"Agent(name={self.name!r}, agentic={self.name in self.AGENTIC_AGENTS})"

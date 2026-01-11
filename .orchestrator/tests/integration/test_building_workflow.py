@@ -172,12 +172,19 @@ class TestBuildingWorkflowExecution:
             mock_agent_result(
                 content=json.dumps({
                     "plan_id": "test", "plan_type": "simple",
-                    "phases": [{"id": "p1", "name": "Phase", "steps": []}],
+                    "phases": [{"id": "p1", "name": "Phase", "steps": [
+                        {"id": "s1", "action": "create", "target": "README.md", "description": "Create readme"}
+                    ]}],
                     "validation_commands": []
                 }),
                 agent_name="parser"
             ),
-            mock_agent_result(content="Done", agent_name="reviewer"),
+            # Builder for the step
+            mock_agent_result(content="Created README.md", agent_name="builder", files_created=["README.md"]),
+            # Tester
+            mock_agent_result(content="Tests passed", agent_name="tester"),
+            # Reviewer
+            mock_agent_result(content='{"status": "good"}', agent_name="reviewer"),
         ]
 
         workflow = BuildingWorkflow(project_root=project_root)

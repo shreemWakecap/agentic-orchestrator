@@ -219,7 +219,7 @@ class TestAgentExecution:
         result = agent.run("Explore", max_retries=1)
 
         assert result.success is False
-        assert "timeout" in result.error.lower()
+        assert "timed out" in result.error.lower()
 
     def test_run_handles_cli_not_found(self, project_root, monkeypatch):
         """Test agent handles missing Claude CLI."""

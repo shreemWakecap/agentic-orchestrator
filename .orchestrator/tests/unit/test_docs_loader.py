@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-import responses
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -99,7 +98,7 @@ class TestDocsLoader:
     def test_loader_initialization(self, tmp_path):
         """Test DocsLoader initialization."""
         loader = DocsLoader(tmp_path)
-        assert loader.project_root == tmp_path
+        assert loader.docs_dir == tmp_path / "ai_docs"
 
     def test_get_status_empty(self, tmp_path):
         """Test get_status with no docs."""
@@ -157,50 +156,57 @@ class TestDocsLoader:
 
     def test_url_to_filename(self, tmp_path):
         """Test URL to filename conversion."""
-        loader = DocsLoader(tmp_path)
+        from core.docs_loader import url_to_filename
 
         # Test basic URL
-        filename = loader._url_to_filename("https://example.com/docs/guide")
-        assert "example_com" in filename
+        filename = url_to_filename("https://example.com/docs/guide")
         assert filename.endswith(".md")
+        assert "guide" in filename or "docs" in filename
 
         # Test URL with special characters
-        filename = loader._url_to_filename("https://api.example.com/v2/docs?param=value")
-        assert ".md" in filename
+        filename = url_to_filename("https://api.example.com/v2/docs?param=value")
+        assert filename.endswith(".md")
 
-    @responses.activate
     def test_fetch_single_doc(self, tmp_path):
         """Test fetching a single document."""
-        responses.add(
-            responses.GET,
-            "https://example.com/doc",
-            body="# Documentation\n\nThis is the content.",
-            status=200,
-        )
+        from unittest.mock import MagicMock, patch
+        from core.docs_loader import fetch_url
 
-        ai_docs = tmp_path / "ai_docs"
-        ai_docs.mkdir()
+        # Mock httpx.Client context manager
+        mock_response = MagicMock()
+        mock_response.text = "# Documentation\n\nThis is the content."
+        mock_response.headers = {"content-type": "text/plain"}
+        mock_response.raise_for_status = MagicMock()
 
-        loader = DocsLoader(tmp_path)
-        result = loader._fetch_url("https://example.com/doc")
+        mock_client = MagicMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+
+        with patch("httpx.Client", return_value=mock_client):
+            result = fetch_url("https://example.com/doc")
 
         assert result is not None
         assert "Documentation" in result or "content" in result.lower()
 
-    @responses.activate
     def test_fetch_handles_error(self, tmp_path):
         """Test fetch handles HTTP errors gracefully."""
-        responses.add(
-            responses.GET,
-            "https://example.com/notfound",
-            status=404,
+        from unittest.mock import MagicMock, patch
+        import httpx
+        from core.docs_loader import fetch_url
+
+        # Mock httpx.Client to raise an error
+        mock_client = MagicMock()
+        mock_client.get.side_effect = httpx.HTTPStatusError(
+            "Not Found",
+            request=MagicMock(),
+            response=MagicMock(status_code=404)
         )
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
 
-        ai_docs = tmp_path / "ai_docs"
-        ai_docs.mkdir()
-
-        loader = DocsLoader(tmp_path)
-        result = loader._fetch_url("https://example.com/notfound")
+        with patch("httpx.Client", return_value=mock_client):
+            result = fetch_url("https://example.com/notfound")
 
         assert result is None
 
@@ -224,14 +230,17 @@ class TestDocsLoader:
 
     def test_staleness_detection(self, tmp_path):
         """Test stale document detection."""
+        from core.docs_loader import url_to_filename
+
         ai_docs = tmp_path / "ai_docs"
         ai_docs.mkdir()
 
         readme = ai_docs / "README.md"
         readme.write_text("- https://example.com/doc")
 
-        # Create doc file with old modification time
-        doc_file = ai_docs / "example_com_doc.md"
+        # Create doc file with the correct filename derived from URL
+        expected_filename = url_to_filename("https://example.com/doc")
+        doc_file = ai_docs / expected_filename
         doc_file.write_text("Old content")
 
         # Set mtime to 3 days ago
@@ -242,21 +251,24 @@ class TestDocsLoader:
         status = loader.get_status()
 
         # Should be stale (older than 2 days)
-        assert len(status["stale"]) > 0 or doc_file.name in str(status)
+        assert len(status["stale"]) > 0 or "https://example.com/doc" in status["stale"]
 
 
 class TestDocsLoaderIntegration:
     """Integration tests for DocsLoader."""
 
-    @responses.activate
     def test_refresh_fetches_missing(self, tmp_path):
         """Test refresh fetches missing documents."""
-        responses.add(
-            responses.GET,
-            "https://example.com/newdoc",
-            body="# New Doc\n\nFresh content",
-            status=200,
-        )
+        # Mock httpx.Client for the refresh operation
+        mock_response = MagicMock()
+        mock_response.text = "# New Doc\n\nFresh content"
+        mock_response.headers = {"content-type": "text/plain"}
+        mock_response.raise_for_status = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.get.return_value = mock_response
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
 
         ai_docs = tmp_path / "ai_docs"
         ai_docs.mkdir()
@@ -265,7 +277,9 @@ class TestDocsLoaderIntegration:
         readme.write_text("- https://example.com/newdoc")
 
         loader = DocsLoader(tmp_path)
-        result = loader.refresh()
+
+        with patch("core.docs_loader.httpx.Client", return_value=mock_client):
+            result = loader.refresh()
 
         assert result["updated"] >= 0
 

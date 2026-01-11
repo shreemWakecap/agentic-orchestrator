@@ -7,9 +7,11 @@ Usage:
     uv run python .orchestrator/cli.py plan "Add user authentication"
     uv run python .orchestrator/cli.py build .specs/pending/plan.md
     uv run python .orchestrator/cli.py review .specs/completed/plan.md
+    uv run python .orchestrator/cli.py fix .specs/reviews/review.md
     uv run python .orchestrator/cli.py list
     uv run python .orchestrator/cli.py docs
     uv run python .orchestrator/cli.py experts
+    uv run python .orchestrator/cli.py test
 """
 import shutil
 import sys
@@ -231,6 +233,40 @@ def cmd_experts():
     return 0
 
 
+def cmd_test(args):
+    """Run test suite."""
+    import subprocess
+
+    print("Running SDLC Orchestrator Tests\n" + "=" * 50)
+
+    # Build pytest command
+    pytest_args = [sys.executable, "-m", "pytest", str(ORCHESTRATOR_DIR / "tests")]
+
+    # Pass through common pytest options
+    if "-v" in args or "--verbose" in args:
+        pytest_args.append("-v")
+    if "-x" in args:
+        pytest_args.append("-x")
+    if "--cov" in args:
+        pytest_args.extend(["--cov=.", "--cov-report=term-missing"])
+
+    # Filter by test type
+    if "--unit" in args:
+        pytest_args.append(str(ORCHESTRATOR_DIR / "tests" / "unit"))
+    elif "--integration" in args:
+        pytest_args.append(str(ORCHESTRATOR_DIR / "tests" / "integration"))
+
+    # Pass specific test file or pattern
+    for arg in args:
+        if arg.endswith(".py") or "::" in arg:
+            pytest_args.append(arg)
+
+    print(f"Command: {' '.join(pytest_args)}\n")
+
+    result = subprocess.run(pytest_args, cwd=PROJECT_ROOT)
+    return result.returncode
+
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -244,6 +280,7 @@ COMMANDS = {
     'list': (cmd_list, "List all plans"),
     'docs': (cmd_docs, "Check documentation"),
     'experts': (cmd_experts, "List tech experts"),
+    'test': (cmd_test, "Run test suite"),
 }
 
 
@@ -261,6 +298,10 @@ def main():
         print("  cli.py review .specs/completed/user-auth.md")
         print("  cli.py fix .specs/reviews/review-user-auth.md")
         print("  cli.py fix .specs/reviews/review.md --dry-run")
+        print("  cli.py test                              # Run all tests")
+        print("  cli.py test --unit                       # Run unit tests only")
+        print("  cli.py test --integration                # Run integration tests only")
+        print("  cli.py test -v --cov                     # Verbose with coverage")
         return 1
 
     cmd = sys.argv[1]

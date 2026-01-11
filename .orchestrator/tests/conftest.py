@@ -15,10 +15,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Add orchestrator to path (tests are inside .orchestrator/tests/)
+# Set up paths for proper imports
+# Tests are inside .orchestrator/tests/
 ORCHESTRATOR_DIR = Path(__file__).parent.parent
 PROJECT_ROOT = ORCHESTRATOR_DIR.parent
-sys.path.insert(0, str(ORCHESTRATOR_DIR))
+
+# Add orchestrator dir to path for imports (workflows use absolute imports from here)
+if str(ORCHESTRATOR_DIR) not in sys.path:
+    sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
 
 @pytest.fixture

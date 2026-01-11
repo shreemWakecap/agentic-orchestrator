@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Run {{ run.id }} - SDLC Orchestrator{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">{{ run.workflow|title }} Run</h1>
+                <p class="mt-1 text-sm text-gray-600">Run ID: {{ run.id }}</p>
+            </div>
+            <span id="status-badge" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                {% if run.status == 'completed' %}bg-green-100 text-green-800
+                {% elif run.status == 'running' %}bg-blue-100 text-blue-800
+                {% elif run.status == 'pending' %}bg-yellow-100 text-yellow-800
+                {% else %}bg-red-100 text-red-800{% endif %}">
+                {{ run.status }}
+            </span>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Run Info -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div class="px-4 py-5 sm:px-6">
+                <h3 class="text-lg font-medium text-gray-900">Run Details</h3>
+            </div>
+            <div class="border-t border-gray-200">
+                <dl>
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Workflow</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.workflow|title }}</dd>
+                    </div>
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Started</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.started_at[:19] }}</dd>
+                    </div>
+                    {% if run.completed_at %}
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Completed</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.completed_at[:19] }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if run.description %}
+                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Description</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.description }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if run.output_file %}
+                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-gray-500">Output</dt>
+                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.output_file }}</dd>
+                    </div>
+                    {% endif %}
+                    {% if run.error %}
+                    <div class="bg-red-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                        <dt class="text-sm font-medium text-red-500">Error</dt>
+                        <dd class="mt-1 text-sm text-red-900 sm:mt-0 sm:col-span-2">{{ run.error }}</dd>
+                    </div>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+
+        <!-- Progress -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
+            <div class="px-4 py-5 sm:px-6">
+                <h3 class="text-lg font-medium text-gray-900">Progress</h3>
+            </div>
+            <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+                <div class="mb-4">
+                    <div class="flex justify-between text-sm text-gray-600 mb-1">
+                        <span>Progress</span>
+                        <span id="progress-percent">{{ run.progress }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: {{ run.progress }}%"></div>
+                    </div>
+                </div>
+                {% if run.current_step %}
+                <p class="text-sm text-gray-600">
+                    Current step: <span id="current-step" class="font-medium">{{ run.current_step }}</span>
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Events Log -->
+    <div class="mt-6 bg-white shadow overflow-hidden sm:rounded-lg">
+        <div class="px-4 py-5 sm:px-6">
+            <h3 class="text-lg font-medium text-gray-900">Event Log</h3>
+        </div>
+        <div class="border-t border-gray-200">
+            <div id="events-log" class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                {% for event in run.events %}
+                <div class="px-4 py-3 text-sm fade-in">
+                    <span class="text-gray-500">{{ event.timestamp[:19] if event.timestamp else '' }}</span>
+                    <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium
+                        {% if event.type == 'error' %}bg-red-100 text-red-800
+                        {% elif event.type == 'complete' %}bg-green-100 text-green-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ event.type }}
+                    </span>
+                    {% if event.step %}
+                    <span class="ml-2 text-gray-700">{{ event.step }}</span>
+                    {% endif %}
+                    {% if event.message %}
+                    <span class="ml-2 text-gray-700">{{ event.message }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-6">
+        <a href="/runs" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+            &larr; Back to Runs
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Stream events if run is not completed
+const runStatus = '{{ run.status }}';
+const runId = '{{ run.id }}';
+
+if (runStatus === 'running' || runStatus === 'pending') {
+    const eventSource = new EventSource('/api/runs/' + runId + '/events');
+
+    eventSource.onmessage = function(e) {
+        const event = JSON.parse(e.data);
+
+        // Update status
+        if (event.type === 'done') {
+            const badge = document.getElementById('status-badge');
+            badge.textContent = event.status;
+            badge.className = badge.className.replace(/bg-\w+-100 text-\w+-800/, '');
+            if (event.status === 'completed') {
+                badge.classList.add('bg-green-100', 'text-green-800');
+            } else {
+                badge.classList.add('bg-red-100', 'text-red-800');
+            }
+            eventSource.close();
+        }
+
+        // Update progress
+        if (event.progress !== undefined) {
+            document.getElementById('progress-bar').style.width = event.progress + '%';
+            document.getElementById('progress-percent').textContent = event.progress + '%';
+        }
+
+        // Update current step
+        if (event.step) {
+            const stepEl = document.getElementById('current-step');
+            if (stepEl) stepEl.textContent = event.step;
+        }
+
+        // Add event to log
+        const eventsLog = document.getElementById('events-log');
+        const eventDiv = document.createElement('div');
+        eventDiv.className = 'px-4 py-3 text-sm fade-in';
+
+        let badgeClass = 'bg-gray-100 text-gray-800';
+        if (event.type === 'error') badgeClass = 'bg-red-100 text-red-800';
+        else if (event.type === 'complete') badgeClass = 'bg-green-100 text-green-800';
+
+        let content = `<span class="text-gray-500">${event.timestamp || new Date().toISOString().slice(0, 19)}</span>`;
+        content += `<span class="ml-2 px-2 py-0.5 rounded text-xs font-medium ${badgeClass}">${event.type}</span>`;
+        if (event.step) content += `<span class="ml-2 text-gray-700">${event.step}</span>`;
+        if (event.message) content += `<span class="ml-2 text-gray-700">${event.message}</span>`;
+
+        eventDiv.innerHTML = content;
+        eventsLog.appendChild(eventDiv);
+        eventsLog.scrollTop = eventsLog.scrollHeight;
+    };
+
+    eventSource.onerror = function() {
+        console.log('SSE connection closed');
+        eventSource.close();
+    };
+}
+</script>
+{% endblock %}

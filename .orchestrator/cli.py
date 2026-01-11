@@ -302,6 +302,35 @@ def cmd_experts():
     return 0
 
 
+def cmd_web(args):
+    """Start web UI server."""
+    host = "127.0.0.1"
+    port = 8000
+
+    # Parse arguments
+    for i, arg in enumerate(args):
+        if arg == "--host" and i + 1 < len(args):
+            host = args[i + 1]
+        elif arg == "--port" and i + 1 < len(args):
+            port = int(args[i + 1])
+
+    print(f"Starting SDLC Orchestrator Web UI\n" + "=" * 50)
+    print(f"Server: http://{host}:{port}")
+    print(f"Press Ctrl+C to stop\n")
+
+    try:
+        from server.app import run_server
+        run_server(host=host, port=port)
+    except ImportError as e:
+        print(f"Error: Web dependencies not installed. Run:")
+        print(f"  uv pip install fastapi uvicorn jinja2")
+        return 1
+    except KeyboardInterrupt:
+        print("\nServer stopped.")
+
+    return 0
+
+
 def cmd_test(args):
     """Run test suite."""
     import subprocess
@@ -350,6 +379,7 @@ COMMANDS = {
     'docs': (cmd_docs, "Check documentation"),
     'experts': (cmd_experts, "List tech experts"),
     'test': (cmd_test, "Run test suite"),
+    'web': (cmd_web, "Start web UI server"),
 }
 
 
@@ -372,6 +402,8 @@ def main():
         print("  cli.py test --unit                       # Run unit tests only")
         print("  cli.py test --integration                # Run integration tests only")
         print("  cli.py test -v --cov                     # Verbose with coverage")
+        print("  cli.py web                               # Start web UI")
+        print("  cli.py web --port 8080                   # Custom port")
         return 1
 
     cmd = sys.argv[1]

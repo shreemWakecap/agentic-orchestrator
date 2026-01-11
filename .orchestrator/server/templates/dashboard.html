@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - SDLC Orchestrator{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Header -->
+    <div class="mb-8">
+        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p class="mt-1 text-sm text-gray-600">Overview of your SDLC orchestration status</p>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Pending</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ counts.pending }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">In Progress</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ counts.in_progress }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Completed</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ counts.completed }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Failed</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ counts.failed }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white overflow-hidden shadow rounded-lg">
+            <div class="p-5">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <svg class="h-6 w-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-5 w-0 flex-1">
+                        <dl>
+                            <dt class="text-sm font-medium text-gray-500 truncate">Reviews</dt>
+                            <dd class="text-lg font-medium text-gray-900">{{ counts.reviews }}</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-white shadow rounded-lg mb-8">
+        <div class="px-4 py-5 sm:p-6">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
+            <form id="plan-form" class="flex gap-4">
+                <input type="text" id="plan-description" name="description"
+                       class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                       placeholder="Enter feature description (e.g., Add user authentication)">
+                <button type="submit"
+                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                    Create Plan
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Recent Plans -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Plans</h3>
+                {% if recent_plans %}
+                <ul class="divide-y divide-gray-200">
+                    {% for plan in recent_plans %}
+                    <li class="py-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <a href="/plans/{{ plan.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                                    {{ plan.name }}
+                                </a>
+                                <p class="text-sm text-gray-500">{{ plan.modified[:10] }}</p>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if plan.state == 'completed' %}bg-green-100 text-green-800
+                                {% elif plan.state == 'pending' %}bg-yellow-100 text-yellow-800
+                                {% elif plan.state == 'in-progress' %}bg-blue-100 text-blue-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ plan.state }}
+                            </span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <a href="/plans" class="mt-4 inline-block text-sm text-blue-600 hover:text-blue-800">
+                    View all plans &rarr;
+                </a>
+                {% else %}
+                <p class="text-sm text-gray-500">No plans yet. Create your first plan above!</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Active Runs -->
+        <div class="bg-white shadow rounded-lg">
+            <div class="px-4 py-5 sm:p-6">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Active Runs</h3>
+                {% if active_runs %}
+                <ul class="divide-y divide-gray-200" id="active-runs-list">
+                    {% for run in active_runs %}
+                    <li class="py-3">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <a href="/runs/{{ run.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                                    {{ run.workflow|title }} - {{ run.id }}
+                                </a>
+                                <p class="text-sm text-gray-500">Started: {{ run.started_at[:19] }}</p>
+                            </div>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                {% if run.status == 'completed' %}bg-green-100 text-green-800
+                                {% elif run.status == 'running' %}bg-blue-100 text-blue-800
+                                {% elif run.status == 'pending' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ run.status }}
+                            </span>
+                        </div>
+                        {% if run.status == 'running' %}
+                        <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: {{ run.progress }}%"></div>
+                        </div>
+                        {% endif %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-gray-500">No active runs.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('plan-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const description = document.getElementById('plan-description').value;
+    if (!description.trim()) return;
+
+    try {
+        const response = await fetch('/api/workflows/plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description: description })
+        });
+        const data = await response.json();
+        if (data.run_id) {
+            window.location.href = '/runs/' + data.run_id;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Failed to create plan');
+    }
+});
+</script>
+{% endblock %}

@@ -11,7 +11,9 @@ Usage:
     uv run python .orchestrator/cli.py list
     uv run python .orchestrator/cli.py docs
     uv run python .orchestrator/cli.py experts
+    uv run python .orchestrator/cli.py cost
     uv run python .orchestrator/cli.py test
+    uv run python .orchestrator/cli.py portal
 """
 import shutil
 import sys
@@ -365,8 +367,8 @@ def _experts_create(args):
         return 1
 
 
-def cmd_web(args):
-    """Start web UI server."""
+def cmd_portal(args):
+    """Start the management portal (dashboard UI)."""
     host = "127.0.0.1"
     port = 8000
 
@@ -630,7 +632,7 @@ COMMANDS = {
     'experts': (cmd_experts, "Manage expert agents"),
     'cost': (cmd_cost, "Cost estimation and budgets"),
     'test': (cmd_test, "Run test suite"),
-    'web': (cmd_web, "Start web UI server"),
+    'portal': (cmd_portal, "Start management portal"),
 }
 
 
@@ -654,8 +656,8 @@ def main():
         print("  cli.py test --unit                       # Run unit tests only")
         print("  cli.py test --integration                # Run integration tests only")
         print("  cli.py test -v --cov                     # Verbose with coverage")
-        print("  cli.py web                               # Start web UI")
-        print("  cli.py web --port 8080                   # Custom port")
+        print("  cli.py portal                            # Start management portal")
+        print("  cli.py portal --port 8080                # Custom port")
         print("  cli.py cost estimate plan --request 'Add auth'")
         print("  cli.py cost report daily                 # Daily cost report")
         print("  cli.py cost budget show                  # Show budget status")

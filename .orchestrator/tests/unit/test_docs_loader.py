@@ -240,7 +240,7 @@ class TestDocsLoader:
 
         # Create doc file with the correct filename derived from URL
         expected_filename = url_to_filename("https://example.com/doc")
-        doc_file = ai_docs / expected_filename
+        doc_file = docs_dir / expected_filename
         doc_file.write_text("Old content")
 
         # Set mtime to 3 days ago

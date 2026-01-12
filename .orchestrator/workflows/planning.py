@@ -323,11 +323,12 @@ class PlanningWorkflow(Workflow):
             context=codebase_context
         )
         cached_scout_result = global_scout.content if global_scout.success else None
+        from core.symbols import CHECK, WARNING
         if global_scout.success:
             steps_completed.append("global_scout")
-            self.console.print("  [green]✓[/green] Global scout cached")
+            self.console.print(f"  [green]{CHECK}[/green] Global scout cached")
         else:
-            self.console.print("  [yellow]⚠[/yellow] Global scout failed, sub-features will scout independently")
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Global scout failed, sub-features will scout independently")
 
         # Phase 2b: Decompose
         self.console.print("\n[bold]Phase 2b:[/bold] Decomposing into sub-features...")
@@ -374,21 +375,23 @@ class PlanningWorkflow(Workflow):
                     for sf in sub_features
                 }
 
-                for future in as_completed(futures):
+                from core.symbols import CHECK, CROSS
+            for future in as_completed(futures):
                     sf = futures[future]
                     try:
                         plan = future.result()
                         sub_plans.append(plan)
-                        self.console.print(f"  [green]✓[/green] {plan.name}")
+                        self.console.print(f"  [green]{CHECK}[/green] {plan.name}")
                     except Exception as e:
-                        self.console.print(f"  [red]✗[/red] {sf.get('name', 'Unknown')}: {e}")
+                        self.console.print(f"  [red]{CROSS}[/red] {sf.get('name', 'Unknown')}: {e}")
         else:
             # Sequential planning (with cached scout)
+            from core.symbols import CHECK
             for sf in sub_features:
                 self.console.print(f"  Planning: {sf.get('name', 'Unknown')}...")
                 plan = self._plan_sub_feature(sf, codebase_context, cached_scout_result, num_features)
                 sub_plans.append(plan)
-                self.console.print(f"  [green]✓[/green] {plan.name}")
+                self.console.print(f"  [green]{CHECK}[/green] {plan.name}")
 
         steps_completed.append(f"sub_plans ({len(sub_plans)})")
 

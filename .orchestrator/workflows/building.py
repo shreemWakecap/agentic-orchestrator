@@ -322,7 +322,8 @@ After completing, summarize what you did.""",
                     self.console.print(f"  [dim]↷ {step.id} (already done)[/dim]")
                     continue
 
-                self.console.print(f"  [cyan]→[/cyan] {step.description[:60]}...")
+                from core.symbols import ARROW_RIGHT, CHECK, CROSS
+                self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {step.description[:60]}...")
 
                 result = self._execute_step(step, phase_context)
 
@@ -341,11 +342,11 @@ After completing, summarize what you did.""",
                     self.build_state.files_modified.extend(
                         [f for f in result.files_affected if result.action_taken == "modified"]
                     )
-                    self.console.print(f"  [green]✓[/green] {result.summary[:50]}")
+                    self.console.print(f"  [green]{CHECK}[/green] {result.summary[:50]}")
                     steps_completed.append(step.id)
                 else:
                     self.build_state.failed_steps.append(step.id)
-                    self.console.print(f"  [red]✗[/red] {result.error or 'Failed'}")
+                    self.console.print(f"  [red]{CROSS}[/red] {result.error or 'Failed'}")
                     self._save_state(plan_path)
                     return WorkflowResult(
                         success=False,
@@ -359,7 +360,8 @@ After completing, summarize what you did.""",
             self.console.print(f"\n  [bold]Testing phase {phase_idx + 1}...[/bold]")
             test_result = self._run_phase_tests(plan, phase_idx)
             if not test_result:
-                self.console.print("  [yellow]⚠[/yellow] Tests had issues (continuing)")
+                from core.symbols import WARNING
+                self.console.print(f"  [yellow]{WARNING}[/yellow] Tests had issues (continuing)")
 
         # Final review
         self.console.print("\n[bold]Final Review...[/bold]")
@@ -405,12 +407,13 @@ After completing, summarize what you did.""",
                         if step.id not in self.build_state.completed_steps
                     }
 
+                    from core.symbols import CHECK, CROSS
                     for future in as_completed(futures):
                         step = futures[future]
                         try:
                             result = future.result()
                             results.append(result)
-                            self.console.print(f"    [green]✓[/green] {step.id}: {result.summary[:40]}")
+                            self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
                         except Exception as e:
                             results.append(StepResult(
                                 step_id=step.id,
@@ -420,7 +423,7 @@ After completing, summarize what you did.""",
                                 summary="",
                                 error=str(e)
                             ))
-                            self.console.print(f"    [red]✗[/red] {step.id}: {e}")
+                            self.console.print(f"    [red]{CROSS}[/red] {step.id}: {e}")
 
         return results
 
@@ -459,17 +462,18 @@ After completing, summarize what you did.""",
                 )
             else:
                 results = []
+                from core.symbols import ARROW_RIGHT, CHECK, CROSS
                 for step in steps_to_build:
                     if step.id in self.build_state.completed_steps:
                         continue
-                    self.console.print(f"  [cyan]→[/cyan] {step.description[:50]}...")
+                    self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {step.description[:50]}...")
                     result = self._execute_step(step, phase_context)
                     results.append(result)
 
                     if result.status == "completed":
-                        self.console.print("  [green]✓[/green] Done")
+                        self.console.print(f"  [green]{CHECK}[/green] Done")
                     else:
-                        self.console.print(f"  [red]✗[/red] {result.error}")
+                        self.console.print(f"  [red]{CROSS}[/red] {result.error}")
 
             # Process results
             for result in results:

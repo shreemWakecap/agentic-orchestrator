@@ -120,13 +120,14 @@ class ReviewingWorkflow(Workflow):
 
         context = self.docs_loader.load_docs(refresh_stale=self.refresh_docs)
 
+        from core.symbols import WARNING
         if context.stale_docs:
-            self.console.print(f"  [yellow]⚠ {len(context.stale_docs)} stale docs (older than 2 days)[/yellow]")
+            self.console.print(f"  [yellow]{WARNING} {len(context.stale_docs)} stale docs (older than 2 days)[/yellow]")
             if not self.refresh_docs:
                 self.console.print("  [dim]Use --refresh-docs to update[/dim]")
 
         if context.missing_docs:
-            self.console.print(f"  [yellow]⚠ {len(context.missing_docs)} missing docs[/yellow]")
+            self.console.print(f"  [yellow]{WARNING} {len(context.missing_docs)} missing docs[/yellow]")
 
         return context
 
@@ -506,15 +507,16 @@ Provide specific feedback with file locations.""",
                 for expert in experts
             }
 
+            from core.symbols import CHECK, WARNING, CROSS
             for future in as_completed(futures):
                 expert = futures[future]
                 try:
                     result = future.result()
                     results.append(result)
-                    status = "[green]✓[/green]" if result.score >= 70 else "[yellow]⚠[/yellow]"
+                    status = f"[green]{CHECK}[/green]" if result.score >= 70 else f"[yellow]{WARNING}[/yellow]"
                     self.console.print(f"  {status} {expert.name}: {result.score}/100")
                 except Exception as e:
-                    self.console.print(f"  [red]✗[/red] {expert.name}: {e}")
+                    self.console.print(f"  [red]{CROSS}[/red] {expert.name}: {e}")
 
         return results
 

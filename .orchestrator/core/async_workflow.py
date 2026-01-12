@@ -249,11 +249,13 @@ class AsyncWorkflow(ABC):
 
     def print_success(self, message: str):
         """Print success message."""
-        self.console.print(f"[green]✓ {message}[/green]")
+        from .symbols import CHECK
+        self.console.print(f"[green]{CHECK} {message}[/green]")
 
     def print_error(self, message: str):
         """Print error message."""
-        self.console.print(f"[red]✗ {message}[/red]")
+        from .symbols import CROSS
+        self.console.print(f"[red]{CROSS} {message}[/red]")
 
     def print_info(self, message: str):
         """Print info message."""

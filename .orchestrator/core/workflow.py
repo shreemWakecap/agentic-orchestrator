@@ -66,7 +66,8 @@ class Workflow(ABC):
         Thread-safe: can be called from any thread.
         """
         self._cancel_event.set()
-        self.console.print("[yellow]⚠ Workflow cancellation requested[/yellow]")
+        from .symbols import WARNING
+        self.console.print(f"[yellow]{WARNING} Workflow cancellation requested[/yellow]")
 
     def reset_cancellation(self) -> None:
         """Reset the cancellation flag for reuse of the workflow."""
@@ -135,11 +136,12 @@ class Workflow(ABC):
         self._total_tokens += result.tokens_used
 
         # Log result
+        from .symbols import CHECK, CROSS
         if result.success:
             tokens_info = f" ({result.tokens_used} tokens)" if result.tokens_used > 0 else ""
-            self.console.print(f"  [green]✓[/green] {agent_name} complete{tokens_info}")
+            self.console.print(f"  [green]{CHECK}[/green] {agent_name} complete{tokens_info}")
         else:
-            self.console.print(f"  [red]✗[/red] {agent_name} failed: {result.error}")
+            self.console.print(f"  [red]{CROSS}[/red] {agent_name} failed: {result.error}")
 
         # Check for cancellation after agent completes (for next iteration)
         # Don't raise here, just return the result
@@ -214,10 +216,11 @@ class Workflow(ABC):
         duration = (datetime.now() - start_time).total_seconds()
 
         # Summary
+        from .symbols import CHECK, CROSS, WARNING
         self.console.print()
         if result.success:
             self.console.print(Panel(
-                f"[green]✓ Workflow completed successfully[/green]\n\n"
+                f"[green]{CHECK} Workflow completed successfully[/green]\n\n"
                 f"Output: {result.output_file}\n"
                 f"Steps: {len(result.steps_completed)}\n"
                 f"Tokens: {result.total_tokens:,}\n"
@@ -228,7 +231,7 @@ class Workflow(ABC):
             ))
         elif self.is_cancelled:
             self.console.print(Panel(
-                f"[yellow]⚠ Workflow cancelled[/yellow]\n\n"
+                f"[yellow]{WARNING} Workflow cancelled[/yellow]\n\n"
                 f"Steps completed: {len(result.steps_completed)}\n"
                 f"Tokens used: {result.total_tokens:,}\n"
                 f"Duration: {duration:.1f}s",
@@ -238,7 +241,7 @@ class Workflow(ABC):
             ))
         else:
             self.console.print(Panel(
-                f"[red]✗ Workflow failed[/red]\n\n{result.error}",
+                f"[red]{CROSS} Workflow failed[/red]\n\n{result.error}",
                 title="Error",
                 border_style="red",
                 width=80

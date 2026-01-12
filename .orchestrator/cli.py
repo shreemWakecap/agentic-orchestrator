@@ -5,7 +5,6 @@ SDLC Orchestrator CLI - Unified entry point.
 Usage:
     uv run python .orchestrator/cli.py setup
     uv run python .orchestrator/cli.py plan "Add user authentication"
-    uv run python .orchestrator/cli.py plan --mcp "Add user authentication"  # MCP mode
     uv run python .orchestrator/cli.py build .specs/pending/plan.md
     uv run python .orchestrator/cli.py review .specs/completed/plan.md
     uv run python .orchestrator/cli.py fix .specs/reviews/review.md
@@ -14,7 +13,6 @@ Usage:
     uv run python .orchestrator/cli.py experts
     uv run python .orchestrator/cli.py test
 """
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -79,81 +77,15 @@ def cmd_setup():
 def cmd_plan(args):
     """Create an implementation plan."""
     if not args:
-        print("Usage: cli.py plan [--mcp] [--server URL] 'Your request'")
-        print("\nOptions:")
-        print("  --mcp             Use MCP server for real-time streaming")
-        print("  --server URL      MCP server URL (default: http://localhost:3000)")
+        print("Usage: cli.py plan 'Your request'")
         return 1
 
-    # Check for MCP mode
-    use_mcp = "--mcp" in args
-    server_url = "http://localhost:3000"
+    request = " ".join(args)
 
-    # Parse server URL
-    for i, arg in enumerate(args):
-        if arg == "--server" and i + 1 < len(args):
-            server_url = args[i + 1]
-
-    # Get request (non-option args)
-    request_parts = [a for a in args if not a.startswith("--") and a != server_url]
-    if not request_parts:
-        print("Error: No request provided")
-        return 1
-    request = " ".join(request_parts)
-
-    if use_mcp:
-        return _cmd_plan_mcp(request, server_url)
-    else:
-        from workflows.planning import PlanningWorkflow
-        workflow = PlanningWorkflow(project_root=PROJECT_ROOT)
-        result = workflow.run(request)
-        return 0 if result.success else 1
-
-
-def _cmd_plan_mcp(request: str, server_url: str):
-    """Run planning with MCP server for real-time streaming."""
-    import asyncio
-
-    async def run():
-        from core.mcp_client import MCPClient, StreamEvent
-        from workflows.async_planning import AsyncPlanningWorkflow
-
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-
-        print(f"Connecting to MCP server: {server_url}")
-
-        async with MCPClient(
-            server_url=server_url,
-            api_key=api_key,
-            transport_type="http-sse"
-        ) as client:
-
-            workflow = AsyncPlanningWorkflow(PROJECT_ROOT, client)
-
-            # Set up progress callback for real-time token streaming
-            def on_progress(agent_name: str, event: StreamEvent):
-                if event.event_type == "token":
-                    text = event.data.get("text", "")
-                    print(text, end="", flush=True)
-                elif event.event_type == "tool_use":
-                    tool = event.data.get("tool", "")
-                    print(f"\n  [Tool: {tool}]", end="", flush=True)
-
-            workflow.on_progress(on_progress)
-
-            result = await workflow.execute(request)
-
-            print()  # Newline after streaming
-
-            if result.success:
-                print(f"\n[green]Plan created: {result.output_file}[/green]")
-                print(f"Total tokens: {result.total_tokens}")
-                return 0
-            else:
-                print(f"\n[red]Planning failed: {result.error}[/red]")
-                return 1
-
-    return asyncio.run(run())
+    from workflows.planning import PlanningWorkflow
+    workflow = PlanningWorkflow(project_root=PROJECT_ROOT)
+    result = workflow.run(request)
+    return 0 if result.success else 1
 
 
 def cmd_build(args):
@@ -581,7 +513,6 @@ def main():
         print("\nExamples:")
         print("  cli.py setup")
         print("  cli.py plan 'Add user authentication'")
-        print("  cli.py plan --mcp 'Add authentication'   # MCP streaming mode")
         print("  cli.py build .specs/pending/user-auth.md")
         print("  cli.py review .specs/completed/user-auth.md")
         print("  cli.py fix .specs/reviews/review-user-auth.md")

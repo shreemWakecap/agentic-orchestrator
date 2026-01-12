@@ -127,7 +127,7 @@ class FixingWorkflow(Workflow):
         self.project_root = project_root
         self.min_severity = min_severity
         self.dry_run = dry_run
-        self.specs_dir = project_root / ".specs"
+        self.specs_dir = project_root / ".orchestrator" / "specs"
 
         output_dir = output_dir or self.specs_dir / "fixes"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -609,14 +609,15 @@ Original Issue: {fix.issue_reference}"""
                 "error": result.error
             }
 
+            from core.symbols import CHECK, CROSS, QUESTION
             if result.success:
                 self.fix_state.fixes_completed.append(fix.id)
                 verified = self._verify_fix(fix, result)
-                status = "[green]✓[/green]" if verified else "[yellow]?[/yellow]"
+                status = f"[green]{CHECK}[/green]" if verified else f"[yellow]{QUESTION}[/yellow]"
                 self.console.print(f"    {status} {result.summary[:40]}")
             else:
                 self.fix_state.fixes_failed.append(fix.id)
-                self.console.print(f"    [red]✗[/red] {result.error}")
+                self.console.print(f"    [red]{CROSS}[/red] {result.error}")
 
             self._save_state(review_path)
 
@@ -659,7 +660,7 @@ def main():
 
     if len(sys.argv) < 2:
         print("Usage: python -m orchestrator.workflows.fixing <review-file> [options]")
-        print("Example: python -m orchestrator.workflows.fixing .specs/reviews/review-auth-20240115.md")
+        print("Example: python -m orchestrator.workflows.fixing .orchestrator/specs/reviews/review-auth-20240115.md")
         print("\nOptions:")
         print("  --dry-run         Show fixes without applying")
         print("  --min-severity    Minimum severity to fix (critical|high|medium|low)")

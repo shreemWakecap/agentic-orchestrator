@@ -85,7 +85,7 @@ class ReviewingWorkflow(Workflow):
         self.max_parallel = max_parallel
         self.refresh_docs = refresh_docs
 
-        output_dir = output_dir or project_root / ".specs" / "reviews"
+        output_dir = output_dir or project_root / ".orchestrator" / "specs" / "reviews"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         super().__init__(name="Smart Review Workflow", output_dir=output_dir)
@@ -120,13 +120,14 @@ class ReviewingWorkflow(Workflow):
 
         context = self.docs_loader.load_docs(refresh_stale=self.refresh_docs)
 
+        from core.symbols import WARNING
         if context.stale_docs:
-            self.console.print(f"  [yellow]⚠ {len(context.stale_docs)} stale docs (older than 2 days)[/yellow]")
+            self.console.print(f"  [yellow]{WARNING} {len(context.stale_docs)} stale docs (older than 2 days)[/yellow]")
             if not self.refresh_docs:
                 self.console.print("  [dim]Use --refresh-docs to update[/dim]")
 
         if context.missing_docs:
-            self.console.print(f"  [yellow]⚠ {len(context.missing_docs)} missing docs[/yellow]")
+            self.console.print(f"  [yellow]{WARNING} {len(context.missing_docs)} missing docs[/yellow]")
 
         return context
 
@@ -506,15 +507,16 @@ Provide specific feedback with file locations.""",
                 for expert in experts
             }
 
+            from core.symbols import CHECK, WARNING, CROSS
             for future in as_completed(futures):
                 expert = futures[future]
                 try:
                     result = future.result()
                     results.append(result)
-                    status = "[green]✓[/green]" if result.score >= 70 else "[yellow]⚠[/yellow]"
+                    status = f"[green]{CHECK}[/green]" if result.score >= 70 else f"[yellow]{WARNING}[/yellow]"
                     self.console.print(f"  {status} {expert.name}: {result.score}/100")
                 except Exception as e:
-                    self.console.print(f"  [red]✗[/red] {expert.name}: {e}")
+                    self.console.print(f"  [red]{CROSS}[/red] {expert.name}: {e}")
 
         return results
 
@@ -672,7 +674,7 @@ Score: {standards.score}/100
 
         # Try to find in completed folder
         if not plan_path.exists():
-            completed_path = self.project_root / ".specs" / "completed" / plan_path.name
+            completed_path = self.project_root / ".orchestrator" / "specs" / "completed" / plan_path.name
             if completed_path.exists():
                 plan_path = completed_path
 
@@ -747,7 +749,7 @@ def main():
 
     if len(sys.argv) < 2:
         print("Usage: python -m orchestrator.workflows.reviewing <plan-file>")
-        print("Example: python -m orchestrator.workflows.reviewing .specs/completed/user-auth.md")
+        print("Example: python -m orchestrator.workflows.reviewing .orchestrator/specs/completed/user-auth.md")
         sys.exit(1)
 
     plan_path = sys.argv[1]

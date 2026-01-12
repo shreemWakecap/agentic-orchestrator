@@ -26,7 +26,7 @@ class TestPlanningWorkflowSimple:
     def test_workflow_creates_output_dir(self, project_root):
         """Test workflow creates output directory."""
         workflow = PlanningWorkflow(project_root=project_root)
-        assert (project_root / ".specs" / "pending").exists()
+        assert (project_root / ".orchestrator" / "specs" / "pending").exists()
 
     def test_generate_filename(self, project_root):
         """Test filename generation from request."""
@@ -163,28 +163,34 @@ class TestPlanningWorkflowComplex:
     def test_complex_planning_triggered(self, mock_run_agent, project_root, mock_agent_result):
         """Test complex planning is triggered for complex requests."""
         # Setup: analyzer reports complex
+        # Call sequence for complex planning:
+        # 1. analyzer, 2. global scout, 3. prelim architect, 4. decomposer,
+        # 5. sub-feature scout, 6. sub-feature architect, 7. sub-feature planner,
+        # 8. synthesizer, 9. validator
         mock_run_agent.side_effect = [
             # Analyzer - complex
             mock_agent_result(
                 content='```json\n{"complexity": "complex", "needs_decomposition": true, "strategy": "decompose_sequential"}\n```',
                 agent_name="analyzer"
             ),
-            # Global scout
+            # Global scout (Phase 2a)
             mock_agent_result(content="Global codebase context", agent_name="scout"),
-            # Decomposer
+            # Preliminary architect (Phase 2b - for expert consultation)
+            mock_agent_result(content="High-level architecture overview", agent_name="architect"),
+            # Decomposer (Phase 2c)
             mock_agent_result(
                 content='```json\n{"sub_features": [{"id": "sf1", "name": "Auth", "description": "User auth", "context_summary": ""}]}\n```',
                 agent_name="decomposer"
             ),
-            # Sub-feature scout
-            mock_agent_result(content="Auth context", agent_name="scout"),
+            # Sub-feature scout (Phase 3 - targeted exploration)
+            mock_agent_result(content="Auth specific context", agent_name="scout"),
             # Sub-feature architect
             mock_agent_result(content="Auth architecture", agent_name="architect"),
             # Sub-feature planner
             mock_agent_result(content="Auth steps", agent_name="planner"),
-            # Synthesizer
+            # Synthesizer (Phase 4)
             mock_agent_result(content="Master plan", agent_name="synthesizer"),
-            # Validator
+            # Validator (Phase 5)
             mock_agent_result(content="Valid", agent_name="validator"),
         ]
 
@@ -199,20 +205,23 @@ class TestPlanningWorkflowComplex:
     @patch('workflows.planning.PlanningWorkflow.run_agent')
     def test_complex_falls_back_to_simple(self, mock_run_agent, project_root, mock_agent_result):
         """Test complex planning falls back when decomposer fails."""
+        # Call sequence: analyzer → scout → architect → decomposer (empty) → fallback to simple
         mock_run_agent.side_effect = [
             # Analyzer - complex
             mock_agent_result(
                 content='{"complexity": "complex", "needs_decomposition": true}',
                 agent_name="analyzer"
             ),
-            # Global scout
+            # Global scout (Phase 2a)
             mock_agent_result(content="Context", agent_name="scout"),
-            # Decomposer - returns no sub_features
+            # Preliminary architect (Phase 2b)
+            mock_agent_result(content="Prelim architecture", agent_name="architect"),
+            # Decomposer - returns no sub_features (Phase 2c)
             mock_agent_result(
                 content='{"sub_features": []}',
                 agent_name="decomposer"
             ),
-            # Falls back to simple planning
+            # Falls back to simple planning: scout → architect → planner → validator
             mock_agent_result(content="Scout", agent_name="scout"),
             mock_agent_result(content="Arch", agent_name="architect"),
             mock_agent_result(content="Plan", agent_name="planner"),

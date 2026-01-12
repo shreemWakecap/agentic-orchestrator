@@ -5,16 +5,16 @@ SDLC Orchestrator CLI - Unified entry point.
 Usage:
     uv run python .orchestrator/cli.py setup
     uv run python .orchestrator/cli.py plan "Add user authentication"
-    uv run python .orchestrator/cli.py plan --mcp "Add user authentication"  # MCP mode
-    uv run python .orchestrator/cli.py build .specs/pending/plan.md
-    uv run python .orchestrator/cli.py review .specs/completed/plan.md
-    uv run python .orchestrator/cli.py fix .specs/reviews/review.md
+    uv run python .orchestrator/cli.py build .orchestrator/specs/pending/plan.md
+    uv run python .orchestrator/cli.py review .orchestrator/specs/completed/plan.md
+    uv run python .orchestrator/cli.py fix .orchestrator/specs/reviews/review.md
     uv run python .orchestrator/cli.py list
     uv run python .orchestrator/cli.py docs
     uv run python .orchestrator/cli.py experts
+    uv run python .orchestrator/cli.py cost
     uv run python .orchestrator/cli.py test
+    uv run python .orchestrator/cli.py portal
 """
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -22,7 +22,7 @@ from pathlib import Path
 # Setup paths
 ORCHESTRATOR_DIR = Path(__file__).parent
 PROJECT_ROOT = ORCHESTRATOR_DIR.parent
-SPECS_DIR = PROJECT_ROOT / ".specs"
+SPECS_DIR = ORCHESTRATOR_DIR / "specs"
 
 sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
@@ -49,10 +49,10 @@ def cmd_setup():
 
     # 2. Directories
     print("\n[2/3] Directories...")
-    for d in ['.specs', '.orchestrator/experts', '.orchestrator/config', 'ai_docs']:
-        path = PROJECT_ROOT / d
+    for d in ['specs', 'agents/experts', 'config', 'docs']:
+        path = ORCHESTRATOR_DIR / d
         path.mkdir(parents=True, exist_ok=True)
-        print(f"  [+] {d}")
+        print(f"  [+] .orchestrator/{d}")
 
     # 3. Docs
     print("\n[3/3] Documentation...")
@@ -79,81 +79,15 @@ def cmd_setup():
 def cmd_plan(args):
     """Create an implementation plan."""
     if not args:
-        print("Usage: cli.py plan [--mcp] [--server URL] 'Your request'")
-        print("\nOptions:")
-        print("  --mcp             Use MCP server for real-time streaming")
-        print("  --server URL      MCP server URL (default: http://localhost:3000)")
+        print("Usage: cli.py plan 'Your request'")
         return 1
 
-    # Check for MCP mode
-    use_mcp = "--mcp" in args
-    server_url = "http://localhost:3000"
+    request = " ".join(args)
 
-    # Parse server URL
-    for i, arg in enumerate(args):
-        if arg == "--server" and i + 1 < len(args):
-            server_url = args[i + 1]
-
-    # Get request (non-option args)
-    request_parts = [a for a in args if not a.startswith("--") and a != server_url]
-    if not request_parts:
-        print("Error: No request provided")
-        return 1
-    request = " ".join(request_parts)
-
-    if use_mcp:
-        return _cmd_plan_mcp(request, server_url)
-    else:
-        from workflows.planning import PlanningWorkflow
-        workflow = PlanningWorkflow(project_root=PROJECT_ROOT)
-        result = workflow.run(request)
-        return 0 if result.success else 1
-
-
-def _cmd_plan_mcp(request: str, server_url: str):
-    """Run planning with MCP server for real-time streaming."""
-    import asyncio
-
-    async def run():
-        from core.mcp_client import MCPClient, StreamEvent
-        from workflows.async_planning import AsyncPlanningWorkflow
-
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-
-        print(f"Connecting to MCP server: {server_url}")
-
-        async with MCPClient(
-            server_url=server_url,
-            api_key=api_key,
-            transport_type="http-sse"
-        ) as client:
-
-            workflow = AsyncPlanningWorkflow(PROJECT_ROOT, client)
-
-            # Set up progress callback for real-time token streaming
-            def on_progress(agent_name: str, event: StreamEvent):
-                if event.event_type == "token":
-                    text = event.data.get("text", "")
-                    print(text, end="", flush=True)
-                elif event.event_type == "tool_use":
-                    tool = event.data.get("tool", "")
-                    print(f"\n  [Tool: {tool}]", end="", flush=True)
-
-            workflow.on_progress(on_progress)
-
-            result = await workflow.execute(request)
-
-            print()  # Newline after streaming
-
-            if result.success:
-                print(f"\n[green]Plan created: {result.output_file}[/green]")
-                print(f"Total tokens: {result.total_tokens}")
-                return 0
-            else:
-                print(f"\n[red]Planning failed: {result.error}[/red]")
-                return 1
-
-    return asyncio.run(run())
+    from workflows.planning import PlanningWorkflow
+    workflow = PlanningWorkflow(project_root=PROJECT_ROOT)
+    result = workflow.run(request)
+    return 0 if result.success else 1
 
 
 def cmd_build(args):
@@ -197,7 +131,7 @@ def cmd_fix(args):
         print("\nOptions:")
         print("  --dry-run         Show fixes without applying")
         print("  --min-severity    Minimum severity (critical|high|medium|low)")
-        print("\nExample: cli.py fix .specs/reviews/review-auth-20240115.md")
+        print("\nExample: cli.py fix .orchestrator/specs/reviews/review-auth-20240115.md")
         cmd_list()
         return 1
 
@@ -280,30 +214,161 @@ def cmd_docs(args):
     return 0
 
 
-def cmd_experts():
-    """List available experts."""
+def cmd_experts(args=None):
+    """Manage expert agents (list, create)."""
+    from core.expert_loader import ExpertLoader, ExpertType
+
+    args = args or []
+
+    if not args or args[0] == "list":
+        return _experts_list()
+    elif args[0] == "create":
+        return _experts_create(args[1:])
+    else:
+        print(f"Unknown experts subcommand: {args[0]}")
+        print("\nUsage: cli.py experts <subcommand>")
+        print("\nSubcommands:")
+        print("  list                     List all experts by type")
+        print("  create <name> [options]  Create a new expert")
+        print("\nExamples:")
+        print("  cli.py experts list")
+        print("  cli.py experts create auth --type domain --keywords auth,login,jwt")
+        print("  cli.py experts create core-api --type module --module src/api")
+        print("  cli.py experts create fastapi --type tech --based-on python")
+        return 1
+
+
+def _experts_list():
+    """List all available experts grouped by type."""
     from core.expert_loader import ExpertLoader
 
-    print("Tech Experts\n" + "=" * 50)
+    print("Expert Agents\n" + "=" * 50)
 
     loader = ExpertLoader(PROJECT_ROOT)
     experts = loader.list_experts()
 
-    for category, items in experts.items():
-        if items:
-            print(f"\n{category.upper()}")
-            for e in items:
-                print(f"  {e['name']}: {e['description'][:50]}")
+    # Tech experts (grouped by category)
+    tech = experts.get("tech", {})
+    if any(tech.values()):
+        print("\nTECH EXPERTS")
+        for category in ["language", "framework", "tool", "general"]:
+            items = tech.get(category, [])
+            if items:
+                print(f"  [{category}]")
+                for e in items:
+                    desc = e['description'][:40] + "..." if len(e.get('description', '')) > 40 else e.get('description', '')
+                    print(f"    {e['name']}: {desc}")
 
+    # Domain experts
+    domain = experts.get("domain", [])
+    if domain:
+        print("\nDOMAIN EXPERTS")
+        for e in domain:
+            desc = e['description'][:40] + "..." if len(e.get('description', '')) > 40 else e.get('description', '')
+            print(f"  {e['name']}: {desc}")
+            if e.get('keywords'):
+                print(f"    Keywords: {', '.join(e['keywords'])}")
+
+    # Module experts
+    module = experts.get("module", [])
+    if module:
+        print("\nMODULE EXPERTS")
+        for e in module:
+            desc = e['description'][:40] + "..." if len(e.get('description', '')) > 40 else e.get('description', '')
+            print(f"  {e['name']}: {desc}")
+            if e.get('module_path'):
+                print(f"    Module: {e['module_path']}")
+
+    # Recommendations
     recommended = loader.get_recommended_experts(PROJECT_ROOT)
     if recommended:
-        print(f"\nRecommended: {', '.join(recommended)}")
+        print(f"\nRecommended for this project: {', '.join(recommended)}")
 
     return 0
 
 
-def cmd_web(args):
-    """Start web UI server."""
+def _experts_create(args):
+    """Create a new expert agent."""
+    from core.expert_loader import ExpertLoader, ExpertType
+
+    if not args:
+        print("Usage: cli.py experts create <name> [options]")
+        print("\nOptions:")
+        print("  --type <tech|domain|module>  Expert type (default: tech)")
+        print("  --module <path>              Module path (for module experts)")
+        print("  --keywords <k1,k2,k3>        Domain keywords (for domain experts)")
+        print("  --based-on <tech>            Base technology (for tech experts)")
+        print("  --focus <description>        Specific focus area")
+        print("\nExamples:")
+        print("  cli.py experts create auth --type domain --keywords auth,login,jwt,session")
+        print("  cli.py experts create core-api --type module --module src/api")
+        print("  cli.py experts create fastapi --type tech --based-on python")
+        return 1
+
+    name = args[0]
+    expert_type = ExpertType.TECH
+    module_path = None
+    keywords = []
+    based_on = "python"
+    focus = ""
+
+    # Parse options
+    i = 1
+    while i < len(args):
+        arg = args[i]
+        if arg == "--type" and i + 1 < len(args):
+            type_str = args[i + 1].lower()
+            if type_str == "tech":
+                expert_type = ExpertType.TECH
+            elif type_str == "domain":
+                expert_type = ExpertType.DOMAIN
+            elif type_str == "module":
+                expert_type = ExpertType.MODULE
+            else:
+                print(f"Unknown expert type: {type_str}")
+                print("Valid types: tech, domain, module")
+                return 1
+            i += 2
+        elif arg == "--module" and i + 1 < len(args):
+            module_path = args[i + 1]
+            i += 2
+        elif arg == "--keywords" and i + 1 < len(args):
+            keywords = [k.strip() for k in args[i + 1].split(",")]
+            i += 2
+        elif arg == "--based-on" and i + 1 < len(args):
+            based_on = args[i + 1]
+            i += 2
+        elif arg == "--focus" and i + 1 < len(args):
+            focus = args[i + 1]
+            i += 2
+        else:
+            print(f"Unknown option: {arg}")
+            return 1
+
+    print(f"Creating {expert_type.value} expert: {name}")
+    print("=" * 50)
+
+    loader = ExpertLoader(PROJECT_ROOT)
+    success = loader.create_expert(
+        name=name,
+        expert_type=expert_type,
+        based_on=based_on,
+        focus=focus,
+        module_path=module_path,
+        domain_keywords=keywords if keywords else None
+    )
+
+    if success:
+        print(f"\nExpert '{name}' created successfully!")
+        print(f"Location: .orchestrator/agents/experts/{name}.md")
+        return 0
+    else:
+        print(f"\nFailed to create expert '{name}'")
+        return 1
+
+
+def cmd_portal(args):
+    """Start the management portal (dashboard UI)."""
     host = "127.0.0.1"
     port = 8000
 
@@ -345,7 +410,7 @@ def cmd_cost(args):
         print("  budget set           Set budget limits")
         print("\nExamples:")
         print("  cli.py cost estimate plan --request 'Add authentication'")
-        print("  cli.py cost estimate build --plan .specs/pending/auth.md")
+        print("  cli.py cost estimate build --plan .orchestrator/specs/pending/auth.md")
         print("  cli.py cost report daily")
         print("  cli.py cost budget show")
         print("  cli.py cost budget set --daily 10.00 --monthly 100.00")
@@ -460,6 +525,8 @@ def _cost_report(args, reporter):
 
 def _cost_budget(args, budget_manager):
     """Handle cost budget subcommand."""
+    from core.cost import Budget
+
     if not args:
         print("Usage: cli.py cost budget <action> [options]")
         print("  Actions: show, set")
@@ -562,10 +629,10 @@ COMMANDS = {
     'fix': (cmd_fix, "Fix issues from review"),
     'list': (cmd_list, "List all plans"),
     'docs': (cmd_docs, "Check documentation"),
-    'experts': (cmd_experts, "List tech experts"),
+    'experts': (cmd_experts, "Manage expert agents"),
     'cost': (cmd_cost, "Cost estimation and budgets"),
     'test': (cmd_test, "Run test suite"),
-    'web': (cmd_web, "Start web UI server"),
+    'portal': (cmd_portal, "Start management portal"),
 }
 
 
@@ -579,17 +646,18 @@ def main():
         print("\nExamples:")
         print("  cli.py setup")
         print("  cli.py plan 'Add user authentication'")
-        print("  cli.py plan --mcp 'Add authentication'   # MCP streaming mode")
-        print("  cli.py build .specs/pending/user-auth.md")
-        print("  cli.py review .specs/completed/user-auth.md")
-        print("  cli.py fix .specs/reviews/review-user-auth.md")
-        print("  cli.py fix .specs/reviews/review.md --dry-run")
+        print("  cli.py build .orchestrator/specs/pending/user-auth.md")
+        print("  cli.py review .orchestrator/specs/completed/user-auth.md")
+        print("  cli.py fix .orchestrator/specs/reviews/review-user-auth.md")
+        print("  cli.py fix .orchestrator/specs/reviews/review.md --dry-run")
+        print("  cli.py experts list                      # List all experts")
+        print("  cli.py experts create auth --type domain --keywords auth,login")
         print("  cli.py test                              # Run all tests")
         print("  cli.py test --unit                       # Run unit tests only")
         print("  cli.py test --integration                # Run integration tests only")
         print("  cli.py test -v --cov                     # Verbose with coverage")
-        print("  cli.py web                               # Start web UI")
-        print("  cli.py web --port 8080                   # Custom port")
+        print("  cli.py portal                            # Start management portal")
+        print("  cli.py portal --port 8080                # Custom port")
         print("  cli.py cost estimate plan --request 'Add auth'")
         print("  cli.py cost report daily                 # Daily cost report")
         print("  cli.py cost budget show                  # Show budget status")
@@ -607,7 +675,7 @@ def main():
     handler = COMMANDS[cmd][0]
 
     # Commands that don't take args
-    if cmd in ['setup', 'list', 'experts']:
+    if cmd in ['setup', 'list']:
         return handler()
     else:
         return handler(args)

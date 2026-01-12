@@ -1,23 +1,29 @@
 """
 Smart Planning Workflow: Analyzes complexity and decomposes large features.
 
-For simple features: Scout → Architect → Planner → Validator
-For complex features: Analyzer → Decomposer → [Sub-plans] → Synthesizer → Validator
+For simple features: Scout → Architect → [Expert Consultation] → Planner → Validator
+For complex features: Analyzer → [Expert Consultation] → Decomposer → [Sub-plans] → Synthesizer → Validator
 
 Context Protection:
 - Each sub-feature runs in isolated context
 - Summarized context passed between agents
 - Token budget tracked per agent
+
+Expert Consultation:
+- All domain/module experts are consulted during planning
+- Expert insights feed into the planner for domain-aware plans
 """
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from core import Agent, Workflow, WorkflowResult
+from core.expert_loader import ExpertLoader, ExpertType
+from core.docs_loader import DocsLoader
 
 
 @dataclass
@@ -28,6 +34,16 @@ class SubFeaturePlan:
     scout_result: str
     architect_result: str
     planner_result: str
+
+
+@dataclass
+class ExpertInsight:
+    """Insight from a domain/module expert during planning."""
+    expert_name: str
+    expert_type: str
+    insights: str
+    recommendations: list[str] = field(default_factory=list)
+    concerns: list[str] = field(default_factory=list)
 
 
 class PlanningWorkflow(Workflow):
@@ -73,10 +89,13 @@ class PlanningWorkflow(Workflow):
         self.project_root = project_root
         self.max_parallel = max_parallel
         # Plans go to pending folder by default
-        output_dir = output_dir or project_root / ".specs" / "pending"
+        output_dir = output_dir or project_root / ".orchestrator" / "specs" / "pending"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         super().__init__(name="Smart Planning Workflow", output_dir=output_dir)
+
+        # Initialize expert loader for domain/module expert consultation
+        self.expert_loader = ExpertLoader(project_root)
 
         # Load all agents from .claude/agents/
         self._load_agents()
@@ -111,6 +130,142 @@ class PlanningWorkflow(Workflow):
             context_parts.append(f"\nConfig files: {', '.join(found_configs)}")
 
         return "\n".join(context_parts)
+
+    def _get_docs_context(self) -> str:
+        """Load project documentation context."""
+        try:
+            docs_loader = DocsLoader(self.project_root)
+            docs = docs_loader.load_docs()
+            if docs and docs.docs:
+                return docs.get_context_string(max_chars=4000)
+        except Exception:
+            pass
+        return ""
+
+    def _consult_domain_experts(
+        self,
+        request: str,
+        architect_result: str,
+        codebase_context: str
+    ) -> list[ExpertInsight]:
+        """
+        Consult ALL domain/module experts for planning insights.
+
+        Runs experts in parallel with ThreadPoolExecutor.
+        Each expert receives:
+        - The user's request
+        - Architecture design from architect agent
+        - Codebase context from scout
+        - Project documentation
+
+        Returns:
+            List of ExpertInsight with recommendations and concerns
+        """
+        from core.symbols import CHECK, WARNING
+
+        domain_experts = self.expert_loader.get_all_domain_experts()
+
+        if not domain_experts:
+            return []
+
+        self.console.print(f"\n[bold]Expert Consultation:[/bold] Consulting {len(domain_experts)} domain expert(s)...")
+
+        # Build context for experts
+        docs_context = self._get_docs_context()
+
+        expert_context = f"""## User Request
+{request}
+
+## Architecture Design
+{architect_result}
+
+## Codebase Context
+{codebase_context}
+"""
+        if docs_context:
+            expert_context += f"\n## Project Documentation\n{docs_context}"
+
+        expert_prompt = """Based on the user request and architecture design, provide planning insights from your domain expertise.
+
+Respond in this JSON format:
+```json
+{
+    "insights": "Your analysis of how this request relates to your domain",
+    "recommendations": ["Specific recommendation 1", "Specific recommendation 2"],
+    "concerns": ["Potential concern or risk 1", "Potential concern or risk 2"]
+}
+```
+
+Focus on:
+- Domain-specific patterns and best practices
+- Potential pitfalls or anti-patterns to avoid
+- Security or performance considerations in your domain
+- Integration points with other parts of the system
+"""
+
+        insights: list[ExpertInsight] = []
+
+        def consult_expert(expert) -> Optional[ExpertInsight]:
+            """Consult a single expert."""
+            try:
+                result = expert.run(expert_prompt, context=expert_context)
+                if result.success and result.content:
+                    # Parse JSON response
+                    parsed = self._parse_json_from_response(result.content)
+                    return ExpertInsight(
+                        expert_name=expert.name,
+                        expert_type=getattr(expert, 'expert_type', 'domain'),
+                        insights=parsed.get("insights", result.content),
+                        recommendations=parsed.get("recommendations", []),
+                        concerns=parsed.get("concerns", [])
+                    )
+            except Exception as e:
+                self.console.print(f"  [yellow]{WARNING}[/yellow] {expert.name}: {e}")
+            return None
+
+        # Run expert consultations in parallel
+        with ThreadPoolExecutor(max_workers=self.max_parallel) as executor:
+            futures = {
+                executor.submit(consult_expert, expert): expert
+                for expert in domain_experts
+            }
+
+            for future in as_completed(futures):
+                expert = futures[future]
+                try:
+                    insight = future.result()
+                    if insight:
+                        insights.append(insight)
+                        self.console.print(f"  [green]{CHECK}[/green] {expert.name}")
+                except Exception as e:
+                    self.console.print(f"  [yellow]{WARNING}[/yellow] {expert.name}: {e}")
+
+        return insights
+
+    def _compile_expert_insights(self, insights: list[ExpertInsight]) -> str:
+        """Compile expert insights into context string for planner."""
+        if not insights:
+            return ""
+
+        sections = ["## Domain Expert Insights\n"]
+
+        for insight in insights:
+            sections.append(f"### {insight.expert_name} ({insight.expert_type})\n")
+            sections.append(insight.insights)
+
+            if insight.recommendations:
+                sections.append("\n**Recommendations:**")
+                for rec in insight.recommendations:
+                    sections.append(f"- {rec}")
+
+            if insight.concerns:
+                sections.append("\n**Concerns:**")
+                for concern in insight.concerns:
+                    sections.append(f"- {concern}")
+
+            sections.append("")
+
+        return "\n".join(sections)
 
     def _smart_truncate(self, text: str, limit: int, preserve_start: int = 0) -> str:
         """
@@ -183,12 +338,26 @@ class PlanningWorkflow(Workflow):
             return WorkflowResult(success=False, error=f"Architect failed: {architect_result.error}")
         steps_completed.append("architect")
 
+        # Expert Consultation (after architect, before planner)
+        expert_insights = self._consult_domain_experts(
+            request=request,
+            architect_result=architect_result.content,
+            codebase_context=scout_result.content
+        )
+        expert_context = self._compile_expert_insights(expert_insights)
+        if expert_insights:
+            steps_completed.append(f"expert_consultation ({len(expert_insights)})")
+
         # Planner
         self.console.print("\n[bold]Phase 3:[/bold] Creating implementation plan...")
+        planner_context = f"## Context\n\n{scout_result.content}\n\n## Architecture\n\n{architect_result.content}"
+        if expert_context:
+            planner_context += f"\n\n{expert_context}"
+
         planner_result = self.run_agent(
             "planner",
             message=f"User request: {request}\n\nCreate detailed implementation steps.",
-            context=f"## Context\n\n{scout_result.content}\n\n## Architecture\n\n{architect_result.content}"
+            context=planner_context
         )
         if not planner_result.success:
             return WorkflowResult(success=False, error=f"Planner failed: {planner_result.error}")
@@ -211,7 +380,8 @@ class PlanningWorkflow(Workflow):
             scout=scout_result.content,
             architect=architect_result.content,
             planner=planner_result.content,
-            validator=validator_result.content
+            validator=validator_result.content,
+            expert_insights=expert_insights
         )
 
         filename = self._generate_filename(request)
@@ -323,18 +493,43 @@ class PlanningWorkflow(Workflow):
             context=codebase_context
         )
         cached_scout_result = global_scout.content if global_scout.success else None
+        from core.symbols import CHECK, WARNING
         if global_scout.success:
             steps_completed.append("global_scout")
-            self.console.print("  [green]✓[/green] Global scout cached")
+            self.console.print(f"  [green]{CHECK}[/green] Global scout cached")
         else:
-            self.console.print("  [yellow]⚠[/yellow] Global scout failed, sub-features will scout independently")
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Global scout failed, sub-features will scout independently")
 
-        # Phase 2b: Decompose
-        self.console.print("\n[bold]Phase 2b:[/bold] Decomposing into sub-features...")
+        # Phase 2b: Expert Consultation (for complex features)
+        # Run a preliminary architect to get high-level design for expert consultation
+        self.console.print("\n[bold]Phase 2b:[/bold] Preliminary architecture for expert consultation...")
+        prelim_architect = self.run_agent(
+            "architect",
+            message=f"User request: {request}\n\nProvide high-level architectural overview for a complex multi-feature implementation.",
+            context=f"## Analysis\n\n{json.dumps(analysis, indent=2)}\n\n## Codebase Context\n\n{cached_scout_result or codebase_context}"
+        )
+        prelim_arch_result = prelim_architect.content if prelim_architect.success else ""
+        if prelim_architect.success:
+            steps_completed.append("prelim_architect")
+
+        # Consult domain experts
+        expert_insights = self._consult_domain_experts(
+            request=request,
+            architect_result=prelim_arch_result,
+            codebase_context=cached_scout_result or codebase_context
+        )
+        expert_context = self._compile_expert_insights(expert_insights)
+        if expert_insights:
+            steps_completed.append(f"expert_consultation ({len(expert_insights)})")
+
+        # Phase 2c: Decompose
+        self.console.print("\n[bold]Phase 2c:[/bold] Decomposing into sub-features...")
         decomposer_context = f"## Analysis\n\n{json.dumps(analysis, indent=2)}\n\n## Codebase\n\n{codebase_context}"
         if cached_scout_result:
             scout_summary = self._smart_truncate(cached_scout_result, self.BASE_SCOUT_LIMIT)
             decomposer_context += f"\n\n## Scout Insights\n\n{scout_summary}"
+        if expert_context:
+            decomposer_context += f"\n\n{expert_context}"
 
         decomposer_result = self.run_agent(
             "decomposer",
@@ -374,21 +569,23 @@ class PlanningWorkflow(Workflow):
                     for sf in sub_features
                 }
 
-                for future in as_completed(futures):
+                from core.symbols import CHECK, CROSS
+            for future in as_completed(futures):
                     sf = futures[future]
                     try:
                         plan = future.result()
                         sub_plans.append(plan)
-                        self.console.print(f"  [green]✓[/green] {plan.name}")
+                        self.console.print(f"  [green]{CHECK}[/green] {plan.name}")
                     except Exception as e:
-                        self.console.print(f"  [red]✗[/red] {sf.get('name', 'Unknown')}: {e}")
+                        self.console.print(f"  [red]{CROSS}[/red] {sf.get('name', 'Unknown')}: {e}")
         else:
             # Sequential planning (with cached scout)
+            from core.symbols import CHECK
             for sf in sub_features:
                 self.console.print(f"  Planning: {sf.get('name', 'Unknown')}...")
                 plan = self._plan_sub_feature(sf, codebase_context, cached_scout_result, num_features)
                 sub_plans.append(plan)
-                self.console.print(f"  [green]✓[/green] {plan.name}")
+                self.console.print(f"  [green]{CHECK}[/green] {plan.name}")
 
         steps_completed.append(f"sub_plans ({len(sub_plans)})")
 
@@ -400,10 +597,14 @@ class PlanningWorkflow(Workflow):
             for sp in sub_plans
         ])
 
+        synthesizer_context = f"## Sub-Feature Plans\n\n{sub_plans_text}"
+        if expert_context:
+            synthesizer_context += f"\n\n{expert_context}"
+
         synthesizer_result = self.run_agent(
             "synthesizer",
             message=f"Original request: {request}\n\nCombine these sub-feature plans into a master plan.",
-            context=f"## Sub-Feature Plans\n\n{sub_plans_text}"
+            context=synthesizer_context
         )
         if not synthesizer_result.success:
             return WorkflowResult(success=False, error=f"Synthesizer failed: {synthesizer_result.error}")
@@ -427,7 +628,8 @@ class PlanningWorkflow(Workflow):
             decomposition=decomposition,
             sub_plans=sub_plans,
             synthesis=synthesizer_result.content,
-            validation=validator_result.content
+            validation=validator_result.content,
+            expert_insights=expert_insights
         )
 
         filename = "master-" + self._generate_filename(request)
@@ -473,13 +675,41 @@ class PlanningWorkflow(Workflow):
         else:
             return self._run_simple_planning(request, codebase_context)
 
-    def _compile_simple_plan(self, request: str, scout: str, architect: str, planner: str, validator: str) -> str:
+    def _compile_simple_plan(
+        self,
+        request: str,
+        scout: str,
+        architect: str,
+        planner: str,
+        validator: str,
+        expert_insights: Optional[list[ExpertInsight]] = None
+    ) -> str:
         """Compile simple plan."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        # Build expert insights section if available
+        expert_section = ""
+        if expert_insights:
+            expert_section = "\n---\n\n## Domain Expert Insights\n\n"
+            for insight in expert_insights:
+                expert_section += f"### {insight.expert_name} ({insight.expert_type})\n\n"
+                expert_section += f"{insight.insights}\n\n"
+                if insight.recommendations:
+                    expert_section += "**Recommendations:**\n"
+                    for rec in insight.recommendations:
+                        expert_section += f"- {rec}\n"
+                    expert_section += "\n"
+                if insight.concerns:
+                    expert_section += "**Concerns:**\n"
+                    for concern in insight.concerns:
+                        expert_section += f"- {concern}\n"
+                    expert_section += "\n"
+
         return f"""# Plan: {request}
 
 > Generated on {timestamp}
 > Complexity: Simple/Medium (single-pass planning)
+> Domain experts consulted: {len(expert_insights) if expert_insights else 0}
 
 ## Overview
 
@@ -496,7 +726,7 @@ class PlanningWorkflow(Workflow):
 ## Architecture Design
 
 {architect}
-
+{expert_section}
 ---
 
 ## Implementation Plan
@@ -517,7 +747,8 @@ class PlanningWorkflow(Workflow):
         decomposition: dict,
         sub_plans: list[SubFeaturePlan],
         synthesis: str,
-        validation: str
+        validation: str,
+        expert_insights: Optional[list[ExpertInsight]] = None
     ) -> str:
         """Compile master plan from decomposed planning."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -528,11 +759,30 @@ class PlanningWorkflow(Workflow):
             for sp in sub_plans
         ])
 
+        # Build expert insights section if available
+        expert_section = ""
+        if expert_insights:
+            expert_section = "\n---\n\n## Domain Expert Insights\n\n"
+            for insight in expert_insights:
+                expert_section += f"### {insight.expert_name} ({insight.expert_type})\n\n"
+                expert_section += f"{insight.insights}\n\n"
+                if insight.recommendations:
+                    expert_section += "**Recommendations:**\n"
+                    for rec in insight.recommendations:
+                        expert_section += f"- {rec}\n"
+                    expert_section += "\n"
+                if insight.concerns:
+                    expert_section += "**Concerns:**\n"
+                    for concern in insight.concerns:
+                        expert_section += f"- {concern}\n"
+                    expert_section += "\n"
+
         return f"""# Master Plan: {request}
 
 > Generated on {timestamp}
 > Complexity: {complexity.upper()} (decomposed planning)
 > Sub-features: {len(sub_plans)}
+> Domain experts consulted: {len(expert_insights) if expert_insights else 0}
 
 ## Overview
 
@@ -545,7 +795,7 @@ class PlanningWorkflow(Workflow):
 
 ### Sub-Features Planned
 {sub_features_summary}
-
+{expert_section}
 ---
 
 ## Master Implementation Plan

@@ -1,7 +1,7 @@
 """
-Agent: Loads agent definitions from .claude/agents/ and runs via Claude CLI.
+Agent: Loads agent definitions from .orchestrator/agents/ and runs via Claude CLI.
 
-The agent definitions (system prompts) live in .claude/agents/*.md
+The agent definitions (system prompts) live in .orchestrator/agents/*.md
 The orchestrator loads these and runs them via Claude Code CLI.
 
 Two modes:
@@ -68,10 +68,10 @@ class AgentResult:
 
 class Agent:
     """
-    A Claude Code agent that loads its definition from .claude/agents/.
+    A Claude Code agent that loads its definition from .orchestrator/agents/.
 
     Usage:
-        # Load agent from .claude/agents/scout.md
+        # Load agent from .orchestrator/agents/scout.md
         agent = Agent.load("scout", project_root=Path("."))
 
         # For planning/analysis (read-only)
@@ -104,16 +104,16 @@ class Agent:
     @classmethod
     def load(cls, name: str, project_root: Path) -> "Agent":
         """
-        Load an agent from .claude/agents/<name>.md
+        Load an agent from .orchestrator/agents/<name>.md
 
         Args:
-            name: Agent name (e.g., "scout" loads .claude/agents/scout.md)
+            name: Agent name (e.g., "scout" loads .orchestrator/agents/scout.md)
             project_root: Project root directory
 
         Returns:
             Agent instance with loaded system prompt
         """
-        agent_file = project_root / ".claude" / "agents" / f"{name}.md"
+        agent_file = project_root / ".orchestrator" / "agents" / f"{name}.md"
 
         if not agent_file.exists():
             raise FileNotFoundError(f"Agent not found: {agent_file}")

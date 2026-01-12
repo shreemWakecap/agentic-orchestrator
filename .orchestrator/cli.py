@@ -460,6 +460,8 @@ def _cost_report(args, reporter):
 
 def _cost_budget(args, budget_manager):
     """Handle cost budget subcommand."""
+    from core.cost import Budget
+
     if not args:
         print("Usage: cli.py cost budget <action> [options]")
         print("  Actions: show, set")

@@ -135,9 +135,15 @@ You are a TypeScript expert...
         experts = loader.list_experts()
 
         # Check that expert was parsed
+        # list_experts returns nested structure: tech -> {language, framework, tool, general}, domain -> [], module -> []
         all_experts = []
         for category, expert_list in experts.items():
-            all_experts.extend(expert_list)
+            if category == "tech":
+                # tech is a nested dict
+                for subcategory, items in expert_list.items():
+                    all_experts.extend(items)
+            else:
+                all_experts.extend(expert_list)
 
         # Should find typescript expert
         ts_experts = [e for e in all_experts if "typescript" in e.get("name", "").lower()]
@@ -209,9 +215,16 @@ Content
         experts = loader.list_experts()
 
         # Should only find .md files
+        # list_experts returns nested structure: tech -> {language, framework, tool, general}, domain -> [], module -> []
         all_names = []
         for category, expert_list in experts.items():
-            for e in expert_list:
-                all_names.append(e.get("name", ""))
+            if category == "tech":
+                # tech is a nested dict
+                for subcategory, items in expert_list.items():
+                    for e in items:
+                        all_names.append(e.get("name", ""))
+            else:
+                for e in expert_list:
+                    all_names.append(e.get("name", ""))
 
         assert "notes" not in all_names

@@ -212,26 +212,157 @@ def cmd_docs(args):
     return 0
 
 
-def cmd_experts():
-    """List available experts."""
+def cmd_experts(args=None):
+    """Manage expert agents (list, create)."""
+    from core.expert_loader import ExpertLoader, ExpertType
+
+    args = args or []
+
+    if not args or args[0] == "list":
+        return _experts_list()
+    elif args[0] == "create":
+        return _experts_create(args[1:])
+    else:
+        print(f"Unknown experts subcommand: {args[0]}")
+        print("\nUsage: cli.py experts <subcommand>")
+        print("\nSubcommands:")
+        print("  list                     List all experts by type")
+        print("  create <name> [options]  Create a new expert")
+        print("\nExamples:")
+        print("  cli.py experts list")
+        print("  cli.py experts create auth --type domain --keywords auth,login,jwt")
+        print("  cli.py experts create core-api --type module --module src/api")
+        print("  cli.py experts create fastapi --type tech --based-on python")
+        return 1
+
+
+def _experts_list():
+    """List all available experts grouped by type."""
     from core.expert_loader import ExpertLoader
 
-    print("Tech Experts\n" + "=" * 50)
+    print("Expert Agents\n" + "=" * 50)
 
     loader = ExpertLoader(PROJECT_ROOT)
     experts = loader.list_experts()
 
-    for category, items in experts.items():
-        if items:
-            print(f"\n{category.upper()}")
-            for e in items:
-                print(f"  {e['name']}: {e['description'][:50]}")
+    # Tech experts (grouped by category)
+    tech = experts.get("tech", {})
+    if any(tech.values()):
+        print("\nTECH EXPERTS")
+        for category in ["language", "framework", "tool", "general"]:
+            items = tech.get(category, [])
+            if items:
+                print(f"  [{category}]")
+                for e in items:
+                    desc = e['description'][:40] + "..." if len(e.get('description', '')) > 40 else e.get('description', '')
+                    print(f"    {e['name']}: {desc}")
 
+    # Domain experts
+    domain = experts.get("domain", [])
+    if domain:
+        print("\nDOMAIN EXPERTS")
+        for e in domain:
+            desc = e['description'][:40] + "..." if len(e.get('description', '')) > 40 else e.get('description', '')
+            print(f"  {e['name']}: {desc}")
+            if e.get('keywords'):
+                print(f"    Keywords: {', '.join(e['keywords'])}")
+
+    # Module experts
+    module = experts.get("module", [])
+    if module:
+        print("\nMODULE EXPERTS")
+        for e in module:
+            desc = e['description'][:40] + "..." if len(e.get('description', '')) > 40 else e.get('description', '')
+            print(f"  {e['name']}: {desc}")
+            if e.get('module_path'):
+                print(f"    Module: {e['module_path']}")
+
+    # Recommendations
     recommended = loader.get_recommended_experts(PROJECT_ROOT)
     if recommended:
-        print(f"\nRecommended: {', '.join(recommended)}")
+        print(f"\nRecommended for this project: {', '.join(recommended)}")
 
     return 0
+
+
+def _experts_create(args):
+    """Create a new expert agent."""
+    from core.expert_loader import ExpertLoader, ExpertType
+
+    if not args:
+        print("Usage: cli.py experts create <name> [options]")
+        print("\nOptions:")
+        print("  --type <tech|domain|module>  Expert type (default: tech)")
+        print("  --module <path>              Module path (for module experts)")
+        print("  --keywords <k1,k2,k3>        Domain keywords (for domain experts)")
+        print("  --based-on <tech>            Base technology (for tech experts)")
+        print("  --focus <description>        Specific focus area")
+        print("\nExamples:")
+        print("  cli.py experts create auth --type domain --keywords auth,login,jwt,session")
+        print("  cli.py experts create core-api --type module --module src/api")
+        print("  cli.py experts create fastapi --type tech --based-on python")
+        return 1
+
+    name = args[0]
+    expert_type = ExpertType.TECH
+    module_path = None
+    keywords = []
+    based_on = "python"
+    focus = ""
+
+    # Parse options
+    i = 1
+    while i < len(args):
+        arg = args[i]
+        if arg == "--type" and i + 1 < len(args):
+            type_str = args[i + 1].lower()
+            if type_str == "tech":
+                expert_type = ExpertType.TECH
+            elif type_str == "domain":
+                expert_type = ExpertType.DOMAIN
+            elif type_str == "module":
+                expert_type = ExpertType.MODULE
+            else:
+                print(f"Unknown expert type: {type_str}")
+                print("Valid types: tech, domain, module")
+                return 1
+            i += 2
+        elif arg == "--module" and i + 1 < len(args):
+            module_path = args[i + 1]
+            i += 2
+        elif arg == "--keywords" and i + 1 < len(args):
+            keywords = [k.strip() for k in args[i + 1].split(",")]
+            i += 2
+        elif arg == "--based-on" and i + 1 < len(args):
+            based_on = args[i + 1]
+            i += 2
+        elif arg == "--focus" and i + 1 < len(args):
+            focus = args[i + 1]
+            i += 2
+        else:
+            print(f"Unknown option: {arg}")
+            return 1
+
+    print(f"Creating {expert_type.value} expert: {name}")
+    print("=" * 50)
+
+    loader = ExpertLoader(PROJECT_ROOT)
+    success = loader.create_expert(
+        name=name,
+        expert_type=expert_type,
+        based_on=based_on,
+        focus=focus,
+        module_path=module_path,
+        domain_keywords=keywords if keywords else None
+    )
+
+    if success:
+        print(f"\nExpert '{name}' created successfully!")
+        print(f"Location: .claude/agents/experts/{name}.md")
+        return 0
+    else:
+        print(f"\nFailed to create expert '{name}'")
+        return 1
 
 
 def cmd_web(args):
@@ -496,7 +627,7 @@ COMMANDS = {
     'fix': (cmd_fix, "Fix issues from review"),
     'list': (cmd_list, "List all plans"),
     'docs': (cmd_docs, "Check documentation"),
-    'experts': (cmd_experts, "List tech experts"),
+    'experts': (cmd_experts, "Manage expert agents"),
     'cost': (cmd_cost, "Cost estimation and budgets"),
     'test': (cmd_test, "Run test suite"),
     'web': (cmd_web, "Start web UI server"),
@@ -517,6 +648,8 @@ def main():
         print("  cli.py review .specs/completed/user-auth.md")
         print("  cli.py fix .specs/reviews/review-user-auth.md")
         print("  cli.py fix .specs/reviews/review.md --dry-run")
+        print("  cli.py experts list                      # List all experts")
+        print("  cli.py experts create auth --type domain --keywords auth,login")
         print("  cli.py test                              # Run all tests")
         print("  cli.py test --unit                       # Run unit tests only")
         print("  cli.py test --integration                # Run integration tests only")
@@ -540,7 +673,7 @@ def main():
     handler = COMMANDS[cmd][0]
 
     # Commands that don't take args
-    if cmd in ['setup', 'list', 'experts']:
+    if cmd in ['setup', 'list']:
         return handler()
     else:
         return handler(args)

@@ -2,7 +2,7 @@
 from .agent import Agent, AgentResult
 from .workflow import Workflow, WorkflowResult, WorkflowCancelledError
 from .docs_loader import DocsLoader, load_docs
-from .expert_loader import ExpertLoader, ExpertInfo
+from .expert_loader import ExpertLoader, ExpertInfo, ExpertType
 
 __all__ = [
     "Agent",
@@ -14,4 +14,5 @@ __all__ = [
     "load_docs",
     "ExpertLoader",
     "ExpertInfo",
+    "ExpertType",
 ]

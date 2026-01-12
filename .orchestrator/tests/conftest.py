@@ -31,17 +31,20 @@ def project_root(tmp_path: Path) -> Path:
     Create isolated project directory with required structure.
 
     Creates:
-    - .specs/ directories (pending, in-progress, completed, failed, reviews, fixes)
-    - .claude/agents/ with agent definitions copied from real project
-    - ai_docs/ directory
+    - .orchestrator/specs/ directories (pending, in-progress, completed, failed, reviews, fixes)
+    - .orchestrator/agents/ with agent definitions copied from real project
+    - .orchestrator/docs/ directory
     """
-    # Create .specs directories
+    # Create .orchestrator directory structure
+    orchestrator_dir = tmp_path / ".orchestrator"
+
+    # Create specs directories
     specs_dirs = ["pending", "in-progress", "completed", "failed", "reviews", "fixes"]
     for d in specs_dirs:
-        (tmp_path / ".specs" / d).mkdir(parents=True, exist_ok=True)
+        (orchestrator_dir / "specs" / d).mkdir(parents=True, exist_ok=True)
 
     # Create agents directory
-    agents_dir = tmp_path / ".claude" / "agents"
+    agents_dir = orchestrator_dir / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
 
     # Create experts directory
@@ -49,7 +52,7 @@ def project_root(tmp_path: Path) -> Path:
     experts_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy agent definitions from real project
-    real_agents = PROJECT_ROOT / ".claude" / "agents"
+    real_agents = PROJECT_ROOT / ".orchestrator" / "agents"
     if real_agents.exists():
         for agent_file in real_agents.glob("*.md"):
             shutil.copy(agent_file, agents_dir)
@@ -59,8 +62,8 @@ def project_root(tmp_path: Path) -> Path:
             for expert_file in real_experts.glob("*.md"):
                 shutil.copy(expert_file, experts_dir)
 
-    # Create ai_docs directory
-    (tmp_path / "ai_docs").mkdir(parents=True, exist_ok=True)
+    # Create docs directory
+    (orchestrator_dir / "docs").mkdir(parents=True, exist_ok=True)
 
     return tmp_path
 
@@ -259,7 +262,7 @@ Issues:
 @pytest.fixture
 def pending_plan(project_root: Path, sample_simple_plan: str) -> Path:
     """Create a plan file in the pending directory."""
-    plan_path = project_root / ".specs" / "pending" / "test_plan.md"
+    plan_path = project_root / ".orchestrator" / "specs" / "pending" / "test_plan.md"
     plan_path.write_text(sample_simple_plan, encoding="utf-8")
     return plan_path
 
@@ -267,7 +270,7 @@ def pending_plan(project_root: Path, sample_simple_plan: str) -> Path:
 @pytest.fixture
 def completed_plan(project_root: Path, sample_simple_plan: str) -> Path:
     """Create a plan file in the completed directory."""
-    plan_path = project_root / ".specs" / "completed" / "test_feature.md"
+    plan_path = project_root / ".orchestrator" / "specs" / "completed" / "test_feature.md"
     plan_path.write_text(sample_simple_plan, encoding="utf-8")
 
     # Create some source files to review
@@ -288,7 +291,7 @@ def completed_plan(project_root: Path, sample_simple_plan: str) -> Path:
 @pytest.fixture
 def review_report(project_root: Path, sample_review_report: str) -> Path:
     """Create a review report file."""
-    review_path = project_root / ".specs" / "reviews" / "review-test-feature.md"
+    review_path = project_root / ".orchestrator" / "specs" / "reviews" / "review-test-feature.md"
     review_path.write_text(sample_review_report, encoding="utf-8")
     return review_path
 

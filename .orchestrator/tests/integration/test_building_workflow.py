@@ -27,10 +27,10 @@ class TestBuildingWorkflowInit:
         """Test workflow creates .specs directory structure."""
         workflow = BuildingWorkflow(project_root=project_root)
 
-        assert (project_root / ".specs" / "pending").exists()
-        assert (project_root / ".specs" / "in-progress").exists()
-        assert (project_root / ".specs" / "completed").exists()
-        assert (project_root / ".specs" / "failed").exists()
+        assert (project_root / ".orchestrator" / "specs" / "pending").exists()
+        assert (project_root / ".orchestrator" / "specs" / "in-progress").exists()
+        assert (project_root / ".orchestrator" / "specs" / "completed").exists()
+        assert (project_root / ".orchestrator" / "specs" / "failed").exists()
 
 
 class TestBuildState:
@@ -240,7 +240,7 @@ class TestBuildingWorkflowExecution:
         workflow._save_state(pending_plan)
 
         # Move plan to in-progress for the test
-        in_progress = project_root / ".specs" / "in-progress" / pending_plan.name
+        in_progress = project_root / ".orchestrator" / "specs" / "in-progress" / pending_plan.name
         pending_plan.rename(in_progress)
         state_file = pending_plan.parent / f".{pending_plan.stem}.state.json"
         if state_file.exists():

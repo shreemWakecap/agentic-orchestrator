@@ -26,7 +26,7 @@ class TestReviewingWorkflowInit:
     def test_workflow_creates_reviews_dir(self, project_root):
         """Test workflow creates reviews directory."""
         workflow = ReviewingWorkflow(project_root=project_root)
-        assert (project_root / ".specs" / "reviews").exists()
+        assert (project_root / ".orchestrator" / "specs" / "reviews").exists()
 
 
 class TestReviewResult:

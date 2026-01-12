@@ -20,7 +20,7 @@ class TestExpertLoader:
     def test_discover_experts(self, project_root):
         """Test expert discovery from filesystem."""
         # Create an expert file
-        experts_dir = project_root / ".claude" / "agents" / "experts"
+        experts_dir = project_root / ".orchestrator" / "agents" / "experts"
         experts_dir.mkdir(parents=True, exist_ok=True)
 
         expert_file = experts_dir / "python.md"
@@ -56,7 +56,7 @@ Review Python code for best practices.
     def test_get_experts_for_stack(self, project_root):
         """Test getting experts for a tech stack."""
         # Create python expert
-        experts_dir = project_root / ".claude" / "agents" / "experts"
+        experts_dir = project_root / ".orchestrator" / "agents" / "experts"
         experts_dir.mkdir(parents=True, exist_ok=True)
 
         expert_file = experts_dir / "python.md"
@@ -116,7 +116,7 @@ dependencies = ["fastapi", "sqlalchemy"]
 
     def test_expert_parsing(self, project_root):
         """Test parsing expert metadata from frontmatter."""
-        experts_dir = project_root / ".claude" / "agents" / "experts"
+        experts_dir = project_root / ".orchestrator" / "agents" / "experts"
         experts_dir.mkdir(parents=True, exist_ok=True)
 
         expert_file = experts_dir / "typescript.md"
@@ -149,7 +149,7 @@ class TestExpertLoaderEdgeCases:
 
     def test_handles_malformed_frontmatter(self, project_root):
         """Test loader handles malformed frontmatter gracefully."""
-        experts_dir = project_root / ".claude" / "agents" / "experts"
+        experts_dir = project_root / ".orchestrator" / "agents" / "experts"
         experts_dir.mkdir(parents=True, exist_ok=True)
 
         # Create expert with malformed frontmatter
@@ -177,7 +177,7 @@ category language  # No colon
 
     def test_handles_empty_expert_file(self, project_root):
         """Test loader handles empty expert files."""
-        experts_dir = project_root / ".claude" / "agents" / "experts"
+        experts_dir = project_root / ".orchestrator" / "agents" / "experts"
         experts_dir.mkdir(parents=True, exist_ok=True)
 
         expert_file = experts_dir / "empty.md"
@@ -189,7 +189,7 @@ category language  # No colon
 
     def test_ignores_non_md_files(self, project_root):
         """Test loader ignores non-.md files."""
-        experts_dir = project_root / ".claude" / "agents" / "experts"
+        experts_dir = project_root / ".orchestrator" / "agents" / "experts"
         experts_dir.mkdir(parents=True, exist_ok=True)
 
         # Create non-md file

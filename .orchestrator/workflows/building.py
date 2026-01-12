@@ -126,7 +126,7 @@ class BuildingWorkflow(Workflow):
     ):
         self.project_root = project_root
         self.max_parallel = max_parallel
-        self.specs_dir = specs_dir or project_root / ".specs"
+        self.specs_dir = specs_dir or project_root / ".orchestrator" / "specs"
 
         # Ensure directory structure
         self._ensure_specs_structure()
@@ -140,7 +140,7 @@ class BuildingWorkflow(Workflow):
         self.build_state: Optional[BuildState] = None
 
     def _ensure_specs_structure(self):
-        """Create the .specs directory structure."""
+        """Create the specs directory structure."""
         dirs = ["pending", "in-progress", "completed", "failed"]
         for d in dirs:
             (self.specs_dir / d).mkdir(parents=True, exist_ok=True)
@@ -595,7 +595,7 @@ Provide a quality assessment.""",
             plan_path = self.project_root / plan_path_str
 
         if not plan_path.exists():
-            # Try in .specs directories
+            # Try in specs directories
             for subdir in ["pending", "in-progress", ""]:
                 test_path = self.specs_dir / subdir / plan_path.name if subdir else self.specs_dir / plan_path.name
                 if test_path.exists():
@@ -726,7 +726,7 @@ def main():
 
     if len(sys.argv) < 2:
         print("Usage: python -m orchestrator.workflows.building <plan-file>")
-        print("Example: python -m orchestrator.workflows.building .specs/pending/user-auth.md")
+        print("Example: python -m orchestrator.workflows.building .orchestrator/specs/pending/user-auth.md")
         sys.exit(1)
 
     plan_path = sys.argv[1]

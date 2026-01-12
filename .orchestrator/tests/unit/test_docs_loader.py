@@ -98,16 +98,16 @@ class TestDocsLoader:
     def test_loader_initialization(self, tmp_path):
         """Test DocsLoader initialization."""
         loader = DocsLoader(tmp_path)
-        assert loader.docs_dir == tmp_path / "ai_docs"
+        assert loader.docs_dir == tmp_path / ".orchestrator" / "docs"
 
     def test_get_status_empty(self, tmp_path):
         """Test get_status with no docs."""
-        # Create empty ai_docs directory
-        ai_docs = tmp_path / "ai_docs"
-        ai_docs.mkdir()
+        # Create empty docs directory
+        docs_dir = tmp_path / ".orchestrator" / "docs"
+        docs_dir.mkdir(parents=True)
 
         # Create README with no URLs
-        readme = ai_docs / "README.md"
+        readme = docs_dir / "README.md"
         readme.write_text("# AI Docs\n\nNo URLs here.")
 
         loader = DocsLoader(tmp_path)
@@ -120,10 +120,10 @@ class TestDocsLoader:
 
     def test_get_status_with_urls(self, tmp_path):
         """Test get_status with URLs in README."""
-        ai_docs = tmp_path / "ai_docs"
-        ai_docs.mkdir()
+        docs_dir = tmp_path / ".orchestrator" / "docs"
+        docs_dir.mkdir(parents=True)
 
-        readme = ai_docs / "README.md"
+        readme = docs_dir / "README.md"
         readme.write_text("""# AI Docs
 
 ## Sources
@@ -139,14 +139,14 @@ class TestDocsLoader:
 
     def test_get_status_with_fetched_docs(self, tmp_path):
         """Test get_status with fetched docs."""
-        ai_docs = tmp_path / "ai_docs"
-        ai_docs.mkdir()
+        docs_dir = tmp_path / ".orchestrator" / "docs"
+        docs_dir.mkdir(parents=True)
 
-        readme = ai_docs / "README.md"
+        readme = docs_dir / "README.md"
         readme.write_text("- https://example.com/test")
 
         # Create fetched doc file
-        doc_file = ai_docs / "example_com_test.md"
+        doc_file = docs_dir / "example_com_test.md"
         doc_file.write_text("# Fetched content")
 
         loader = DocsLoader(tmp_path)
@@ -212,15 +212,15 @@ class TestDocsLoader:
 
     def test_load_docs_creates_context(self, tmp_path):
         """Test load_docs creates DocsContext."""
-        ai_docs = tmp_path / "ai_docs"
-        ai_docs.mkdir()
+        docs_dir = tmp_path / ".orchestrator" / "docs"
+        docs_dir.mkdir(parents=True)
 
         # Create a doc file
-        doc_file = ai_docs / "test_doc.md"
+        doc_file = docs_dir / "test_doc.md"
         doc_file.write_text("# Test\n\nContent here")
 
         # Create README
-        readme = ai_docs / "README.md"
+        readme = docs_dir / "README.md"
         readme.write_text("# Docs")
 
         loader = DocsLoader(tmp_path)
@@ -232,10 +232,10 @@ class TestDocsLoader:
         """Test stale document detection."""
         from core.docs_loader import url_to_filename
 
-        ai_docs = tmp_path / "ai_docs"
-        ai_docs.mkdir()
+        docs_dir = tmp_path / ".orchestrator" / "docs"
+        docs_dir.mkdir(parents=True)
 
-        readme = ai_docs / "README.md"
+        readme = docs_dir / "README.md"
         readme.write_text("- https://example.com/doc")
 
         # Create doc file with the correct filename derived from URL
@@ -270,10 +270,10 @@ class TestDocsLoaderIntegration:
         mock_client.__enter__ = MagicMock(return_value=mock_client)
         mock_client.__exit__ = MagicMock(return_value=False)
 
-        ai_docs = tmp_path / "ai_docs"
-        ai_docs.mkdir()
+        docs_dir = tmp_path / ".orchestrator" / "docs"
+        docs_dir.mkdir(parents=True)
 
-        readme = ai_docs / "README.md"
+        readme = docs_dir / "README.md"
         readme.write_text("- https://example.com/newdoc")
 
         loader = DocsLoader(tmp_path)
@@ -284,7 +284,7 @@ class TestDocsLoaderIntegration:
         assert result["updated"] >= 0
 
     def test_docs_directory_created_if_missing(self, tmp_path):
-        """Test ai_docs directory is created if missing."""
+        """Test docs directory is created if missing."""
         loader = DocsLoader(tmp_path)
 
         # Should not raise even if ai_docs doesn't exist

@@ -5,9 +5,9 @@ SDLC Orchestrator CLI - Unified entry point.
 Usage:
     uv run python .orchestrator/cli.py setup
     uv run python .orchestrator/cli.py plan "Add user authentication"
-    uv run python .orchestrator/cli.py build .specs/pending/plan.md
-    uv run python .orchestrator/cli.py review .specs/completed/plan.md
-    uv run python .orchestrator/cli.py fix .specs/reviews/review.md
+    uv run python .orchestrator/cli.py build .orchestrator/specs/pending/plan.md
+    uv run python .orchestrator/cli.py review .orchestrator/specs/completed/plan.md
+    uv run python .orchestrator/cli.py fix .orchestrator/specs/reviews/review.md
     uv run python .orchestrator/cli.py list
     uv run python .orchestrator/cli.py docs
     uv run python .orchestrator/cli.py experts
@@ -22,7 +22,7 @@ from pathlib import Path
 # Setup paths
 ORCHESTRATOR_DIR = Path(__file__).parent
 PROJECT_ROOT = ORCHESTRATOR_DIR.parent
-SPECS_DIR = PROJECT_ROOT / ".specs"
+SPECS_DIR = ORCHESTRATOR_DIR / "specs"
 
 sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
@@ -49,10 +49,10 @@ def cmd_setup():
 
     # 2. Directories
     print("\n[2/3] Directories...")
-    for d in ['.specs', '.orchestrator/experts', '.orchestrator/config', 'ai_docs']:
-        path = PROJECT_ROOT / d
+    for d in ['specs', 'agents/experts', 'config', 'docs']:
+        path = ORCHESTRATOR_DIR / d
         path.mkdir(parents=True, exist_ok=True)
-        print(f"  [+] {d}")
+        print(f"  [+] .orchestrator/{d}")
 
     # 3. Docs
     print("\n[3/3] Documentation...")
@@ -131,7 +131,7 @@ def cmd_fix(args):
         print("\nOptions:")
         print("  --dry-run         Show fixes without applying")
         print("  --min-severity    Minimum severity (critical|high|medium|low)")
-        print("\nExample: cli.py fix .specs/reviews/review-auth-20240115.md")
+        print("\nExample: cli.py fix .orchestrator/specs/reviews/review-auth-20240115.md")
         cmd_list()
         return 1
 
@@ -360,7 +360,7 @@ def _experts_create(args):
 
     if success:
         print(f"\nExpert '{name}' created successfully!")
-        print(f"Location: .claude/agents/experts/{name}.md")
+        print(f"Location: .orchestrator/agents/experts/{name}.md")
         return 0
     else:
         print(f"\nFailed to create expert '{name}'")
@@ -410,7 +410,7 @@ def cmd_cost(args):
         print("  budget set           Set budget limits")
         print("\nExamples:")
         print("  cli.py cost estimate plan --request 'Add authentication'")
-        print("  cli.py cost estimate build --plan .specs/pending/auth.md")
+        print("  cli.py cost estimate build --plan .orchestrator/specs/pending/auth.md")
         print("  cli.py cost report daily")
         print("  cli.py cost budget show")
         print("  cli.py cost budget set --daily 10.00 --monthly 100.00")
@@ -646,10 +646,10 @@ def main():
         print("\nExamples:")
         print("  cli.py setup")
         print("  cli.py plan 'Add user authentication'")
-        print("  cli.py build .specs/pending/user-auth.md")
-        print("  cli.py review .specs/completed/user-auth.md")
-        print("  cli.py fix .specs/reviews/review-user-auth.md")
-        print("  cli.py fix .specs/reviews/review.md --dry-run")
+        print("  cli.py build .orchestrator/specs/pending/user-auth.md")
+        print("  cli.py review .orchestrator/specs/completed/user-auth.md")
+        print("  cli.py fix .orchestrator/specs/reviews/review-user-auth.md")
+        print("  cli.py fix .orchestrator/specs/reviews/review.md --dry-run")
         print("  cli.py experts list                      # List all experts")
         print("  cli.py experts create auth --type domain --keywords auth,login")
         print("  cli.py test                              # Run all tests")

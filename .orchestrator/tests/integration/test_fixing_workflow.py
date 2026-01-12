@@ -26,7 +26,7 @@ class TestFixingWorkflowInit:
     def test_workflow_creates_fixes_dir(self, project_root):
         """Test workflow creates fixes directory."""
         workflow = FixingWorkflow(project_root=project_root)
-        assert (project_root / ".specs" / "fixes").exists()
+        assert (project_root / ".orchestrator" / "specs" / "fixes").exists()
 
     def test_workflow_dry_run_mode(self, project_root):
         """Test dry run mode initialization."""

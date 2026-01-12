@@ -1,7 +1,7 @@
 """
-Docs Loader - Simple documentation fetcher for ai_docs/.
+Docs Loader - Simple documentation fetcher for .orchestrator/docs/.
 
-Fetches URLs from ai_docs/README.md, saves as markdown files.
+Fetches URLs from .orchestrator/docs/README.md, saves as markdown files.
 Uses file modification time for staleness (>2 days = stale).
 """
 import re
@@ -196,10 +196,10 @@ class DocsContext:
 
 
 class DocsLoader:
-    """Simple docs loader for ai_docs/."""
+    """Simple docs loader for .orchestrator/docs/."""
 
     def __init__(self, project_root: Path):
-        self.docs_dir = project_root / 'ai_docs'
+        self.docs_dir = project_root / '.orchestrator' / 'docs'
         self.readme = self.docs_dir / 'README.md'
         self._last_fetch = 0.0
 
@@ -304,5 +304,5 @@ class DocsLoader:
 
 # Convenience function
 def load_docs(project_root: Path) -> list[dict]:
-    """Load docs from ai_docs/."""
+    """Load docs from .orchestrator/docs/."""
     return DocsLoader(project_root).load()

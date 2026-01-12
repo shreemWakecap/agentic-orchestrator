@@ -85,7 +85,7 @@ class ReviewingWorkflow(Workflow):
         self.max_parallel = max_parallel
         self.refresh_docs = refresh_docs
 
-        output_dir = output_dir or project_root / ".specs" / "reviews"
+        output_dir = output_dir or project_root / ".orchestrator" / "specs" / "reviews"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         super().__init__(name="Smart Review Workflow", output_dir=output_dir)
@@ -674,7 +674,7 @@ Score: {standards.score}/100
 
         # Try to find in completed folder
         if not plan_path.exists():
-            completed_path = self.project_root / ".specs" / "completed" / plan_path.name
+            completed_path = self.project_root / ".orchestrator" / "specs" / "completed" / plan_path.name
             if completed_path.exists():
                 plan_path = completed_path
 
@@ -749,7 +749,7 @@ def main():
 
     if len(sys.argv) < 2:
         print("Usage: python -m orchestrator.workflows.reviewing <plan-file>")
-        print("Example: python -m orchestrator.workflows.reviewing .specs/completed/user-auth.md")
+        print("Example: python -m orchestrator.workflows.reviewing .orchestrator/specs/completed/user-auth.md")
         sys.exit(1)
 
     plan_path = sys.argv[1]

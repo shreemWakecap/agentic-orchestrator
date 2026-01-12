@@ -26,7 +26,7 @@ class TestPlanningWorkflowSimple:
     def test_workflow_creates_output_dir(self, project_root):
         """Test workflow creates output directory."""
         workflow = PlanningWorkflow(project_root=project_root)
-        assert (project_root / ".specs" / "pending").exists()
+        assert (project_root / ".orchestrator" / "specs" / "pending").exists()
 
     def test_generate_filename(self, project_root):
         """Test filename generation from request."""

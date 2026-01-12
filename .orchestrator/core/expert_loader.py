@@ -1,7 +1,7 @@
 """
 Expert Loader: Manages tech-specific, domain, and module expert agents.
 
-Loads experts from .claude/agents/experts/ directory:
+Loads experts from .orchestrator/agents/experts/ directory:
 - Discovers available experts (tech, domain, module types)
 - Matches experts to detected tech stack
 - Can trigger meta-expert to create new experts
@@ -57,7 +57,7 @@ class ExpertLoader:
 
     def __init__(self, project_root: Path):
         self.project_root = project_root
-        self.experts_dir = project_root / ".claude" / "agents" / "experts"
+        self.experts_dir = project_root / ".orchestrator" / "agents" / "experts"
         self.console = Console()
 
         # Ensure directory exists

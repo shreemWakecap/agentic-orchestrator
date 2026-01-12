@@ -89,7 +89,7 @@ class PlanningWorkflow(Workflow):
         self.project_root = project_root
         self.max_parallel = max_parallel
         # Plans go to pending folder by default
-        output_dir = output_dir or project_root / ".specs" / "pending"
+        output_dir = output_dir or project_root / ".orchestrator" / "specs" / "pending"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         super().__init__(name="Smart Planning Workflow", output_dir=output_dir)

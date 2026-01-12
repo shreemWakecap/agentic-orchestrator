@@ -30,7 +30,6 @@ ai_docs/*.md
 ai_docs/.cache/
 
 # Generated
-.local_improvements/
 .ruff_cache/
 uv.lock
 *.lock

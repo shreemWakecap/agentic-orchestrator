@@ -79,7 +79,7 @@ class FixRequest(BaseModel):
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Render main dashboard."""
-    specs_dir = PROJECT_ROOT / ".specs"
+    specs_dir = ORCHESTRATOR_DIR / "specs"
 
     # Count plans by state
     counts = {
@@ -418,7 +418,7 @@ async def api_set_budget(request: BudgetUpdateRequest):
 
 async def _get_all_plans() -> List[Dict]:
     """Get all plans across all states."""
-    specs_dir = PROJECT_ROOT / ".specs"
+    specs_dir = ORCHESTRATOR_DIR / "specs"
     plans = []
 
     for state in ["pending", "in-progress", "completed", "failed"]:
@@ -445,7 +445,7 @@ async def _get_recent_plans(limit: int) -> List[Dict]:
 
 async def _get_plan_by_id(plan_id: str) -> Optional[Dict]:
     """Get a specific plan by ID."""
-    specs_dir = PROJECT_ROOT / ".specs"
+    specs_dir = ORCHESTRATOR_DIR / "specs"
 
     for state in ["pending", "in-progress", "completed", "failed"]:
         plan_file = specs_dir / state / f"{plan_id}.md"
@@ -464,7 +464,7 @@ async def _get_plan_by_id(plan_id: str) -> Optional[Dict]:
 
 async def _get_all_reviews() -> List[Dict]:
     """Get all review reports."""
-    reviews_dir = PROJECT_ROOT / ".specs" / "reviews"
+    reviews_dir = ORCHESTRATOR_DIR / "specs" / "reviews"
     reviews = []
 
     if reviews_dir.exists():

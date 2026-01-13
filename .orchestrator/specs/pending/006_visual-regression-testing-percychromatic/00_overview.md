@@ -1,0 +1,16 @@
+# Plan: Add visual regression testing (Percy/Chromatic)
+
+> Generated on 2026-01-13 23:48
+> Complexity: Simple/Medium (single-pass planning)
+> Domain experts consulted: 0
+
+## Overview
+
+**Request:** Add visual regression testing (Percy/Chromatic)
+
+## Plan Structure
+
+- `01_context.md` - Codebase context and analysis
+- `02_architecture.md` - Architecture design
+- `03_implementation.md` - Step-by-step implementation plan
+- `04_validation.md` - Validation checklist and criteria

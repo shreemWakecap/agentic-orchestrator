@@ -50,6 +50,9 @@ class ExpertLoader:
         # Domain experts (for planning)
         domain_experts = loader.get_all_domain_experts()
 
+        # Find missing experts
+        gaps = loader.find_missing_experts()
+
         # Create new experts
         loader.create_expert("auth", expert_type=ExpertType.DOMAIN,
                             domain_keywords=["auth", "login", "jwt"])
@@ -208,15 +211,7 @@ class ExpertLoader:
         return domain_experts
 
     def get_experts_by_type(self, expert_type: ExpertType) -> list[ExpertInfo]:
-        """
-        Get all experts of a specific type.
-
-        Args:
-            expert_type: The type of experts to retrieve
-
-        Returns:
-            List of ExpertInfo for matching experts
-        """
+        """Get all experts of a specific type."""
         return [e for e in self.discover_experts() if e.expert_type == expert_type]
 
     def list_experts(self) -> dict:
@@ -255,6 +250,18 @@ class ExpertLoader:
 
         return result
 
+    def find_missing_experts(self) -> list[dict]:
+        """
+        Find technologies without expert coverage.
+
+        Returns:
+            List of gaps with name, type, category, confidence
+        """
+        from .system_explorer import find_missing_experts
+
+        existing_names = [e.name for e in self.discover_experts()]
+        return find_missing_experts(self.project_root, existing_names)
+
     def create_expert(
         self,
         name: str,
@@ -262,7 +269,8 @@ class ExpertLoader:
         based_on: str = "python",
         focus: str = "",
         module_path: Optional[str] = None,
-        domain_keywords: Optional[list[str]] = None
+        domain_keywords: Optional[list[str]] = None,
+        use_ultra_think: bool = True
     ) -> bool:
         """
         Create a new expert using the meta-expert.
@@ -274,6 +282,7 @@ class ExpertLoader:
             focus: Specific focus area
             module_path: Path to module code (for MODULE type)
             domain_keywords: Keywords for domain matching (for DOMAIN type)
+            use_ultra_think: Use deep reasoning mode (default: True)
 
         Returns:
             True if expert was created successfully
@@ -284,7 +293,14 @@ class ExpertLoader:
             return False
 
         # Build context based on expert type
-        context_parts = [f"Expert Type: {expert_type.value}"]
+        context_parts = []
+
+        # Add ultra think trigger
+        if use_ultra_think:
+            context_parts.append("[ULTRA_THINK]")
+            context_parts.append("")
+
+        context_parts.append(f"Expert Type: {expert_type.value}")
 
         if expert_type == ExpertType.TECH:
             context_parts.append(f"Based on: {based_on}")

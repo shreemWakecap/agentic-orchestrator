@@ -95,7 +95,9 @@ async def dashboard(request: Request):
     for state in ["pending", "in-progress", "completed", "failed"]:
         state_dir = specs_dir / state
         if state_dir.exists():
-            count = len(list(state_dir.glob("*.md")))
+            # Count plan directories (e.g., 001_feature-name/) not .md files
+            count = len([d for d in state_dir.iterdir()
+                        if d.is_dir() and not d.name.startswith('.')])
             key = state.replace("-", "_")
             counts[key] = count
 
@@ -174,6 +176,28 @@ async def api_get_plan(plan_id: str):
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
     return plan
+
+
+@app.get("/api/plans/{plan_id}/files/{filename}")
+async def api_get_plan_file(plan_id: str, filename: str):
+    """Get content of a specific file within a plan."""
+    specs_dir = ORCHESTRATOR_DIR / "specs"
+
+    for state in ["pending", "in-progress", "completed", "failed"]:
+        plan_dir = specs_dir / state / plan_id
+        if plan_dir.exists() and plan_dir.is_dir():
+            file_path = plan_dir / filename
+            if file_path.exists() and file_path.is_file():
+                content = file_path.read_text(encoding="utf-8")
+                return {
+                    "plan_id": plan_id,
+                    "filename": filename,
+                    "content": content,
+                    "state": state
+                }
+            raise HTTPException(status_code=404, detail=f"File '{filename}' not found in plan")
+
+    raise HTTPException(status_code=404, detail="Plan not found")
 
 
 @app.post("/api/workflows/plan")
@@ -413,25 +437,56 @@ async def api_set_budget(request: BudgetUpdateRequest):
 
 # ============== Helper Functions ==============
 
+def _extract_plan_number(plan_id: str) -> int:
+    """Extract numeric prefix from plan ID (e.g., '001_feature' -> 1)."""
+    try:
+        prefix = plan_id.split('_')[0]
+        return int(prefix)
+    except (ValueError, IndexError):
+        return 999999  # Sort plans without numeric prefix at the end
+
+
 async def _get_all_plans() -> List[Dict]:
-    """Get all plans across all states."""
+    """Get all plans across all states, sorted by numeric prefix."""
     specs_dir = ORCHESTRATOR_DIR / "specs"
     plans = []
 
     for state in ["pending", "in-progress", "completed", "failed"]:
         state_dir = specs_dir / state
         if state_dir.exists():
-            for plan_file in state_dir.glob("*.md"):
-                if not plan_file.name.startswith("."):
-                    plans.append({
-                        "id": plan_file.stem,
-                        "name": plan_file.stem.replace("-", " ").replace("_", " ").title(),
-                        "state": state,
-                        "file": str(plan_file),
-                        "modified": datetime.fromtimestamp(plan_file.stat().st_mtime).isoformat()
-                    })
+            # Look for plan directories (e.g., 001_feature-name/)
+            for plan_dir in state_dir.iterdir():
+                if plan_dir.is_dir() and not plan_dir.name.startswith('.'):
+                    # Get list of files in the plan directory
+                    files = sorted([
+                        f.name for f in plan_dir.iterdir()
+                        if f.is_file() and not f.name.startswith('.')
+                    ])
 
-    return sorted(plans, key=lambda p: p["modified"], reverse=True)
+                    plan_data = {
+                        "id": plan_dir.name,
+                        "name": plan_dir.name.replace("-", " ").replace("_", " ").title(),
+                        "state": state,
+                        "file": str(plan_dir),
+                        "files": files,
+                        "modified": datetime.fromtimestamp(plan_dir.stat().st_mtime).isoformat()
+                    }
+
+                    # Try to load metadata for additional info
+                    metadata_file = plan_dir / "metadata.json"
+                    if metadata_file.exists():
+                        try:
+                            metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+                            plan_data["name"] = metadata.get("name", plan_data["name"])
+                            plan_data["request"] = metadata.get("request", "")
+                            plan_data["complexity"] = metadata.get("complexity", "unknown")
+                        except (json.JSONDecodeError, IOError):
+                            pass
+
+                    plans.append(plan_data)
+
+    # Sort by numeric prefix (001_, 002_, etc.)
+    return sorted(plans, key=lambda p: _extract_plan_number(p["id"]))
 
 
 async def _get_recent_plans(limit: int) -> List[Dict]:
@@ -445,16 +500,44 @@ async def _get_plan_by_id(plan_id: str) -> Optional[Dict]:
     specs_dir = ORCHESTRATOR_DIR / "specs"
 
     for state in ["pending", "in-progress", "completed", "failed"]:
-        plan_file = specs_dir / state / f"{plan_id}.md"
-        if plan_file.exists():
-            return {
+        # Look for plan directory matching the ID
+        plan_dir = specs_dir / state / plan_id
+        if plan_dir.exists() and plan_dir.is_dir():
+            plan_data = {
                 "id": plan_id,
                 "name": plan_id.replace("-", " ").replace("_", " ").title(),
                 "state": state,
-                "file": str(plan_file),
-                "content": plan_file.read_text(encoding="utf-8"),
-                "modified": datetime.fromtimestamp(plan_file.stat().st_mtime).isoformat()
+                "file": str(plan_dir),
+                "modified": datetime.fromtimestamp(plan_dir.stat().st_mtime).isoformat()
             }
+
+            # Load metadata if available
+            metadata_file = plan_dir / "metadata.json"
+            if metadata_file.exists():
+                try:
+                    metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+                    plan_data["name"] = metadata.get("name", plan_data["name"])
+                    plan_data["request"] = metadata.get("request", "")
+                    plan_data["complexity"] = metadata.get("complexity", "unknown")
+                    plan_data["metadata"] = metadata
+                except (json.JSONDecodeError, IOError):
+                    pass
+
+            # Load plan content from overview file
+            overview_file = plan_dir / "00_overview.md"
+            if overview_file.exists():
+                plan_data["content"] = overview_file.read_text(encoding="utf-8")
+            else:
+                # Fallback: concatenate all .md files
+                content_parts = []
+                for md_file in sorted(plan_dir.glob("*.md")):
+                    content_parts.append(f"# {md_file.stem}\n\n{md_file.read_text(encoding='utf-8')}\n\n")
+                plan_data["content"] = "".join(content_parts) if content_parts else ""
+
+            # List all plan files
+            plan_data["files"] = [f.name for f in plan_dir.iterdir() if f.is_file()]
+
+            return plan_data
 
     return None
 

@@ -778,11 +778,14 @@ def cmd_sync_remote(args=None):
         return result.stdout.strip() if capture else result
 
     def get_ai_response(prompt):
-        result = subprocess.run(
-            ["claude", "--print", "-p", prompt], cwd=PROJECT_ROOT,
-            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
-        )
-        return result.stdout.strip() if result.returncode == 0 else None
+        try:
+            result = subprocess.run(
+                ["claude", "--print", "-p", prompt], cwd=PROJECT_ROOT,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
+            )
+            return result.stdout.strip() if result.returncode == 0 else None
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return None
 
     print("=" * 60)
     print("SYNC REMOTE - Push changes via PR")

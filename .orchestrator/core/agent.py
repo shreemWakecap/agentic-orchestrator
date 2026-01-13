@@ -274,6 +274,8 @@ class Agent:
                     cwd=str(validated_cwd),
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=effective_timeout,
                     shell=False,
                 )
@@ -381,6 +383,8 @@ class Agent:
                     cwd=str(validated_cwd),
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=effective_timeout,
                     shell=False,
                 )

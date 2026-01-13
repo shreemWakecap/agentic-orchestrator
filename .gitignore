@@ -25,9 +25,9 @@ logs/
 .env.local
 
 # AI Docs (fetched docs, keep only README.md)
-ai_docs/*.md
-!ai_docs/README.md
-ai_docs/.cache/
+.orchestrator/docs/*.md
+!.orchestrator/docs/README.md
+.orchestrator/docs/.cache/
 
 # Generated
 .ruff_cache/

@@ -14,9 +14,13 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional, TypeVar
+
+from .config import get_agent_config, RetryConfig
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 # Transient errors that warrant retry
 TRANSIENT_ERRORS = (
@@ -51,6 +55,85 @@ def _safe_get(data: dict | list, key: str, default=None):
     if isinstance(data, dict):
         return data.get(key, default)
     return default
+
+
+@dataclass
+class RetryState:
+    """Tracks state across retry attempts."""
+    attempt: int = 0
+    last_error: Optional[str] = None
+
+
+def _run_with_retry(
+    execute_fn: Callable[[RetryState], T],
+    retry_config: RetryConfig,
+    error_prefix: str,
+) -> T:
+    """
+    Execute a function with retry logic for transient errors.
+
+    Args:
+        execute_fn: Function to execute. Receives RetryState, returns result or raises.
+                   Should raise TransientError for retryable errors.
+        retry_config: Retry configuration settings
+        error_prefix: Prefix for error messages (e.g., "Agent scout")
+
+    Returns:
+        Result from execute_fn on success
+
+    Raises:
+        The last exception if all retries exhausted
+    """
+    state = RetryState()
+
+    for attempt in range(retry_config.max_attempts):
+        state.attempt = attempt
+        try:
+            return execute_fn(state)
+        except _TransientError as e:
+            state.last_error = str(e)
+            if attempt < retry_config.max_attempts - 1:
+                delay = min(
+                    retry_config.base_delay * (retry_config.backoff_multiplier ** attempt),
+                    retry_config.max_delay
+                )
+                logger.warning(
+                    f"{error_prefix} transient error (attempt {attempt + 1}/{retry_config.max_attempts}): "
+                    f"{state.last_error}. Retrying in {delay:.1f}s..."
+                )
+                time.sleep(delay)
+                continue
+            raise
+        except _NonTransientError:
+            raise
+        except Exception as e:
+            # Check if it's transient
+            if _is_transient_error(str(e)) and attempt < retry_config.max_attempts - 1:
+                state.last_error = str(e)
+                delay = min(
+                    retry_config.base_delay * (retry_config.backoff_multiplier ** attempt),
+                    retry_config.max_delay
+                )
+                logger.warning(
+                    f"{error_prefix} error (attempt {attempt + 1}/{retry_config.max_attempts}): "
+                    f"{state.last_error}. Retrying in {delay:.1f}s..."
+                )
+                time.sleep(delay)
+                continue
+            raise
+
+    # Should not reach here, but just in case
+    raise RuntimeError(f"Failed after {retry_config.max_attempts} attempts. Last error: {state.last_error}")
+
+
+class _TransientError(Exception):
+    """Internal: marks an error as transient (retryable)."""
+    pass
+
+
+class _NonTransientError(Exception):
+    """Internal: marks an error as non-transient (fail immediately)."""
+    pass
 
 
 @dataclass
@@ -100,6 +183,7 @@ class Agent:
         self.name = name
         self.system_prompt = system_prompt
         self.cwd = cwd
+        self._config = get_agent_config(cwd)
 
     @classmethod
     def load(cls, name: str, project_root: Path) -> "Agent":
@@ -148,8 +232,9 @@ class Agent:
         self,
         message: str,
         context: Optional[str] = None,
-        max_retries: int = 3,
-        retry_delay: float = 1.0,
+        max_retries: Optional[int] = None,
+        retry_delay: Optional[float] = None,
+        timeout: Optional[int] = None,
     ) -> AgentResult:
         """
         Run the agent in print mode (read-only, no tool execution).
@@ -159,8 +244,9 @@ class Agent:
         Args:
             message: The task/message for the agent
             context: Optional context from previous agents
-            max_retries: Maximum retry attempts for transient failures
-            retry_delay: Base delay between retries (exponential backoff)
+            max_retries: Maximum retry attempts (default from config)
+            retry_delay: Base delay between retries (default from config)
+            timeout: Timeout in seconds (default from config)
 
         Returns:
             AgentResult with the agent's response
@@ -169,38 +255,33 @@ class Agent:
         if self.name in self.AGENTIC_AGENTS:
             return self.run_agentic(message, context, max_retries=max_retries)
 
-        last_error: Optional[str] = None
+        # Build retry config with overrides
+        retry_config = RetryConfig(
+            max_attempts=max_retries or self._config.retry.max_attempts,
+            base_delay=retry_delay or self._config.retry.base_delay,
+            backoff_multiplier=self._config.retry.backoff_multiplier,
+            max_delay=self._config.retry.max_delay,
+        )
+        effective_timeout = timeout or self._config.timeouts.print_mode
 
-        for attempt in range(max_retries):
+        def execute(state: RetryState) -> AgentResult:
             try:
-                # Validate working directory
                 validated_cwd = _validate_cwd(self.cwd)
                 prompt = self._build_prompt(message, context)
 
-                # Run Claude Code CLI in print mode
-                # shell=False is default with list args, but explicit for security
                 result = subprocess.run(
                     ["claude", "--print", "-p", prompt],
                     cwd=str(validated_cwd),
                     capture_output=True,
                     text=True,
-                    timeout=300,  # 5 minute timeout
-                    shell=False,  # Explicit for security - prevents shell injection
+                    timeout=effective_timeout,
+                    shell=False,
                 )
 
                 if result.returncode != 0:
                     error_msg = result.stderr or f"Exit code: {result.returncode}"
-                    # Check if transient and should retry
-                    if _is_transient_error(error_msg) and attempt < max_retries - 1:
-                        last_error = error_msg
-                        delay = retry_delay * (2 ** attempt)  # Exponential backoff
-                        logger.warning(
-                            f"Agent {self.name} transient error (attempt {attempt + 1}/{max_retries}): "
-                            f"{error_msg}. Retrying in {delay:.1f}s..."
-                        )
-                        time.sleep(delay)
-                        continue
-
+                    if _is_transient_error(error_msg):
+                        raise _TransientError(error_msg)
                     return AgentResult(
                         content="",
                         agent_name=self.name,
@@ -215,65 +296,46 @@ class Agent:
                 )
 
             except subprocess.TimeoutExpired:
-                last_error = "Agent timed out after 5 minutes"
-                if attempt < max_retries - 1:
-                    delay = retry_delay * (2 ** attempt)
-                    logger.warning(
-                        f"Agent {self.name} timeout (attempt {attempt + 1}/{max_retries}). "
-                        f"Retrying in {delay:.1f}s..."
-                    )
-                    time.sleep(delay)
-                    continue
+                raise _TransientError(f"Agent timed out after {effective_timeout} seconds")
             except FileNotFoundError:
-                # Non-transient error - don't retry
-                return AgentResult(
-                    content="",
-                    agent_name=self.name,
-                    success=False,
-                    error="Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
+                raise _NonTransientError(
+                    "Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
                 )
             except ValueError as e:
-                # CWD validation error - non-transient
-                return AgentResult(
-                    content="",
-                    agent_name=self.name,
-                    success=False,
-                    error=str(e)
-                )
-            except Exception as e:
-                last_error = str(e)
-                if _is_transient_error(last_error) and attempt < max_retries - 1:
-                    delay = retry_delay * (2 ** attempt)
-                    logger.warning(
-                        f"Agent {self.name} error (attempt {attempt + 1}/{max_retries}): "
-                        f"{last_error}. Retrying in {delay:.1f}s..."
-                    )
-                    time.sleep(delay)
-                    continue
+                raise _NonTransientError(str(e))
 
-                return AgentResult(
-                    content="",
-                    agent_name=self.name,
-                    success=False,
-                    error=last_error
-                )
-
-        # All retries exhausted
-        return AgentResult(
-            content="",
-            agent_name=self.name,
-            success=False,
-            error=f"Failed after {max_retries} attempts. Last error: {last_error}"
-        )
+        try:
+            return _run_with_retry(execute, retry_config, f"Agent {self.name}")
+        except _TransientError as e:
+            return AgentResult(
+                content="",
+                agent_name=self.name,
+                success=False,
+                error=f"Failed after {retry_config.max_attempts} attempts. Last error: {e}"
+            )
+        except _NonTransientError as e:
+            return AgentResult(
+                content="",
+                agent_name=self.name,
+                success=False,
+                error=str(e)
+            )
+        except Exception as e:
+            return AgentResult(
+                content="",
+                agent_name=self.name,
+                success=False,
+                error=str(e)
+            )
 
     def run_agentic(
         self,
         message: str,
         context: Optional[str] = None,
         allowed_tools: Optional[list[str]] = None,
-        timeout: int = 600,  # 10 minutes for agentic tasks
-        max_retries: int = 3,
-        retry_delay: float = 2.0,
+        timeout: Optional[int] = None,
+        max_retries: Optional[int] = None,
+        retry_delay: Optional[float] = None,
     ) -> AgentResult:
         """
         Run the agent in agentic mode (can execute tools, write files).
@@ -284,55 +346,49 @@ class Agent:
             message: The task/message for the agent
             context: Optional context from previous agents
             allowed_tools: List of allowed tools (defaults to ALLOWED_TOOLS)
-            timeout: Timeout in seconds
-            max_retries: Maximum retry attempts for transient failures
-            retry_delay: Base delay between retries (exponential backoff)
+            timeout: Timeout in seconds (default from config)
+            max_retries: Maximum retry attempts (default from config)
+            retry_delay: Base delay between retries (default from config)
 
         Returns:
             AgentResult with the agent's response and file changes
         """
-        last_error: Optional[str] = None
+        # Build retry config with overrides (agentic uses longer delays)
+        retry_config = RetryConfig(
+            max_attempts=max_retries or self._config.retry.max_attempts,
+            base_delay=retry_delay or self._config.retry.agentic_base_delay,
+            backoff_multiplier=self._config.retry.backoff_multiplier,
+            max_delay=self._config.retry.max_delay,
+        )
+        effective_timeout = timeout or self._config.timeouts.agentic_mode
+        tools = allowed_tools or self.ALLOWED_TOOLS
 
-        for attempt in range(max_retries):
+        def execute(state: RetryState) -> AgentResult:
             try:
-                # Validate working directory
                 validated_cwd = _validate_cwd(self.cwd)
                 prompt = self._build_prompt(message, context)
-                tools = allowed_tools or self.ALLOWED_TOOLS
 
-                # Build command with agentic flags
                 cmd = [
                     "claude",
                     "-p", prompt,
-                    "--yes",  # Auto-accept prompts for unattended execution
-                    "--output-format", "json",  # Get structured output
+                    "--yes",
+                    "--output-format", "json",
                     "--allowedTools", ",".join(tools),
                 ]
 
-                # Run Claude Code CLI in agentic mode
-                # shell=False is default with list args, but explicit for security
                 result = subprocess.run(
                     cmd,
                     cwd=str(validated_cwd),
                     capture_output=True,
                     text=True,
-                    timeout=timeout,
-                    shell=False,  # Explicit for security - prevents shell injection
+                    timeout=effective_timeout,
+                    shell=False,
                 )
 
                 if result.returncode != 0:
                     error_msg = result.stderr or f"Exit code: {result.returncode}"
-                    # Check if transient and should retry
-                    if _is_transient_error(error_msg) and attempt < max_retries - 1:
-                        last_error = error_msg
-                        delay = retry_delay * (2 ** attempt)
-                        logger.warning(
-                            f"Agent {self.name} transient error (attempt {attempt + 1}/{max_retries}): "
-                            f"{error_msg}. Retrying in {delay:.1f}s..."
-                        )
-                        time.sleep(delay)
-                        continue
-
+                    if _is_transient_error(error_msg):
+                        raise _TransientError(error_msg)
                     return AgentResult(
                         content="",
                         agent_name=self.name,
@@ -340,14 +396,8 @@ class Agent:
                         error=error_msg
                     )
 
-                # Parse JSON output with robust error handling
+                # Parse output
                 output = result.stdout.strip()
-                files_created: list[str] = []
-                files_modified: list[str] = []
-                commands_run: list[str] = []
-                tokens_used: int = 0
-                content = output
-
                 parsed_ok, content, files_created, files_modified, commands_run, tokens_used = (
                     self._parse_agentic_output(output)
                 )
@@ -366,56 +416,37 @@ class Agent:
                 )
 
             except subprocess.TimeoutExpired:
-                last_error = f"Agent timed out after {timeout} seconds"
-                if attempt < max_retries - 1:
-                    delay = retry_delay * (2 ** attempt)
-                    logger.warning(
-                        f"Agent {self.name} timeout (attempt {attempt + 1}/{max_retries}). "
-                        f"Retrying in {delay:.1f}s..."
-                    )
-                    time.sleep(delay)
-                    continue
+                raise _TransientError(f"Agent timed out after {effective_timeout} seconds")
             except FileNotFoundError:
-                # Non-transient error - don't retry
-                return AgentResult(
-                    content="",
-                    agent_name=self.name,
-                    success=False,
-                    error="Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
+                raise _NonTransientError(
+                    "Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
                 )
             except ValueError as e:
-                # CWD validation error - non-transient
-                return AgentResult(
-                    content="",
-                    agent_name=self.name,
-                    success=False,
-                    error=str(e)
-                )
-            except Exception as e:
-                last_error = str(e)
-                if _is_transient_error(last_error) and attempt < max_retries - 1:
-                    delay = retry_delay * (2 ** attempt)
-                    logger.warning(
-                        f"Agent {self.name} error (attempt {attempt + 1}/{max_retries}): "
-                        f"{last_error}. Retrying in {delay:.1f}s..."
-                    )
-                    time.sleep(delay)
-                    continue
+                raise _NonTransientError(str(e))
 
-                return AgentResult(
-                    content="",
-                    agent_name=self.name,
-                    success=False,
-                    error=last_error
-                )
-
-        # All retries exhausted
-        return AgentResult(
-            content="",
-            agent_name=self.name,
-            success=False,
-            error=f"Failed after {max_retries} attempts. Last error: {last_error}"
-        )
+        try:
+            return _run_with_retry(execute, retry_config, f"Agent {self.name}")
+        except _TransientError as e:
+            return AgentResult(
+                content="",
+                agent_name=self.name,
+                success=False,
+                error=f"Failed after {retry_config.max_attempts} attempts. Last error: {e}"
+            )
+        except _NonTransientError as e:
+            return AgentResult(
+                content="",
+                agent_name=self.name,
+                success=False,
+                error=str(e)
+            )
+        except Exception as e:
+            return AgentResult(
+                content="",
+                agent_name=self.name,
+                success=False,
+                error=str(e)
+            )
 
     def _parse_agentic_output(
         self, output: str
@@ -443,24 +474,21 @@ class Agent:
             content = _safe_get(data, "result") or _safe_get(data, "content") or output
 
             # Extract token usage from various possible locations in JSON
-            # Claude CLI may include usage stats at different places
             usage = _safe_get(data, "usage", {})
             if isinstance(usage, dict):
                 input_tokens = _safe_get(usage, "input_tokens", 0) or 0
                 output_tokens = _safe_get(usage, "output_tokens", 0) or 0
                 tokens_used = input_tokens + output_tokens
 
-            # Alternative: check for total_tokens directly
             if tokens_used == 0:
                 tokens_used = _safe_get(data, "total_tokens", 0) or 0
 
-            # Check in stats section
             if tokens_used == 0:
                 stats = _safe_get(data, "stats", {})
                 if isinstance(stats, dict):
                     tokens_used = _safe_get(stats, "total_tokens", 0) or 0
 
-            # Extract file operations from tool calls if available
+            # Extract file operations from tool calls
             messages = _safe_get(data, "messages", [])
             if not isinstance(messages, list):
                 logger.debug(f"Agent {self.name}: 'messages' is not a list: {type(messages)}")
@@ -482,7 +510,6 @@ class Agent:
                     )
                     continue
 
-                # Extract file paths, filtering empty strings
                 if tool_name == "Write":
                     file_path = _safe_get(tool_input, "file_path", "")
                     if file_path:

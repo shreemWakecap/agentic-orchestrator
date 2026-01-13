@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from core import Agent, Workflow, WorkflowResult
+from core import Agent, Workflow, WorkflowResult, get_agent_config
 
 
 @dataclass
@@ -122,10 +122,11 @@ class BuildingWorkflow(Workflow):
         self,
         project_root: Path,
         specs_dir: Optional[Path] = None,
-        max_parallel: int = 3,
+        max_parallel: Optional[int] = None,
     ):
         self.project_root = project_root
-        self.max_parallel = max_parallel
+        self._config = get_agent_config(project_root)
+        self.max_parallel = max_parallel or self._config.parallel.max_sub_features
         self.specs_dir = specs_dir or project_root / ".orchestrator" / "specs"
 
         # Ensure directory structure

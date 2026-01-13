@@ -606,7 +606,9 @@ Provide a quality assessment.""",
         if not plan_path.exists():
             return WorkflowResult(success=False, error=f"Plan not found: {plan_path}")
 
-        self.console.print(f"[dim]Loading plan: {plan_path}[/dim]")
+        # Use forward slashes for display (Rich console on Windows)
+        plan_display = str(plan_path).replace("\\", "/")
+        self.console.print(f"[dim]Loading plan: {plan_display}[/dim]")
 
         # Load or create build state
         existing_state = self._load_state(plan_path)
@@ -632,6 +634,18 @@ Provide a quality assessment.""",
         # Phase 1: Parse the plan
         self.console.print("\n[bold]Phase 1:[/bold] Parsing plan...")
         plan_content = plan_path.read_text(encoding="utf-8")
+
+        # Validate plan has actual content (not just headers)
+        content_lines = [
+            line for line in plan_content.split('\n')
+            if line.strip() and not line.startswith('#') and not line.startswith('*') and not line.startswith('>')  and not line.startswith('---')
+        ]
+        if len(content_lines) < 5:
+            self._move_plan(plan_path, "failed")
+            return WorkflowResult(
+                success=False,
+                error=f"Plan appears to be empty or incomplete. Expected implementation steps but found only {len(content_lines)} content lines. Please re-run the planning workflow to generate a complete plan."
+            )
 
         parser_result = self.run_agent(
             "parser",
@@ -711,12 +725,14 @@ Provide a quality assessment.""",
             self._save_state(plan_path)
             final_path = self._move_plan(plan_path, "completed")
             result.output_file = final_path
-            self.console.print(f"\n[green]Plan moved to:[/green] {final_path}")
+            final_display = str(final_path).replace("\\", "/")
+            self.console.print(f"\n[green]Plan moved to:[/green] {final_display}")
         else:
             self.build_state.status = "failed"
             self._save_state(plan_path)
             final_path = self._move_plan(plan_path, "failed")
-            self.console.print(f"\n[red]Plan moved to:[/red] {final_path}")
+            final_display = str(final_path).replace("\\", "/")
+            self.console.print(f"\n[red]Plan moved to:[/red] {final_display}")
 
         return result
 

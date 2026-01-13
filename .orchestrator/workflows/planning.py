@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from core import Agent, Workflow, WorkflowResult
+from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.expert_loader import ExpertLoader, ExpertType
 from core.docs_loader import DocsLoader
 
@@ -59,12 +59,6 @@ class PlanningWorkflow(Workflow):
     Each sub-plan runs in isolated context to prevent data loss.
     """
 
-    # Context size limits - base values (scaled by _get_context_limits)
-    BASE_CODEBASE_LIMIT = 4000   # For sub-feature codebase overview
-    BASE_SCOUT_LIMIT = 3500      # For scout results in sub-features
-    BASE_ARCHITECT_LIMIT = 2500  # For architect results
-    MIN_CONTEXT_LIMIT = 1500     # Floor to ensure meaningful context
-
     def _get_context_limits(self, num_sub_features: int = 1) -> tuple[int, int, int]:
         """
         Adaptive context limits based on parallelism.
@@ -74,20 +68,22 @@ class PlanningWorkflow(Workflow):
         # Scale factor: 1.0 for 1 feature, 0.6 for 5+ features
         scale = max(0.6, 1.0 - (num_sub_features - 1) * 0.1)
 
+        ctx = self._config.context_limits
         return (
-            max(self.MIN_CONTEXT_LIMIT, int(self.BASE_CODEBASE_LIMIT * scale)),
-            max(self.MIN_CONTEXT_LIMIT, int(self.BASE_SCOUT_LIMIT * scale)),
-            max(self.MIN_CONTEXT_LIMIT, int(self.BASE_ARCHITECT_LIMIT * scale)),
+            max(ctx.minimum, int(ctx.base_codebase * scale)),
+            max(ctx.minimum, int(ctx.base_scout * scale)),
+            max(ctx.minimum, int(ctx.base_architect * scale)),
         )
 
     def __init__(
         self,
         project_root: Path,
         output_dir: Optional[Path] = None,
-        max_parallel: int = 3,  # Max parallel sub-agents
+        max_parallel: Optional[int] = None,
     ):
         self.project_root = project_root
-        self.max_parallel = max_parallel
+        self._config = get_agent_config(project_root)
+        self.max_parallel = max_parallel or self._config.parallel.max_sub_features
         # Plans go to pending folder by default
         output_dir = output_dir or project_root / ".orchestrator" / "specs" / "pending"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -224,7 +220,8 @@ Focus on:
             return None
 
         # Run expert consultations in parallel
-        with ThreadPoolExecutor(max_workers=self.max_parallel) as executor:
+        max_expert_workers = self._config.parallel.max_expert_workers
+        with ThreadPoolExecutor(max_workers=max_expert_workers) as executor:
             futures = {
                 executor.submit(consult_expert, expert): expert
                 for expert in domain_experts
@@ -526,7 +523,7 @@ Focus on:
         self.console.print("\n[bold]Phase 2c:[/bold] Decomposing into sub-features...")
         decomposer_context = f"## Analysis\n\n{json.dumps(analysis, indent=2)}\n\n## Codebase\n\n{codebase_context}"
         if cached_scout_result:
-            scout_summary = self._smart_truncate(cached_scout_result, self.BASE_SCOUT_LIMIT)
+            scout_summary = self._smart_truncate(cached_scout_result, self._config.context_limits.base_scout)
             decomposer_context += f"\n\n## Scout Insights\n\n{scout_summary}"
         if expert_context:
             decomposer_context += f"\n\n{expert_context}"

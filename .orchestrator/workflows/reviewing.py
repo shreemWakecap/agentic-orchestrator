@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from core import Agent, Workflow, WorkflowResult
+from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.docs_loader import DocsLoader, DocsContext
 from core.expert_loader import ExpertLoader
 
@@ -78,11 +78,12 @@ class ReviewingWorkflow(Workflow):
         self,
         project_root: Path,
         output_dir: Optional[Path] = None,
-        max_parallel: int = 3,
+        max_parallel: Optional[int] = None,
         refresh_docs: bool = False,
     ):
         self.project_root = project_root
-        self.max_parallel = max_parallel
+        self._config = get_agent_config(project_root)
+        self.max_parallel = max_parallel or self._config.parallel.max_expert_workers
         self.refresh_docs = refresh_docs
 
         output_dir = output_dir or project_root / ".orchestrator" / "specs" / "reviews"

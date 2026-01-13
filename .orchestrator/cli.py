@@ -14,7 +14,6 @@ Usage:
     uv run python .orchestrator/cli.py cost
     uv run python .orchestrator/cli.py test
     uv run python .orchestrator/cli.py portal
-    uv run python .orchestrator/cli.py sync-remote
 """
 import shutil
 import sys
@@ -756,63 +755,34 @@ def cmd_test(args):
 # =============================================================================
 
 def cmd_sync_remote(args=None):
-    """
-    Sync local changes to remote via PR.
-
-    Workflow:
-    1. Check for uncommitted changes
-    2. Create new branch from current branch
-    3. Commit changes (AI generates message)
-    4. Push to remote
-    5. Create PR (AI generates description)
-
-    No parameters required - just run: cli.py sync-remote
-    """
+    """Commit changes and create PR with AI-generated messages."""
     import subprocess
     from datetime import datetime
 
     def run_git(cmd, capture=True, check=True):
-        """Run git command and return output."""
         result = subprocess.run(
-            ["git"] + cmd,
-            cwd=PROJECT_ROOT,
-            capture_output=capture,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+            ["git"] + cmd, cwd=PROJECT_ROOT, capture_output=capture,
+            text=True, encoding="utf-8", errors="replace",
         )
         if check and result.returncode != 0:
-            raise RuntimeError(f"Git command failed: {' '.join(cmd)}\n{result.stderr}")
+            raise RuntimeError(f"Git failed: {' '.join(cmd)}\n{result.stderr}")
         return result.stdout.strip() if capture else result
 
     def run_gh(cmd, capture=True, check=True):
-        """Run gh CLI command and return output."""
         result = subprocess.run(
-            ["gh"] + cmd,
-            cwd=PROJECT_ROOT,
-            capture_output=capture,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
+            ["gh"] + cmd, cwd=PROJECT_ROOT, capture_output=capture,
+            text=True, encoding="utf-8", errors="replace",
         )
         if check and result.returncode != 0:
             raise RuntimeError(f"GitHub CLI failed: {' '.join(cmd)}\n{result.stderr}")
         return result.stdout.strip() if capture else result
 
     def get_ai_response(prompt):
-        """Get AI response using Claude CLI (print mode - fast, no tools)."""
         result = subprocess.run(
-            ["claude", "--print", "-p", prompt],
-            cwd=PROJECT_ROOT,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=60,
+            ["claude", "--print", "-p", prompt], cwd=PROJECT_ROOT,
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
         )
-        if result.returncode != 0:
-            return None
-        return result.stdout.strip()
+        return result.stdout.strip() if result.returncode == 0 else None
 
     print("=" * 60)
     print("SYNC REMOTE - Push changes via PR")
@@ -824,7 +794,6 @@ def cmd_sync_remote(args=None):
     if not status:
         print("  [X] No changes to commit")
         return 1
-
     changed_files = [line.split()[-1] for line in status.split("\n") if line]
     print(f"  [OK] Found {len(changed_files)} changed file(s)")
 
@@ -840,17 +809,14 @@ def cmd_sync_remote(args=None):
     run_git(["checkout", "-b", new_branch])
     print(f"  [OK] Created branch: {new_branch}")
 
-    # Step 4: Stage and get diff
+    # Step 4: Stage and generate commit message
     print("\n[4/6] Staging changes and generating commit message...")
     run_git(["add", "-A"])
     diff = run_git(["diff", "--cached", "--stat"])
     diff_content = run_git(["diff", "--cached"])
-
-    # Truncate diff if too long
     if len(diff_content) > 8000:
         diff_content = diff_content[:8000] + "\n... (truncated)"
 
-    # Generate commit message with AI
     commit_prompt = f"""Analyze this git diff and generate a concise commit message.
 
 DIFF STATS:
@@ -869,13 +835,10 @@ Return ONLY the commit message, nothing else."""
 
     print("  -> Generating commit message with AI...")
     commit_msg = get_ai_response(commit_prompt)
-
     if not commit_msg:
-        # Fallback to generic message
         commit_msg = f"chore: sync changes ({len(changed_files)} files)"
-        print(f"  [WARN] AI unavailable, using fallback message")
+        print("  [WARN] AI unavailable, using fallback message")
     else:
-        # Clean up AI response (remove quotes if present)
         commit_msg = commit_msg.strip('"\'')
         print(f"  [OK] Commit message: {commit_msg.split(chr(10))[0]}")
 
@@ -883,17 +846,14 @@ Return ONLY the commit message, nothing else."""
     print("\n[5/6] Committing and pushing...")
     run_git(["commit", "-m", commit_msg])
     print("  [OK] Changes committed")
-
     run_git(["push", "-u", "origin", new_branch])
     print(f"  [OK] Pushed to origin/{new_branch}")
 
     # Step 6: Create PR
     print("\n[6/6] Creating pull request...")
-
-    # Generate PR description with AI
     pr_prompt = f"""Create a pull request description for these changes.
 
-BRANCH: {new_branch} → {base_branch}
+BRANCH: {new_branch} -> {base_branch}
 COMMIT: {commit_msg}
 
 CHANGED FILES:
@@ -909,37 +869,26 @@ Format:
 Return ONLY the PR body markdown, nothing else."""
 
     pr_body = get_ai_response(pr_prompt)
-
     if not pr_body:
         pr_body = f"## Summary\n- Synced local changes\n\n## Changes\n{diff}"
 
-    # Extract title from commit message (first line)
     pr_title = commit_msg.split("\n")[0]
-
-    # Create PR using gh CLI
     try:
-        pr_url = run_gh([
-            "pr", "create",
-            "--base", base_branch,
-            "--head", new_branch,
-            "--title", pr_title,
-            "--body", pr_body,
-        ])
+        pr_url = run_gh(["pr", "create", "--base", base_branch, "--head", new_branch,
+                         "--title", pr_title, "--body", pr_body])
         print(f"  [OK] PR created: {pr_url}")
     except RuntimeError as e:
         print(f"  [WARN] PR creation failed: {e}")
-        print(f"  -> Manual PR: gh pr create --base {base_branch} --head {new_branch}")
+        print(f"  -> Manual: gh pr create --base {base_branch} --head {new_branch}")
+        run_git(["checkout", base_branch])
         return 1
 
-    # Switch back to base branch
     run_git(["checkout", base_branch])
-
     print("\n" + "=" * 60)
     print("[OK] SYNC COMPLETE")
     print(f"  Branch: {new_branch}")
     print(f"  PR: {pr_url}")
     print("=" * 60)
-
     return 0
 
 
@@ -989,7 +938,6 @@ def main():
         print("  cli.py cost report daily                 # Daily cost report")
         print("  cli.py cost budget show                  # Show budget status")
         print("  cli.py cost budget set --daily 10.00     # Set daily limit")
-        print("  cli.py sync-remote                       # Commit & PR to remote")
         return 1
 
     cmd = sys.argv[1]

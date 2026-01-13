@@ -109,7 +109,7 @@
             <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
             <form id="plan-form" class="flex gap-4">
                 <input type="text" id="plan-description" name="description"
-                       class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm"
+                       class="flex-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                        placeholder="Enter feature description (e.g., Add user authentication)">
                 <button type="submit"
                         class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
@@ -199,8 +199,19 @@
 <script>
 document.getElementById('plan-form').addEventListener('submit', async function(e) {
     e.preventDefault();
-    const description = document.getElementById('plan-description').value;
-    if (!description.trim()) return;
+    const input = document.getElementById('plan-description');
+    const description = input.value;
+    const button = this.querySelector('button[type="submit"]');
+
+    if (!description.trim()) {
+        input.focus();
+        input.style.borderColor = '#EF4444';
+        setTimeout(() => input.style.borderColor = '', 2000);
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = 'Creating...';
 
     try {
         const response = await fetch('/api/workflows/plan', {
@@ -208,13 +219,22 @@ document.getElementById('plan-form').addEventListener('submit', async function(e
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ description: description })
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const data = await response.json();
         if (data.run_id) {
             window.location.href = '/runs/' + data.run_id;
+        } else {
+            throw new Error('No run_id in response');
         }
     } catch (error) {
         console.error('Error:', error);
-        alert('Failed to create plan');
+        alert('Failed to create plan: ' + error.message);
+        button.disabled = false;
+        button.textContent = 'Create Plan';
     }
 });
 </script>

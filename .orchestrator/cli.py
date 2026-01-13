@@ -215,7 +215,7 @@ def cmd_docs(args):
 
 
 def cmd_experts(args=None):
-    """Manage expert agents (list, create)."""
+    """Manage expert agents (list, create, discover, auto-build)."""
     from core.expert_loader import ExpertLoader, ExpertType
 
     args = args or []
@@ -224,18 +224,30 @@ def cmd_experts(args=None):
         return _experts_list()
     elif args[0] == "create":
         return _experts_create(args[1:])
+    elif args[0] == "discover":
+        return _experts_discover(args[1:])
+    elif args[0] == "auto-build":
+        return _experts_auto_build(args[1:])
     else:
         print(f"Unknown experts subcommand: {args[0]}")
-        print("\nUsage: cli.py experts <subcommand>")
-        print("\nSubcommands:")
-        print("  list                     List all experts by type")
-        print("  create <name> [options]  Create a new expert")
-        print("\nExamples:")
-        print("  cli.py experts list")
-        print("  cli.py experts create auth --type domain --keywords auth,login,jwt")
-        print("  cli.py experts create core-api --type module --module src/api")
-        print("  cli.py experts create fastapi --type tech --based-on python")
+        _experts_help()
         return 1
+
+
+def _experts_help():
+    """Show expert commands help."""
+    print("\nUsage: cli.py experts <subcommand>")
+    print("\nSubcommands:")
+    print("  list                     List all experts by type")
+    print("  create <name> [options]  Create a new expert manually")
+    print("  discover                 Analyze codebase and show missing experts")
+    print("  auto-build [options]     Auto-create all missing experts")
+    print("\nExamples:")
+    print("  cli.py experts list")
+    print("  cli.py experts discover")
+    print("  cli.py experts auto-build --dry-run")
+    print("  cli.py experts auto-build --confirm")
+    print("  cli.py experts create auth --type domain --keywords auth,login,jwt")
 
 
 def _experts_list():
@@ -365,6 +377,127 @@ def _experts_create(args):
     else:
         print(f"\nFailed to create expert '{name}'")
         return 1
+
+
+def _experts_discover(args):
+    """
+    Explore system and show missing experts.
+
+    Usage: cli.py experts discover [--json]
+    """
+    import json as json_lib
+    from core.expert_loader import ExpertLoader
+
+    as_json = "--json" in args
+
+    if not as_json:
+        print("Analyzing codebase...")
+
+    loader = ExpertLoader(PROJECT_ROOT)
+    gaps = loader.find_missing_experts()
+
+    if as_json:
+        print(json_lib.dumps(gaps, indent=2))
+        return 0
+
+    print(f"\n{'=' * 50}")
+    print("EXPERT GAP ANALYSIS")
+    print(f"{'=' * 50}")
+
+    if not gaps:
+        print("\nNo gaps found! All detected technologies have experts.")
+        return 0
+
+    print(f"\nFound {len(gaps)} missing expert(s):\n")
+
+    for gap in gaps:
+        print(f"  [{gap['type'].upper()}] {gap['name']}")
+        print(f"       Confidence: {gap['confidence']:.0%}")
+        if gap.get('category'):
+            print(f"       Category: {gap['category']}")
+        if gap.get('source'):
+            print(f"       Source: {gap['source']}")
+        print()
+
+    print("\nTo auto-create missing experts:")
+    print("  cli.py experts auto-build")
+    print("\nTo auto-create with preview (dry run):")
+    print("  cli.py experts auto-build --dry-run")
+
+    return 0
+
+
+def _experts_auto_build(args):
+    """
+    Auto-create all missing experts.
+
+    Usage: cli.py experts auto-build [options]
+
+    Options:
+      --dry-run       Show what would be created without creating
+      --confirm       Skip confirmation prompt
+    """
+    from core.expert_loader import ExpertLoader, ExpertType
+
+    dry_run = "--dry-run" in args
+    skip_confirm = "--confirm" in args
+
+    loader = ExpertLoader(PROJECT_ROOT)
+    gaps = loader.find_missing_experts()
+
+    if not gaps:
+        print("No missing experts to create.")
+        return 0
+
+    print(f"\nWill create {len(gaps)} expert(s):\n")
+    for gap in gaps:
+        category_str = f" ({gap['category']})" if gap.get('category') else ""
+        print(f"  - {gap['name']} ({gap['type']}{category_str})")
+
+    if dry_run:
+        print("\n[DRY RUN] No experts created.")
+        return 0
+
+    if not skip_confirm:
+        try:
+            response = input("\nProceed? [y/N] ")
+            if response.lower() != 'y':
+                print("Cancelled.")
+                return 0
+        except (EOFError, KeyboardInterrupt):
+            print("\nCancelled.")
+            return 0
+
+    print("\nCreating experts (using ultra think mode)...")
+    print("=" * 50)
+
+    created = []
+    failed = []
+
+    for gap in gaps:
+        name = gap["name"]
+        print(f"\nCreating {name}...")
+        success = loader.create_expert(
+            name=name,
+            expert_type=ExpertType.TECH,
+            based_on=name,
+            use_ultra_think=True
+        )
+        if success:
+            created.append(name)
+        else:
+            failed.append(name)
+
+    print(f"\nResults:")
+    print(f"  Created: {len(created)}")
+    print(f"  Failed:  {len(failed)}")
+
+    if created:
+        print(f"\nCreated experts: {', '.join(created)}")
+    if failed:
+        print(f"Failed experts: {', '.join(failed)}")
+
+    return 0 if not failed else 1
 
 
 def cmd_portal(args):

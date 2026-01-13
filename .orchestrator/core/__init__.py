@@ -14,6 +14,7 @@ from .config import (
     get_agent_config,
     get_budget_config,
 )
+from .system_explorer import TechDetection, detect_technologies, find_missing_experts
 
 __all__ = [
     "Agent",
@@ -26,6 +27,7 @@ __all__ = [
     "ExpertLoader",
     "ExpertInfo",
     "ExpertType",
+    # Config
     "ConfigLoader",
     "AgentConfig",
     "TimeoutConfig",
@@ -35,4 +37,8 @@ __all__ = [
     "BudgetConfig",
     "get_agent_config",
     "get_budget_config",
+    # Tech detection
+    "TechDetection",
+    "detect_technologies",
+    "find_missing_experts",
 ]

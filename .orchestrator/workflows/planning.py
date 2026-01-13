@@ -24,6 +24,7 @@ from typing import Optional
 from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.expert_loader import ExpertLoader, ExpertType
 from core.docs_loader import DocsLoader
+from core.plan_registry import PlanRegistry, PlanMetadata, ScanResult
 
 
 @dataclass
@@ -93,12 +94,15 @@ class PlanningWorkflow(Workflow):
         # Initialize expert loader for domain/module expert consultation
         self.expert_loader = ExpertLoader(project_root)
 
+        # Initialize plan registry for cross-plan dependency tracking
+        self.plan_registry = PlanRegistry(project_root)
+
         # Load all agents from .claude/agents/
         self._load_agents()
 
     def _load_agents(self):
         """Load all agents from .claude/agents/"""
-        agents = ["analyzer", "decomposer", "scout", "architect", "planner", "validator", "synthesizer"]
+        agents = ["analyzer", "decomposer", "scout", "architect", "planner", "validator", "synthesizer", "deduplicator"]
         for agent_name in agents:
             try:
                 self.register_agent(Agent.load(agent_name, self.project_root))
@@ -442,6 +446,13 @@ Focus on:
         dirname = self._generate_plan_dirname(request)
         output_path = self._save_plan_folder(dirname, plan_files)
 
+        # Generate and save metadata for cross-plan tracking
+        self._generate_plan_metadata(
+            request=request,
+            plan_dir=output_path,
+            complexity="simple"
+        )
+
         return WorkflowResult(
             success=True,
             output_file=output_path,
@@ -690,6 +701,14 @@ Focus on:
         dirname = self._generate_plan_dirname(request, prefix="master-")
         output_path = self._save_plan_folder(dirname, plan_files)
 
+        # Generate and save metadata for cross-plan tracking
+        self._generate_plan_metadata(
+            request=request,
+            plan_dir=output_path,
+            complexity=analysis.get("complexity", "complex"),
+            analysis=analysis
+        )
+
         return WorkflowResult(
             success=True,
             output_file=output_path,
@@ -701,8 +720,227 @@ Focus on:
             }
         )
 
-    def execute(self, request: str) -> WorkflowResult:
-        """Execute the smart planning workflow."""
+    def _run_pre_planning_scan(self, request: str) -> tuple[ScanResult, Optional[dict]]:
+        """
+        Run pre-planning scan to check for duplicates and dependencies.
+
+        Returns:
+            Tuple of (ScanResult, AI analysis dict or None)
+        """
+        from core.symbols import CHECK, WARNING, CROSS
+
+        self.console.print("[bold]Pre-Planning Scan:[/bold] Checking for duplicates...")
+
+        # Quick keyword-based scan
+        scan_result = self.plan_registry.pre_planning_scan(request)
+
+        ai_analysis = None
+
+        if scan_result.duplicates and self._config.deduplication.use_ai_analysis:
+            # Run AI-powered deep analysis
+            self.console.print("  Found potential matches, running deep analysis...")
+
+            # Build context for deduplicator
+            similar_plans_context = []
+            for dup in scan_result.duplicates[:5]:  # Limit to top 5
+                plan_data = self.plan_registry.get_plan(dup["plan_id"])
+                if plan_data:
+                    similar_plans_context.append({
+                        "plan_id": dup["plan_id"],
+                        "request": plan_data.get("request", ""),
+                        "status": plan_data.get("status", ""),
+                        "keywords": plan_data.get("keywords", [])
+                    })
+
+            # Run deduplicator agent if available
+            if "deduplicator" in self.agents:
+                dedup_result = self.run_agent(
+                    "deduplicator",
+                    message=f"Analyze this new request for similarity:\n\n{request}",
+                    context=f"## Existing Plans\n\n```json\n{json.dumps(similar_plans_context, indent=2)}\n```",
+                    show_progress=False
+                )
+
+                if dedup_result.success:
+                    ai_analysis = self._parse_json_from_response(dedup_result.content)
+
+        # Report findings
+        if scan_result.recommendation == "block":
+            self.console.print(f"  [red]{CROSS}[/red] {scan_result.message}")
+        elif scan_result.recommendation == "warn":
+            self.console.print(f"  [yellow]{WARNING}[/yellow] {scan_result.message}")
+        else:
+            self.console.print(f"  [green]{CHECK}[/green] {scan_result.message}")
+
+        return scan_result, ai_analysis
+
+    def _display_conflict_details(
+        self,
+        scan_result: ScanResult,
+        ai_analysis: Optional[dict]
+    ) -> None:
+        """Display detailed conflict information to user."""
+        from rich.table import Table
+        from rich.panel import Panel
+
+        if scan_result.duplicates:
+            table = Table(title="Similar Plans Detected")
+            table.add_column("Plan ID", style="cyan")
+            table.add_column("Similarity", style="yellow")
+            table.add_column("Status", style="green")
+            table.add_column("Request", style="dim")
+
+            for dup in scan_result.duplicates:
+                request_text = dup.get("request", "")
+                if len(request_text) > 40:
+                    request_text = request_text[:40] + "..."
+                table.add_row(
+                    dup["plan_id"],
+                    f"{dup['similarity']:.0%}",
+                    dup.get("status", "unknown"),
+                    request_text
+                )
+
+            self.console.print(table)
+
+        if ai_analysis and ai_analysis.get("suggested_action"):
+            self.console.print(Panel(
+                ai_analysis["suggested_action"],
+                title="Suggestion",
+                border_style="yellow"
+            ))
+
+        if scan_result.dependencies:
+            self.console.print("\n[bold]Potential Dependencies:[/bold]")
+            for dep in scan_result.dependencies:
+                self.console.print(f"  - Plan {dep['plan_id']}: {dep['reason']}")
+
+    def _generate_plan_metadata(
+        self,
+        request: str,
+        plan_dir: Path,
+        complexity: str,
+        analysis: Optional[dict] = None
+    ) -> PlanMetadata:
+        """
+        Generate metadata.json for a newly created plan.
+
+        Args:
+            request: Original user request
+            plan_dir: Path to the plan directory
+            complexity: Complexity level (simple, medium, complex, massive)
+            analysis: Optional analysis data from analyzer agent
+        """
+        # Extract plan ID from directory name
+        match = re.match(r'^(\d+)[_-](.+)$', plan_dir.name)
+        plan_id = match.group(1).lstrip('0') if match else "0"
+        plan_name = match.group(2) if match else plan_dir.name
+
+        # Extract keywords
+        keywords = self.plan_registry.extract_keywords(request)
+
+        # Infer features from analysis
+        features_provided = []
+        if analysis:
+            sub_features = analysis.get("sub_features", [])
+            for sf in sub_features:
+                if isinstance(sf, str):
+                    features_provided.append(sf.lower().replace(" ", "-"))
+                elif isinstance(sf, dict):
+                    name = sf.get("name", "")
+                    if name:
+                        features_provided.append(name.lower().replace(" ", "-"))
+
+        # If no features extracted, derive from keywords
+        if not features_provided:
+            features_provided = [f"{kw}-feature" for kw in keywords[:3]]
+
+        # Infer affected files
+        files_affected = self._infer_affected_files(request, keywords)
+
+        metadata = PlanMetadata(
+            plan_id=plan_id,
+            plan_name=plan_name,
+            request=request,
+            request_hash=self.plan_registry.compute_request_hash(request),
+            keywords=keywords,
+            features_provided=features_provided,
+            features_required=[],
+            files_affected=files_affected,
+            status="pending",
+            complexity=complexity,
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat()
+        )
+
+        # Save metadata.json
+        metadata_path = plan_dir / "metadata.json"
+        metadata_path.write_text(
+            json.dumps(metadata.to_dict(), indent=2),
+            encoding="utf-8"
+        )
+
+        # Trigger registry update
+        self.plan_registry.scan_existing_plans()
+
+        return metadata
+
+    def _infer_affected_files(self, request: str, keywords: list[str]) -> list[str]:
+        """Infer likely affected file patterns from request."""
+        patterns = []
+        request_lower = request.lower()
+
+        # Common patterns
+        pattern_map = {
+            'test': ['tests/*'],
+            'e2e': ['tests/e2e/*'],
+            'playwright': ['tests/e2e/*', 'playwright.config.*'],
+            'api': ['api/*', 'routes/*'],
+            'auth': ['auth/*', 'middleware/*'],
+            'config': ['config/*', '*.config.*'],
+            'ui': ['src/components/*'],
+            'component': ['src/components/*'],
+            'database': ['models/*', 'migrations/*'],
+        }
+
+        for keyword in keywords:
+            if keyword in pattern_map:
+                patterns.extend(pattern_map[keyword])
+
+        return list(dict.fromkeys(patterns)) or ['*']
+
+    def execute(self, request: str, force: bool = False) -> WorkflowResult:
+        """
+        Execute the smart planning workflow.
+
+        Args:
+            request: The user's feature request
+            force: If True, skip duplicate detection (default False)
+        """
+        # Phase 0: Pre-Planning Scan (if deduplication is enabled)
+        if not force and self._config.deduplication.enabled:
+            scan_result, ai_analysis = self._run_pre_planning_scan(request)
+
+            if scan_result.recommendation == "block":
+                self._display_conflict_details(scan_result, ai_analysis)
+                return WorkflowResult(
+                    success=False,
+                    error=f"Plan creation blocked: {scan_result.message}",
+                    data={
+                        "scan_result": {
+                            "has_conflicts": scan_result.has_conflicts,
+                            "duplicates": scan_result.duplicates,
+                            "dependencies": scan_result.dependencies,
+                            "recommendation": scan_result.recommendation,
+                            "message": scan_result.message
+                        },
+                        "ai_analysis": ai_analysis,
+                        "blocked": True
+                    }
+                )
+            elif scan_result.recommendation == "warn":
+                self._display_conflict_details(scan_result, ai_analysis)
+                self.console.print("\n[yellow]Proceeding despite warnings...[/yellow]\n")
 
         codebase_context = self._get_codebase_context()
 

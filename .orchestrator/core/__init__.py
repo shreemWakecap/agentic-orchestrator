@@ -10,11 +10,13 @@ from .config import (
     RetryConfig,
     ContextLimitsConfig,
     ParallelConfig,
+    DeduplicationConfig,
     BudgetConfig,
     get_agent_config,
     get_budget_config,
 )
 from .system_explorer import TechDetection, detect_technologies, find_missing_experts
+from .plan_registry import PlanRegistry, PlanMetadata, ScanResult
 
 __all__ = [
     "Agent",
@@ -34,6 +36,7 @@ __all__ = [
     "RetryConfig",
     "ContextLimitsConfig",
     "ParallelConfig",
+    "DeduplicationConfig",
     "BudgetConfig",
     "get_agent_config",
     "get_budget_config",
@@ -41,4 +44,8 @@ __all__ = [
     "TechDetection",
     "detect_technologies",
     "find_missing_experts",
+    # Plan registry
+    "PlanRegistry",
+    "PlanMetadata",
+    "ScanResult",
 ]

@@ -14,6 +14,7 @@ Usage:
     uv run python .orchestrator/cli.py cost
     uv run python .orchestrator/cli.py test
     uv run python .orchestrator/cli.py portal
+    uv run python .orchestrator/cli.py sync-remote
 """
 import shutil
 import sys
@@ -751,6 +752,198 @@ def cmd_test(args):
 
 
 # =============================================================================
+# Sync Remote Command
+# =============================================================================
+
+def cmd_sync_remote(args=None):
+    """
+    Sync local changes to remote via PR.
+
+    Workflow:
+    1. Check for uncommitted changes
+    2. Create new branch from current branch
+    3. Commit changes (AI generates message)
+    4. Push to remote
+    5. Create PR (AI generates description)
+
+    No parameters required - just run: cli.py sync-remote
+    """
+    import subprocess
+    from datetime import datetime
+
+    def run_git(cmd, capture=True, check=True):
+        """Run git command and return output."""
+        result = subprocess.run(
+            ["git"] + cmd,
+            cwd=PROJECT_ROOT,
+            capture_output=capture,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if check and result.returncode != 0:
+            raise RuntimeError(f"Git command failed: {' '.join(cmd)}\n{result.stderr}")
+        return result.stdout.strip() if capture else result
+
+    def run_gh(cmd, capture=True, check=True):
+        """Run gh CLI command and return output."""
+        result = subprocess.run(
+            ["gh"] + cmd,
+            cwd=PROJECT_ROOT,
+            capture_output=capture,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if check and result.returncode != 0:
+            raise RuntimeError(f"GitHub CLI failed: {' '.join(cmd)}\n{result.stderr}")
+        return result.stdout.strip() if capture else result
+
+    def get_ai_response(prompt):
+        """Get AI response using Claude CLI (print mode - fast, no tools)."""
+        result = subprocess.run(
+            ["claude", "--print", "-p", prompt],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+        )
+        if result.returncode != 0:
+            return None
+        return result.stdout.strip()
+
+    print("=" * 60)
+    print("SYNC REMOTE - Push changes via PR")
+    print("=" * 60)
+
+    # Step 1: Check for changes
+    print("\n[1/6] Checking for changes...")
+    status = run_git(["status", "--porcelain"])
+    if not status:
+        print("  [X] No changes to commit")
+        return 1
+
+    changed_files = [line.split()[-1] for line in status.split("\n") if line]
+    print(f"  [OK] Found {len(changed_files)} changed file(s)")
+
+    # Step 2: Get current branch
+    print("\n[2/6] Getting current branch...")
+    base_branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
+    print(f"  [OK] Base branch: {base_branch}")
+
+    # Step 3: Create new branch
+    print("\n[3/6] Creating feature branch...")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    new_branch = f"sync/{base_branch}/{timestamp}"
+    run_git(["checkout", "-b", new_branch])
+    print(f"  [OK] Created branch: {new_branch}")
+
+    # Step 4: Stage and get diff
+    print("\n[4/6] Staging changes and generating commit message...")
+    run_git(["add", "-A"])
+    diff = run_git(["diff", "--cached", "--stat"])
+    diff_content = run_git(["diff", "--cached"])
+
+    # Truncate diff if too long
+    if len(diff_content) > 8000:
+        diff_content = diff_content[:8000] + "\n... (truncated)"
+
+    # Generate commit message with AI
+    commit_prompt = f"""Analyze this git diff and generate a concise commit message.
+
+DIFF STATS:
+{diff}
+
+DIFF CONTENT:
+{diff_content}
+
+Rules:
+- First line: type(scope): description (max 72 chars)
+- Types: feat, fix, refactor, docs, test, chore
+- Be specific about what changed
+- No body needed for simple changes
+
+Return ONLY the commit message, nothing else."""
+
+    print("  -> Generating commit message with AI...")
+    commit_msg = get_ai_response(commit_prompt)
+
+    if not commit_msg:
+        # Fallback to generic message
+        commit_msg = f"chore: sync changes ({len(changed_files)} files)"
+        print(f"  [WARN] AI unavailable, using fallback message")
+    else:
+        # Clean up AI response (remove quotes if present)
+        commit_msg = commit_msg.strip('"\'')
+        print(f"  [OK] Commit message: {commit_msg.split(chr(10))[0]}")
+
+    # Step 5: Commit and push
+    print("\n[5/6] Committing and pushing...")
+    run_git(["commit", "-m", commit_msg])
+    print("  [OK] Changes committed")
+
+    run_git(["push", "-u", "origin", new_branch])
+    print(f"  [OK] Pushed to origin/{new_branch}")
+
+    # Step 6: Create PR
+    print("\n[6/6] Creating pull request...")
+
+    # Generate PR description with AI
+    pr_prompt = f"""Create a pull request description for these changes.
+
+BRANCH: {new_branch} → {base_branch}
+COMMIT: {commit_msg}
+
+CHANGED FILES:
+{diff}
+
+Format:
+## Summary
+<2-3 bullet points describing the changes>
+
+## Changes
+<list of specific changes>
+
+Return ONLY the PR body markdown, nothing else."""
+
+    pr_body = get_ai_response(pr_prompt)
+
+    if not pr_body:
+        pr_body = f"## Summary\n- Synced local changes\n\n## Changes\n{diff}"
+
+    # Extract title from commit message (first line)
+    pr_title = commit_msg.split("\n")[0]
+
+    # Create PR using gh CLI
+    try:
+        pr_url = run_gh([
+            "pr", "create",
+            "--base", base_branch,
+            "--head", new_branch,
+            "--title", pr_title,
+            "--body", pr_body,
+        ])
+        print(f"  [OK] PR created: {pr_url}")
+    except RuntimeError as e:
+        print(f"  [WARN] PR creation failed: {e}")
+        print(f"  -> Manual PR: gh pr create --base {base_branch} --head {new_branch}")
+        return 1
+
+    # Switch back to base branch
+    run_git(["checkout", base_branch])
+
+    print("\n" + "=" * 60)
+    print("[OK] SYNC COMPLETE")
+    print(f"  Branch: {new_branch}")
+    print(f"  PR: {pr_url}")
+    print("=" * 60)
+
+    return 0
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -766,6 +959,7 @@ COMMANDS = {
     'cost': (cmd_cost, "Cost estimation and budgets"),
     'test': (cmd_test, "Run test suite"),
     'portal': (cmd_portal, "Start management portal"),
+    'sync-remote': (cmd_sync_remote, "Sync changes to remote via PR"),
 }
 
 
@@ -795,6 +989,7 @@ def main():
         print("  cli.py cost report daily                 # Daily cost report")
         print("  cli.py cost budget show                  # Show budget status")
         print("  cli.py cost budget set --daily 10.00     # Set daily limit")
+        print("  cli.py sync-remote                       # Commit & PR to remote")
         return 1
 
     cmd = sys.argv[1]
@@ -808,7 +1003,7 @@ def main():
     handler = COMMANDS[cmd][0]
 
     # Commands that don't take args
-    if cmd in ['setup', 'list']:
+    if cmd in ['setup', 'list', 'sync-remote']:
         return handler()
     else:
         return handler(args)

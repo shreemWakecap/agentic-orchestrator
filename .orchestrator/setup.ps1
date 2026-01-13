@@ -8,8 +8,8 @@ if (-not (Get-Command "uv" -ErrorAction SilentlyContinue)) {
     irm https://astral.sh/uv/install.ps1 | iex
 }
 
-# Sync and run setup
+# Sync all dependencies (including web extras for portal)
 Push-Location $scriptDir
-uv sync --quiet 2>$null
+uv sync --all-extras --quiet 2>$null
 uv run python cli.py setup
 Pop-Location

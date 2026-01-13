@@ -107,8 +107,7 @@ async def dashboard(request: Request):
     # Get active runs
     runs = list(active_runs.values())
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", {
         "counts": counts,
         "recent_plans": recent_plans,
         "active_runs": runs
@@ -119,8 +118,7 @@ async def dashboard(request: Request):
 async def plans_page(request: Request):
     """Render plans list page."""
     plans = await _get_all_plans()
-    return templates.TemplateResponse("plans.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "plans.html", {
         "plans": plans
     })
 
@@ -132,8 +130,7 @@ async def plan_detail(request: Request, plan_id: str):
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
 
-    return templates.TemplateResponse("plan_detail.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "plan_detail.html", {
         "plan": plan
     })
 
@@ -142,8 +139,7 @@ async def plan_detail(request: Request, plan_id: str):
 async def runs_page(request: Request):
     """Render runs history page."""
     runs = list(active_runs.values())
-    return templates.TemplateResponse("runs.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "runs.html", {
         "runs": runs
     })
 
@@ -155,8 +151,7 @@ async def run_detail(request: Request, run_id: str):
         raise HTTPException(status_code=404, detail="Run not found")
 
     run = active_runs[run_id]
-    return templates.TemplateResponse("run_detail.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "run_detail.html", {
         "run": run
     })
 

@@ -1,0 +1,24 @@
+{
+  "timeouts": {
+    "print_mode": 300,
+    "agentic_mode": 600,
+    "expert_consultation": 180
+  },
+  "retry": {
+    "max_attempts": 3,
+    "base_delay": 1.0,
+    "agentic_base_delay": 2.0,
+    "backoff_multiplier": 2.0,
+    "max_delay": 60.0
+  },
+  "context_limits": {
+    "base_codebase": 4000,
+    "base_scout": 3500,
+    "base_architect": 2500,
+    "minimum": 1500
+  },
+  "parallel": {
+    "max_sub_features": 3,
+    "max_expert_workers": 3
+  }
+}

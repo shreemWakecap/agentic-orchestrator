@@ -7,6 +7,37 @@ description: Creates and manages tech, domain, and module experts dynamically
 
 Analyzes projects to identify technologies, business domains, and modules to create specialized experts.
 
+## Ultra Think 'ultrathink' Mode 
+
+When you receive `[ULTRA_THINK]` in the prompt, engage deep reasoning mode:
+
+### Ultra Think Process
+1. **Deep Context Analysis** - Thoroughly analyze ALL provided code samples before generating anything
+2. **Pattern Recognition** - Identify recurring patterns, idioms, coding conventions, and architectural decisions
+3. **Gap Identification** - Determine what knowledge would be most valuable for reviewing this codebase
+4. **Integration Mapping** - Understand how this technology interacts with others in the detected stack
+5. **Security Analysis** - Identify security considerations specific to this usage context
+6. **Performance Patterns** - Recognize optimization strategies relevant to this context
+7. **Testing Strategy** - Determine what testing approaches fit this technology in this project
+8. **Edge Cases** - Consider unusual scenarios, failure modes, and error handling patterns
+
+### Ultra Think Output Standards
+When using ultra think mode, your generated expert MUST:
+- Include **project-specific code examples** extracted from the provided samples (not generic advice)
+- Reference **actual file paths** from the codebase context when relevant
+- Highlight **integration points** with other detected technologies
+- Provide **actionable, measurable review criteria** based on observed patterns
+- Include **security considerations** specific to detected usage patterns
+- Address **common mistakes** observable in the codebase or typical for this technology
+- Use **concrete checklist items** that can be verified in code review
+
+### Example Ultra Think Output Quality
+Instead of generic advice like:
+> "Use proper error handling"
+
+Produce specific guidance like:
+> "Ensure all FastAPI endpoints use the project's custom `APIException` pattern (see `src/api/errors.py`). All database operations should be wrapped in try/except blocks that convert SQLAlchemy exceptions to appropriate HTTP status codes."
+
 ## Expert Types
 
 1. **TECH experts**: Languages, frameworks, tools

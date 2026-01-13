@@ -290,6 +290,34 @@ Focus on:
 
         return truncated + f"\n\n... [truncated {len(text) - len(truncated)} chars]"
 
+    def _is_placeholder_response(self, content: str) -> bool:
+        """
+        Detect if agent returned a placeholder/greeting instead of actual content.
+
+        This catches cases where the agent system prompt wasn't properly applied
+        and Claude returns generic greeting responses.
+        """
+        if not content or len(content.strip()) < 50:
+            return True
+
+        placeholder_patterns = [
+            "I'm ready to help you",
+            "I'll help you with software engineering",
+            "What would you like me to",
+            "What would you like to work on",
+            "I understand you've sent",
+            "I understand. I'm ready to help",
+            "How can I help you",
+            "I can see you're on the",
+        ]
+
+        content_lower = content.lower()
+        for pattern in placeholder_patterns:
+            if pattern.lower() in content_lower:
+                return True
+
+        return False
+
     def _get_next_plan_number(self) -> int:
         """
         Get the next sequential plan number.
@@ -420,6 +448,18 @@ Focus on:
         )
         if not planner_result.success:
             return WorkflowResult(success=False, error=f"Planner failed: {planner_result.error}")
+
+        # Validate that planner returned actual implementation steps, not a placeholder/greeting
+        if self._is_placeholder_response(planner_result.content):
+            return WorkflowResult(
+                success=False,
+                error=(
+                    "Planner returned a generic response instead of implementation steps. "
+                    "This may indicate an issue with the agent system prompt configuration. "
+                    "Please check that the Claude CLI is properly configured and try again."
+                )
+            )
+
         steps_completed.append("planner")
 
         # Validator

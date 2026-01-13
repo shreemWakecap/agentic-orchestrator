@@ -729,6 +729,18 @@ Provide a quality assessment.""",
         self.console.print(f"  Phases: [cyan]{len(phases)}[/cyan]")
         self.console.print(f"  Total steps: [cyan]{total_steps}[/cyan]")
 
+        # CRITICAL: Fail if no steps were extracted from the plan
+        if total_steps == 0:
+            self._move_plan(plan_path, "failed")
+            return WorkflowResult(
+                success=False,
+                error=(
+                    "Parser could not extract any implementation steps from the plan. "
+                    "The plan may be incomplete, empty, or malformed. "
+                    "Please re-run the planning workflow to generate a complete plan with actionable steps."
+                )
+            )
+
         # Decide: simple or complex build
         if plan.plan_type == "master" or total_steps > 15:
             # Complex build with coordination

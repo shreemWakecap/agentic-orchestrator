@@ -43,7 +43,9 @@ app = FastAPI(
 
 # Setup templates and static files
 templates = Jinja2Templates(directory=SERVER_DIR / "templates")
-app.mount("/static", StaticFiles(directory=SERVER_DIR / "static"), name="static")
+STATIC_DIR = SERVER_DIR / "static"
+STATIC_DIR.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # In-memory store for active runs
 active_runs: Dict[str, Dict[str, Any]] = {}

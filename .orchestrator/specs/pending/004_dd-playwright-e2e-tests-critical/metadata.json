@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "4",
+  "plan_name": "dd-playwright-e2e-tests-critical",
+  "request": "dd Playwright E2E tests for critical user flows",
+  "request_hash": "b1b27acc8a7bc9e7",
+  "keywords": [
+    "playwright",
+    "e2e",
+    "tests",
+    "critical",
+    "user",
+    "flows"
+  ],
+  "features_provided": [
+    "playwright-setup",
+    "e2e-testing",
+    "tests-feature",
+    "critical-feature",
+    "user-feature"
+  ],
+  "features_required": [],
+  "files_affected": [
+    "tests/e2e/*",
+    "playwright.config.*"
+  ],
+  "modules_touched": [],
+  "depends_on": [],
+  "blocked_by": [],
+  "status": "pending",
+  "complexity": "simple",
+  "created_at": "2026-01-13T23:44:00",
+  "updated_at": "2026-01-13T23:44:00",
+  "similarity_scores": {}
+}

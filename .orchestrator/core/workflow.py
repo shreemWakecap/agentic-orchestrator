@@ -186,8 +186,10 @@ class Workflow(ABC):
         self.reset_cancellation()
         self._total_tokens = 0
 
+        # Escape backslashes in request for Rich markup (Windows paths)
+        display_request = str(request).replace("\\", "/")
         self.console.print(Panel(
-            f"[bold]{self.name}[/bold]\n\n{request}",
+            f"[bold]{self.name}[/bold]\n\n{display_request}",
             title="Workflow Started",
             border_style="cyan",
             width=80
@@ -219,9 +221,11 @@ class Workflow(ABC):
         from .symbols import CHECK, CROSS, WARNING
         self.console.print()
         if result.success:
+            # Escape backslashes for Rich markup (Windows paths)
+            output_display = str(result.output_file).replace("\\", "/") if result.output_file else "None"
             self.console.print(Panel(
                 f"[green]{CHECK} Workflow completed successfully[/green]\n\n"
-                f"Output: {result.output_file}\n"
+                f"Output: {output_display}\n"
                 f"Steps: {len(result.steps_completed)}\n"
                 f"Tokens: {result.total_tokens:,}\n"
                 f"Duration: {duration:.1f}s",
@@ -240,8 +244,10 @@ class Workflow(ABC):
                 width=80
             ))
         else:
+            # Escape backslashes in error for Rich markup (Windows paths)
+            error_display = str(result.error).replace("\\", "/") if result.error else "Unknown error"
             self.console.print(Panel(
-                f"[red]{CROSS} Workflow failed[/red]\n\n{result.error}",
+                f"[red]{CROSS} Workflow failed[/red]\n\n{error_display}",
                 title="Error",
                 border_style="red",
                 width=80

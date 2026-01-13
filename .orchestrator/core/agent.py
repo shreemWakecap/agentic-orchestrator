@@ -232,17 +232,11 @@ class Agent:
 
         return cls(name=name, system_prompt=system_prompt, cwd=project_root)
 
-    def _build_prompt(self, message: str, context: Optional[str] = None) -> str:
-        """Build the full prompt with system prompt and context."""
-        full_message = message
+    def _build_user_prompt(self, message: str, context: Optional[str] = None) -> str:
+        """Build the user prompt with optional context (system prompt passed separately)."""
         if context:
-            full_message = f"## Context\n\n{context}\n\n## Task\n\n{message}"
-
-        return f"""<system>
-{self.system_prompt}
-</system>
-
-{full_message}"""
+            return f"## Context\n\n{context}\n\n## Task\n\n{message}"
+        return message
 
     def run(
         self,
@@ -283,10 +277,18 @@ class Agent:
         def execute(state: RetryState) -> AgentResult:
             try:
                 validated_cwd = _validate_cwd(self.cwd)
-                prompt = self._build_prompt(message, context)
+                user_prompt = self._build_user_prompt(message, context)
+
+                # Use --system-prompt flag for agent's system prompt
+                # Pass user prompt via stdin to avoid Windows command-line issues with newlines
+                cmd = [
+                    _get_claude_executable(),
+                    "--print",
+                    "--system-prompt", self.system_prompt,
+                ]
 
                 result = subprocess.run(
-                    [_get_claude_executable(), "--print", "-p", prompt],
+                    cmd,
                     cwd=str(validated_cwd),
                     capture_output=True,
                     text=True,
@@ -294,6 +296,7 @@ class Agent:
                     errors="replace",
                     timeout=effective_timeout,
                     shell=False,
+                    input=user_prompt,  # Pass prompt via stdin
                 )
 
                 if result.returncode != 0:
@@ -384,11 +387,13 @@ class Agent:
         def execute(state: RetryState) -> AgentResult:
             try:
                 validated_cwd = _validate_cwd(self.cwd)
-                prompt = self._build_prompt(message, context)
+                user_prompt = self._build_user_prompt(message, context)
 
+                # Use --system-prompt flag for agent's system prompt
+                # Pass user prompt via stdin to avoid Windows command-line issues with newlines
                 cmd = [
                     _get_claude_executable(),
-                    "-p", prompt,
+                    "--system-prompt", self.system_prompt,
                     "--yes",
                     "--output-format", "json",
                     "--allowedTools", ",".join(tools),
@@ -403,6 +408,7 @@ class Agent:
                     errors="replace",
                     timeout=effective_timeout,
                     shell=False,
+                    input=user_prompt,  # Pass prompt via stdin
                 )
 
                 if result.returncode != 0:

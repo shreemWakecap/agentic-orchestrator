@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "last_scan": "2026-01-14T00:24:40.846869",
+  "last_scan": "2026-01-14T02:05:32.041307",
   "plans": {
     "1": {
       "path": "pending/001_simple-hello-world-feature",
@@ -193,6 +193,28 @@
         "tests/*"
       ],
       "depends_on": []
+    },
+    "9": {
+      "path": "pending/009_new-api-health-check-endpoint",
+      "status": "pending",
+      "request": "Add a new API health check endpoint",
+      "request_hash": "ba8de4faef8b542e",
+      "keywords": [
+        "api",
+        "health",
+        "check",
+        "endpoint"
+      ],
+      "features_provided": [
+        "api-feature",
+        "health-feature",
+        "check-feature"
+      ],
+      "files_affected": [
+        "api/*",
+        "routes/*"
+      ],
+      "depends_on": []
     }
   },
   "features_index": {
@@ -300,6 +322,15 @@
     ],
     "suite-feature": [
       "8"
+    ],
+    "api-feature": [
+      "9"
+    ],
+    "health-feature": [
+      "9"
+    ],
+    "check-feature": [
+      "9"
     ]
   },
   "files_index": {
@@ -320,11 +351,17 @@
     ],
     "playwright.config.*": [
       "4"
+    ],
+    "api/*": [
+      "9"
+    ],
+    "routes/*": [
+      "9"
     ]
   },
   "stats": {
-    "total_plans": 8,
-    "pending": 8,
+    "total_plans": 9,
+    "pending": 9,
     "in_progress": 0,
     "completed": 0,
     "failed": 0

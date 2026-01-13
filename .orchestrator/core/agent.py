@@ -10,6 +10,7 @@ Two modes:
 """
 import json
 import logging
+import shutil
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -17,6 +18,21 @@ from pathlib import Path
 from typing import Callable, Optional, TypeVar
 
 from .config import get_agent_config, RetryConfig
+
+
+def _get_claude_executable() -> str:
+    """
+    Get the full path to the claude executable.
+
+    On Windows, subprocess.run with shell=False doesn't search PATH for .cmd files.
+    Using shutil.which() properly resolves claude.cmd on Windows.
+    """
+    claude_path = shutil.which("claude")
+    if claude_path is None:
+        raise FileNotFoundError(
+            "Claude Code CLI not found. Install: npm install -g @anthropic-ai/claude-code"
+        )
+    return claude_path
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +286,7 @@ class Agent:
                 prompt = self._build_prompt(message, context)
 
                 result = subprocess.run(
-                    ["claude", "--print", "-p", prompt],
+                    [_get_claude_executable(), "--print", "-p", prompt],
                     cwd=str(validated_cwd),
                     capture_output=True,
                     text=True,
@@ -371,7 +387,7 @@ class Agent:
                 prompt = self._build_prompt(message, context)
 
                 cmd = [
-                    "claude",
+                    _get_claude_executable(),
                     "-p", prompt,
                     "--yes",
                     "--output-format", "json",

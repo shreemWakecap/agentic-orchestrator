@@ -115,6 +115,28 @@ class ReviewingWorkflow(Workflow):
             except FileNotFoundError:
                 self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
 
+    def _load_plan_content(self, plan_path: Path) -> str:
+        """
+        Load plan content from either a single file or a folder-based plan.
+
+        For folder-based plans (e.g., 001_feature-name/), reads all .md files
+        in sorted order and concatenates them.
+
+        For single-file plans, returns the file content directly.
+        """
+        if plan_path.is_dir():
+            md_files = sorted(plan_path.glob("*.md"))
+            if not md_files:
+                return ""
+            contents = []
+            for md_file in md_files:
+                file_content = md_file.read_text(encoding="utf-8")
+                contents.append(f"<!-- File: {md_file.name} -->\n{file_content}")
+            return "\n\n---\n\n".join(contents)
+        elif plan_path.exists():
+            return plan_path.read_text(encoding="utf-8")
+        return ""
+
     def _load_docs(self) -> DocsContext:
         """Load AI documentation with freshness check."""
         self.console.print("[bold]Loading AI Documentation...[/bold]")
@@ -361,10 +383,8 @@ class ReviewingWorkflow(Workflow):
         """Check if implementation matches the plan."""
         self.console.print("\n[bold]Phase 2:[/bold] Checking plan compliance...")
 
-        # Load plan content
-        plan_content = ""
-        if plan_path.exists():
-            plan_content = plan_path.read_text(encoding="utf-8")
+        # Load plan content (supports both file and folder-based plans)
+        plan_content = self._load_plan_content(plan_path)
 
         # Load build state if exists
         state_file = plan_path.parent / f".{plan_path.stem}.state.json"

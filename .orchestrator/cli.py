@@ -186,11 +186,24 @@ def cmd_list():
         status_dir = SPECS_DIR / status
         if not status_dir.exists():
             continue
-        plans = list(status_dir.glob("*.md"))
+        # Find both folder-based plans (directories with numeric prefix) and legacy .md files
+        plans = []
+        for item in status_dir.iterdir():
+            if item.is_dir() and item.name[0].isdigit():
+                # Folder-based plan (e.g., "001_feature-name")
+                plans.append(item)
+            elif item.is_file() and item.suffix == ".md":
+                # Legacy single-file plan
+                plans.append(item)
         if plans:
             print(f"\n{colors[status]}{status.upper()}\033[0m ({len(plans)})")
-            for p in sorted(plans):
-                print(f"  {p.name}")
+            for p in sorted(plans, key=lambda x: x.name):
+                if p.is_dir():
+                    # Show folder with file count
+                    file_count = len(list(p.glob("*.md")))
+                    print(f"  {p.name}/ ({file_count} files)")
+                else:
+                    print(f"  {p.name}")
 
     return 0
 
@@ -779,8 +792,11 @@ def cmd_sync_remote(args=None):
 
     def get_ai_response(prompt):
         try:
+            claude_path = shutil.which("claude")
+            if not claude_path:
+                return None
             result = subprocess.run(
-                ["claude", "--print", "-p", prompt], cwd=PROJECT_ROOT,
+                [claude_path, "--print", "-p", prompt], cwd=PROJECT_ROOT,
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
             )
             return result.stdout.strip() if result.returncode == 0 else None

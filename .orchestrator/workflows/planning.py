@@ -286,8 +286,66 @@ Focus on:
 
         return truncated + f"\n\n... [truncated {len(text) - len(truncated)} chars]"
 
+    def _get_next_plan_number(self) -> int:
+        """
+        Get the next sequential plan number.
+
+        Scans the output directory for existing plan folders with numeric prefixes
+        (e.g., 001_feature-name) and returns the next number in sequence.
+        """
+        max_num = 0
+        if self.output_dir.exists():
+            for item in self.output_dir.iterdir():
+                if item.is_dir():
+                    # Match pattern: NNN_name or NNN-name
+                    match = re.match(r'^(\d+)[_-]', item.name)
+                    if match:
+                        num = int(match.group(1))
+                        max_num = max(max_num, num)
+        return max_num + 1
+
+    def _generate_plan_dirname(self, request: str, prefix: str = "") -> str:
+        """
+        Generate a kebab-case directory name with sequential prefix.
+
+        Args:
+            request: The user's request
+            prefix: Optional prefix like "master-" for complex plans
+
+        Returns:
+            Directory name like "001_user-authentication" or "002_master-oauth-system"
+        """
+        plan_num = self._get_next_plan_number()
+        words = re.sub(r'[^\w\s]', '', request.lower()).split()
+        stop_words = {'a', 'an', 'the', 'to', 'for', 'with', 'and', 'or', 'in', 'on', 'add', 'create', 'implement'}
+        words = [w for w in words if w not in stop_words][:5]
+        name_part = '-'.join(words)
+        if prefix:
+            name_part = f"{prefix}{name_part}"
+        return f"{plan_num:03d}_{name_part}"
+
+    def _save_plan_folder(self, dirname: str, files: dict[str, str]) -> Path:
+        """
+        Save plan as a folder with multiple files.
+
+        Args:
+            dirname: Directory name (e.g., "001_user-authentication")
+            files: Dict mapping filename to content (e.g., {"00_overview.md": "..."})
+
+        Returns:
+            Path to the created plan directory
+        """
+        plan_dir = self.output_dir / dirname
+        plan_dir.mkdir(parents=True, exist_ok=True)
+
+        for filename, content in files.items():
+            file_path = plan_dir / filename
+            file_path.write_text(content, encoding="utf-8")
+
+        return plan_dir
+
     def _generate_filename(self, request: str) -> str:
-        """Generate a kebab-case filename."""
+        """Generate a kebab-case filename. DEPRECATED: Use _generate_plan_dirname instead."""
         words = re.sub(r'[^\w\s]', '', request.lower()).split()
         stop_words = {'a', 'an', 'the', 'to', 'for', 'with', 'and', 'or', 'in', 'on', 'add', 'create', 'implement'}
         words = [w for w in words if w not in stop_words][:5]
@@ -371,8 +429,8 @@ Focus on:
             return WorkflowResult(success=False, error=f"Validator failed: {validator_result.error}")
         steps_completed.append("validator")
 
-        # Compile and save
-        final_plan = self._compile_simple_plan(
+        # Compile and save as folder with multiple files
+        plan_files = self._compile_simple_plan(
             request=request,
             scout=scout_result.content,
             architect=architect_result.content,
@@ -381,8 +439,8 @@ Focus on:
             expert_insights=expert_insights
         )
 
-        filename = self._generate_filename(request)
-        output_path = self.save_output(filename, final_plan)
+        dirname = self._generate_plan_dirname(request)
+        output_path = self._save_plan_folder(dirname, plan_files)
 
         return WorkflowResult(
             success=True,
@@ -618,8 +676,8 @@ Focus on:
             return WorkflowResult(success=False, error=f"Validator failed: {validator_result.error}")
         steps_completed.append("validator")
 
-        # Save master plan
-        final_plan = self._compile_master_plan(
+        # Save master plan as folder with multiple files
+        plan_files = self._compile_master_plan(
             request=request,
             analysis=analysis,
             decomposition=decomposition,
@@ -629,8 +687,8 @@ Focus on:
             expert_insights=expert_insights
         )
 
-        filename = "master-" + self._generate_filename(request)
-        output_path = self.save_output(filename, final_plan)
+        dirname = self._generate_plan_dirname(request, prefix="master-")
+        output_path = self._save_plan_folder(dirname, plan_files)
 
         return WorkflowResult(
             success=True,
@@ -680,62 +738,86 @@ Focus on:
         planner: str,
         validator: str,
         expert_insights: Optional[list[ExpertInsight]] = None
-    ) -> str:
-        """Compile simple plan."""
+    ) -> dict[str, str]:
+        """
+        Compile simple plan as multiple files.
+
+        Returns:
+            Dict mapping filename to content for the plan folder
+        """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        expert_count = len(expert_insights) if expert_insights else 0
 
-        # Build expert insights section if available
-        expert_section = ""
-        if expert_insights:
-            expert_section = "\n---\n\n## Domain Expert Insights\n\n"
-            for insight in expert_insights:
-                expert_section += f"### {insight.expert_name} ({insight.expert_type})\n\n"
-                expert_section += f"{insight.insights}\n\n"
-                if insight.recommendations:
-                    expert_section += "**Recommendations:**\n"
-                    for rec in insight.recommendations:
-                        expert_section += f"- {rec}\n"
-                    expert_section += "\n"
-                if insight.concerns:
-                    expert_section += "**Concerns:**\n"
-                    for concern in insight.concerns:
-                        expert_section += f"- {concern}\n"
-                    expert_section += "\n"
+        files = {}
 
-        return f"""# Plan: {request}
+        # 00_overview.md - Summary and metadata
+        files["00_overview.md"] = f"""# Plan: {request}
 
 > Generated on {timestamp}
 > Complexity: Simple/Medium (single-pass planning)
-> Domain experts consulted: {len(expert_insights) if expert_insights else 0}
+> Domain experts consulted: {expert_count}
 
 ## Overview
 
 **Request:** {request}
 
----
+## Plan Structure
 
-## Codebase Context
+- `01_context.md` - Codebase context and analysis
+- `02_architecture.md` - Architecture design{' and expert insights' if expert_insights else ''}
+- `03_implementation.md` - Step-by-step implementation plan
+- `04_validation.md` - Validation checklist and criteria
+"""
+
+        # 01_context.md - Scout/codebase context
+        files["01_context.md"] = f"""# Codebase Context
+
+> Part of plan: {request}
 
 {scout}
+"""
 
----
+        # 02_architecture.md - Architecture design + expert insights
+        architect_content = f"""# Architecture Design
 
-## Architecture Design
+> Part of plan: {request}
 
 {architect}
-{expert_section}
----
+"""
+        if expert_insights:
+            architect_content += "\n---\n\n## Domain Expert Insights\n\n"
+            for insight in expert_insights:
+                architect_content += f"### {insight.expert_name} ({insight.expert_type})\n\n"
+                architect_content += f"{insight.insights}\n\n"
+                if insight.recommendations:
+                    architect_content += "**Recommendations:**\n"
+                    for rec in insight.recommendations:
+                        architect_content += f"- {rec}\n"
+                    architect_content += "\n"
+                if insight.concerns:
+                    architect_content += "**Concerns:**\n"
+                    for concern in insight.concerns:
+                        architect_content += f"- {concern}\n"
+                    architect_content += "\n"
+        files["02_architecture.md"] = architect_content
 
-## Implementation Plan
+        # 03_implementation.md - Implementation steps
+        files["03_implementation.md"] = f"""# Implementation Plan
+
+> Part of plan: {request}
 
 {planner}
+"""
 
----
+        # 04_validation.md - Validation
+        files["04_validation.md"] = f"""# Validation
 
-## Validation
+> Part of plan: {request}
 
 {validator}
 """
+
+        return files
 
     def _compile_master_plan(
         self,
@@ -746,40 +828,37 @@ Focus on:
         synthesis: str,
         validation: str,
         expert_insights: Optional[list[ExpertInsight]] = None
-    ) -> str:
-        """Compile master plan from decomposed planning."""
+    ) -> dict[str, str]:
+        """
+        Compile master plan as multiple files.
+
+        Returns:
+            Dict mapping filename to content for the plan folder.
+            Sub-features get their own numbered files.
+        """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
         complexity = analysis.get("complexity", "complex")
+        expert_count = len(expert_insights) if expert_insights else 0
 
+        files = {}
+
+        # Build sub-features summary for overview
         sub_features_summary = "\n".join([
-            f"- **{sp.name}** ({sp.id})"
-            for sp in sub_plans
+            f"- **{sp.name}** ({sp.id}) - `{i+2:02d}_sub-{self._slugify(sp.name)}.md`"
+            for i, sp in enumerate(sub_plans)
         ])
 
-        # Build expert insights section if available
-        expert_section = ""
-        if expert_insights:
-            expert_section = "\n---\n\n## Domain Expert Insights\n\n"
-            for insight in expert_insights:
-                expert_section += f"### {insight.expert_name} ({insight.expert_type})\n\n"
-                expert_section += f"{insight.insights}\n\n"
-                if insight.recommendations:
-                    expert_section += "**Recommendations:**\n"
-                    for rec in insight.recommendations:
-                        expert_section += f"- {rec}\n"
-                    expert_section += "\n"
-                if insight.concerns:
-                    expert_section += "**Concerns:**\n"
-                    for concern in insight.concerns:
-                        expert_section += f"- {concern}\n"
-                    expert_section += "\n"
+        # Calculate the master implementation file number
+        master_impl_num = len(sub_plans) + 2
+        validation_num = master_impl_num + 1
 
-        return f"""# Master Plan: {request}
+        # 00_overview.md - Summary and metadata
+        files["00_overview.md"] = f"""# Master Plan: {request}
 
 > Generated on {timestamp}
 > Complexity: {complexity.upper()} (decomposed planning)
 > Sub-features: {len(sub_plans)}
-> Domain experts consulted: {len(expert_insights) if expert_insights else 0}
+> Domain experts consulted: {expert_count}
 
 ## Overview
 
@@ -790,22 +869,12 @@ Focus on:
 - Strategy: {analysis.get('strategy', 'decompose_sequential')}
 - Estimated steps: {analysis.get('estimated_steps', 'N/A')}
 
-### Sub-Features Planned
+## Plan Structure
+
+- `01_architecture.md` - High-level architecture{' and expert insights' if expert_insights else ''}
 {sub_features_summary}
-{expert_section}
----
-
-## Master Implementation Plan
-
-{synthesis}
-
----
-
-## Validation
-
-{validation}
-
----
+- `{master_impl_num:02d}_master-implementation.md` - Synthesized master implementation plan
+- `{validation_num:02d}_validation.md` - Validation checklist
 
 ## Execution Notes
 
@@ -814,6 +883,84 @@ Focus on:
 3. Run validation commands after each phase
 4. Integration testing after all features complete
 """
+
+        # 01_architecture.md - Architecture + expert insights
+        architect_content = f"""# Architecture Overview
+
+> Part of master plan: {request}
+
+This document contains the high-level architecture design for the decomposed feature implementation.
+"""
+        if expert_insights:
+            architect_content += "\n---\n\n## Domain Expert Insights\n\n"
+            for insight in expert_insights:
+                architect_content += f"### {insight.expert_name} ({insight.expert_type})\n\n"
+                architect_content += f"{insight.insights}\n\n"
+                if insight.recommendations:
+                    architect_content += "**Recommendations:**\n"
+                    for rec in insight.recommendations:
+                        architect_content += f"- {rec}\n"
+                    architect_content += "\n"
+                if insight.concerns:
+                    architect_content += "**Concerns:**\n"
+                    for concern in insight.concerns:
+                        architect_content += f"- {concern}\n"
+                    architect_content += "\n"
+        files["01_architecture.md"] = architect_content
+
+        # Sub-feature files (02_sub-*, 03_sub-*, etc.)
+        for i, sp in enumerate(sub_plans):
+            file_num = i + 2
+            slug = self._slugify(sp.name)
+            filename = f"{file_num:02d}_sub-{slug}.md"
+
+            files[filename] = f"""# Sub-Feature: {sp.name}
+
+> Part of master plan: {request}
+> Sub-feature ID: {sp.id}
+
+## Context
+
+{sp.scout_result}
+
+---
+
+## Architecture
+
+{sp.architect_result}
+
+---
+
+## Implementation Steps
+
+{sp.planner_result}
+"""
+
+        # Master implementation file
+        files[f"{master_impl_num:02d}_master-implementation.md"] = f"""# Master Implementation Plan
+
+> Part of master plan: {request}
+
+This document synthesizes all sub-feature plans into a cohesive implementation strategy.
+
+{synthesis}
+"""
+
+        # Validation file
+        files[f"{validation_num:02d}_validation.md"] = f"""# Validation
+
+> Part of master plan: {request}
+
+{validation}
+"""
+
+        return files
+
+    def _slugify(self, text: str) -> str:
+        """Convert text to kebab-case slug for filenames."""
+        slug = re.sub(r'[^\w\s-]', '', text.lower())
+        slug = re.sub(r'[-\s]+', '-', slug).strip('-')
+        return slug[:30]  # Limit length
 
 
 def main():

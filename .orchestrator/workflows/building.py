@@ -179,6 +179,38 @@ class BuildingWorkflow(Workflow):
                 return None
         return None
 
+    def _load_plan_content(self, plan_path: Path) -> str:
+        """
+        Load plan content from either a single file or a folder-based plan.
+
+        For folder-based plans (e.g., 001_feature-name/), reads all .md files
+        in sorted order and concatenates them.
+
+        For single-file plans, returns the file content directly.
+
+        Args:
+            plan_path: Path to plan file or directory
+
+        Returns:
+            Combined plan content as a single string
+        """
+        if plan_path.is_dir():
+            # Folder-based plan - read all .md files in sorted order
+            md_files = sorted(plan_path.glob("*.md"))
+            if not md_files:
+                raise ValueError(f"No .md files found in plan folder: {plan_path}")
+
+            contents = []
+            for md_file in md_files:
+                file_content = md_file.read_text(encoding="utf-8")
+                # Add file header for context
+                contents.append(f"<!-- File: {md_file.name} -->\n{file_content}")
+
+            return "\n\n---\n\n".join(contents)
+        else:
+            # Single file plan (legacy format)
+            return plan_path.read_text(encoding="utf-8")
+
     def _move_plan(self, plan_path: Path, destination: str):
         """Move plan file to a destination folder."""
         dest_dir = self.specs_dir / destination
@@ -633,7 +665,7 @@ Provide a quality assessment.""",
 
         # Phase 1: Parse the plan
         self.console.print("\n[bold]Phase 1:[/bold] Parsing plan...")
-        plan_content = plan_path.read_text(encoding="utf-8")
+        plan_content = self._load_plan_content(plan_path)
 
         # Validate plan has actual content (not just headers)
         content_lines = [

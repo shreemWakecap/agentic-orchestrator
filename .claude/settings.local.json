@@ -7,7 +7,9 @@
       "Bash(cmd.exe /c \"tasklist | findstr /i node\")",
       "Bash(tasklist.exe:*)",
       "Bash(cmd.exe /c \"wmic process where \"\"name=''python.exe''\"\" get ProcessId,CommandLine\")",
-      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Get-CimInstance Win32_Process -Filter \"\"Name=''python.exe''\"\" | Select-Object ProcessId,CommandLine | Format-List\")"
+      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Get-CimInstance Win32_Process -Filter \"\"Name=''python.exe''\"\" | Select-Object ProcessId,CommandLine | Format-List\")",
+      "Bash(python -m py_compile:*)",
+      "Bash(uv run:*)"
     ]
   }
 }

@@ -1,5 +1,10 @@
 {
   "tests/unit/test_agent.py::TestAgentPromptBuilding::test_build_prompt_basic": true,
   "tests/unit/test_agent.py::TestAgentPromptBuilding::test_build_prompt_with_context": true,
-  "tests/unit/test_agent.py::TestAgentRetries::test_retries_on_transient_error": true
+  "tests/unit/test_agent.py::TestAgentRetries::test_retries_on_transient_error": true,
+  "tests/e2e/test_plan_flows.py::TestPlanList::test_plans_list_displays_plans[chromium]": true,
+  "tests/e2e/test_plan_flows.py::TestPlanDetails::test_navigate_to_plan_details[chromium]": true,
+  "tests/e2e/test_plan_flows.py::TestPlanDetails::test_plan_details_back_navigation[chromium]": true,
+  "tests/e2e/test_plan_flows.py::TestDashboard::test_dashboard_loads[chromium]": true,
+  "tests/e2e/test_plan_flows.py::TestDashboard::test_dashboard_navigation_to_plans[chromium]": true
 }

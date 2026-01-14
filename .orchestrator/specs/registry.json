@@ -1,38 +1,87 @@
 {
   "schema_version": "1.0",
-  "last_scan": "2026-01-14T16:01:22.340463",
+  "last_scan": "2026-01-14T18:25:42.923322",
   "plans": {
     "1": {
-      "path": "completed/001_health-api-endpoint-orchestrator-server",
+      "path": "completed/001_test-module-3-independent-model",
       "status": "completed",
-      "request": "Add a /health API endpoint to the orchestrator server (server/app.py). The endpoint should return JSON with status, version, and uptime. Include pytest tests in tests/unit/test_portal.py.",
-      "request_hash": "664a49a1648ca5a0",
+      "request": "Create a test module with 3 independent model files (user.py, product.py, order.py) in tests/parallel_test/models/, a registry.py that imports all models, and 2 utility files (validators.py, formatters.py) in tests/parallel_test/utils/. Each file should have a simple class or function. This tests parallel build capability.",
+      "request_hash": "622198ff625fe64a",
       "keywords": [
-        "health",
-        "api",
-        "endpoint",
-        "orchestrator",
-        "server",
-        "serverapppy",
-        "endpoint",
-        "return",
-        "json",
-        "status",
-        "version",
-        "uptime",
-        "include",
-        "pytest",
+        "test",
+        "module",
+        "independent",
+        "model",
+        "files",
+        "userpy",
+        "productpy",
+        "orderpy",
+        "testsparallel_testmodels",
+        "registrypy",
+        "imports",
+        "all",
+        "models",
+        "utility",
+        "files",
+        "validatorspy",
+        "formatterspy",
+        "testsparallel_testutils",
+        "each",
+        "file",
+        "simple",
+        "class",
+        "function",
         "tests",
-        "testsunittest_portalpy"
+        "parallel",
+        "capability"
       ],
       "features_provided": [
-        "health-feature",
-        "api-feature",
-        "endpoint-feature"
+        "test-feature",
+        "module-feature",
+        "independent-feature"
       ],
       "files_affected": [
-        "api/*",
-        "routes/*"
+        "tests/*"
+      ],
+      "depends_on": []
+    },
+    "2": {
+      "path": "pending/002_playwright-e2e-tests-critical-user",
+      "status": "pending",
+      "request": "Add Playwright E2E tests for critical user flows in the orchestrator web UI. Cover: (1) viewing plan list, (2) viewing plan details, (3) starting a build. Create tests/e2e/ directory, add playwright.config.ts, and implement tests using @playwright/test.",
+      "request_hash": "32b6ff2d7c2fcb51",
+      "keywords": [
+        "playwright",
+        "e2e",
+        "tests",
+        "critical",
+        "user",
+        "flows",
+        "orchestrator",
+        "web",
+        "cover",
+        "viewing",
+        "plan",
+        "list",
+        "viewing",
+        "plan",
+        "details",
+        "starting",
+        "testse2e",
+        "directory",
+        "playwrightconfigts",
+        "tests",
+        "using",
+        "playwrighttest"
+      ],
+      "features_provided": [
+        "playwright-feature",
+        "e2e-feature",
+        "tests-feature"
+      ],
+      "files_affected": [
+        "tests/e2e/*",
+        "playwright.config.*"
       ],
       "depends_on": []
     }
@@ -41,11 +90,20 @@
     "test-feature": [
       "1"
     ],
-    "module-feature": [
+    "validates-feature": [
       "1"
     ],
-    "independent-feature": [
+    "form-feature": [
       "1"
+    ],
+    "playwright-feature": [
+      "2"
+    ],
+    "e2e-feature": [
+      "2"
+    ],
+    "tests-feature": [
+      "2"
     ],
     "health-feature": [
       "1"
@@ -55,11 +113,29 @@
     ],
     "endpoint-feature": [
       "1"
+    ],
+    "assertion-feature": [
+      "1"
+    ],
+    "verify-feature": [
+      "1"
+    ],
+    "module-feature": [
+      "1"
+    ],
+    "independent-feature": [
+      "1"
     ]
   },
   "files_index": {
     "tests/*": [
       "1"
+    ],
+    "tests/e2e/*": [
+      "2"
+    ],
+    "playwright.config.*": [
+      "2"
     ],
     "api/*": [
       "1"
@@ -69,10 +145,10 @@
     ]
   },
   "stats": {
-    "total_plans": 2,
-    "pending": 1,
+    "total_plans": 5,
+    "pending": 2,
     "in_progress": 0,
-    "completed": 1,
+    "completed": 3,
     "failed": 0
   }
 }

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "last_scan": "2026-01-14T18:25:42.923322",
+  "last_scan": "2026-01-15T00:59:56.532496",
   "plans": {
     "1": {
       "path": "completed/001_test-module-3-independent-model",
@@ -84,11 +84,182 @@
         "playwright.config.*"
       ],
       "depends_on": []
+    },
+    "3": {
+      "path": "pending/003_extract-inline-javascript-from-servertemplateshtml",
+      "status": "pending",
+      "request": "Extract inline JavaScript from server/templates/*.html into separate .js files in server/static/js/. Add Jest for testing. Create package.json with jest dependency, configure Jest, and add unit tests for extracted JS functions.",
+      "request_hash": "5137800592dfb6e1",
+      "keywords": [
+        "extract",
+        "inline",
+        "javascript",
+        "servertemplateshtml",
+        "separate",
+        "files",
+        "serverstaticjs",
+        "jest",
+        "testing",
+        "packagejson",
+        "jest",
+        "dependency",
+        "configure",
+        "jest",
+        "unit",
+        "tests",
+        "extracted",
+        "functions"
+      ],
+      "features_provided": [
+        "extract-feature",
+        "inline-feature",
+        "javascript-feature"
+      ],
+      "files_affected": [
+        "*"
+      ],
+      "depends_on": []
+    },
+    "4": {
+      "path": "pending/004_visual-regression-testing-using-percyio",
+      "status": "pending",
+      "request": "Add visual regression testing using Percy.io for the orchestrator web UI. Integrate Percy with the existing Playwright tests (or create new ones). Configure Percy in CI, add percy.yml config, and capture snapshots of key pages: plan list, plan detail, and build progress.",
+      "request_hash": "949716acd26f6547",
+      "keywords": [
+        "visual",
+        "regression",
+        "testing",
+        "using",
+        "percyio",
+        "orchestrator",
+        "web",
+        "integrate",
+        "percy",
+        "existing",
+        "playwright",
+        "tests",
+        "ones",
+        "configure",
+        "percy",
+        "percyyml",
+        "config",
+        "capture",
+        "snapshots",
+        "key",
+        "pages",
+        "plan",
+        "list",
+        "plan",
+        "detail",
+        "progress"
+      ],
+      "features_provided": [
+        "visual-feature",
+        "regression-feature",
+        "testing-feature"
+      ],
+      "files_affected": [
+        "tests/e2e/*",
+        "playwright.config.*",
+        "config/*",
+        "*.config.*"
+      ],
+      "depends_on": []
+    },
+    "5": {
+      "path": "pending/005_refactor-serverapppy-use-dependency-injection",
+      "status": "pending",
+      "request": "Refactor server/app.py to use dependency injection for better testability. Extract hard-coded dependencies (file paths, plan registry) into injectable services. Create a services/ module with interfaces. Update tests to use mock services.",
+      "request_hash": "6cce01a85bd0df38",
+      "keywords": [
+        "refactor",
+        "serverapppy",
+        "use",
+        "dependency",
+        "injection",
+        "better",
+        "testability",
+        "extract",
+        "hardcoded",
+        "dependencies",
+        "file",
+        "paths",
+        "plan",
+        "registry",
+        "injectable",
+        "services",
+        "services",
+        "module",
+        "interfaces",
+        "tests",
+        "use",
+        "mock",
+        "services"
+      ],
+      "features_provided": [
+        "refactor-feature",
+        "serverapppy-feature",
+        "use-feature"
+      ],
+      "files_affected": [
+        "*"
+      ],
+      "depends_on": []
+    },
+    "6": {
+      "path": "pending/006_comprehensive-e2e-test-suite-orchestrator",
+      "status": "pending",
+      "request": "Create a comprehensive E2E test suite for the orchestrator. Use Playwright to test: (1) full planning workflow - create plan from request, (2) build workflow - execute plan and verify files created, (3) review workflow - review built code. Structure tests in tests/e2e/ with fixtures for test data.",
+      "request_hash": "618930b27e0b0e2e",
+      "keywords": [
+        "comprehensive",
+        "e2e",
+        "test",
+        "suite",
+        "orchestrator",
+        "use",
+        "playwright",
+        "test",
+        "full",
+        "planning",
+        "workflow",
+        "plan",
+        "request",
+        "workflow",
+        "execute",
+        "plan",
+        "verify",
+        "files",
+        "created",
+        "review",
+        "workflow",
+        "review",
+        "built",
+        "code",
+        "structure",
+        "tests",
+        "testse2e",
+        "fixtures",
+        "test",
+        "data"
+      ],
+      "features_provided": [
+        "comprehensive-feature",
+        "e2e-feature",
+        "test-feature"
+      ],
+      "files_affected": [
+        "tests/e2e/*",
+        "tests/*",
+        "playwright.config.*"
+      ],
+      "depends_on": []
     }
   },
   "features_index": {
     "test-feature": [
-      "1"
+      "1",
+      "6"
     ],
     "validates-feature": [
       "1"
@@ -100,10 +271,41 @@
       "2"
     ],
     "e2e-feature": [
-      "2"
+      "2",
+      "6"
     ],
     "tests-feature": [
       "2"
+    ],
+    "extract-feature": [
+      "3"
+    ],
+    "inline-feature": [
+      "3"
+    ],
+    "javascript-feature": [
+      "3"
+    ],
+    "visual-feature": [
+      "4"
+    ],
+    "regression-feature": [
+      "4"
+    ],
+    "testing-feature": [
+      "4"
+    ],
+    "refactor-feature": [
+      "5"
+    ],
+    "serverapppy-feature": [
+      "5"
+    ],
+    "use-feature": [
+      "5"
+    ],
+    "comprehensive-feature": [
+      "6"
     ],
     "health-feature": [
       "1"
@@ -129,13 +331,28 @@
   },
   "files_index": {
     "tests/*": [
-      "1"
+      "1",
+      "6"
     ],
     "tests/e2e/*": [
-      "2"
+      "2",
+      "4",
+      "6"
     ],
     "playwright.config.*": [
-      "2"
+      "2",
+      "4",
+      "6"
+    ],
+    "*": [
+      "3",
+      "5"
+    ],
+    "config/*": [
+      "4"
+    ],
+    "*.config.*": [
+      "4"
     ],
     "api/*": [
       "1"
@@ -145,8 +362,8 @@
     ]
   },
   "stats": {
-    "total_plans": 5,
-    "pending": 2,
+    "total_plans": 9,
+    "pending": 6,
     "in_progress": 0,
     "completed": 3,
     "failed": 0

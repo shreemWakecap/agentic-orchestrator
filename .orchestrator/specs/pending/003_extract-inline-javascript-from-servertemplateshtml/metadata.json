@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "3",
+  "plan_name": "extract-inline-javascript-from-servertemplateshtml",
+  "request": "Extract inline JavaScript from server/templates/*.html into separate .js files in server/static/js/. Add Jest for testing. Create package.json with jest dependency, configure Jest, and add unit tests for extracted JS functions.",
+  "request_hash": "5137800592dfb6e1",
+  "keywords": [
+    "extract",
+    "inline",
+    "javascript",
+    "servertemplateshtml",
+    "separate",
+    "files",
+    "serverstaticjs",
+    "jest",
+    "testing",
+    "packagejson",
+    "jest",
+    "dependency",
+    "configure",
+    "jest",
+    "unit",
+    "tests",
+    "extracted",
+    "functions"
+  ],
+  "features_provided": [
+    "extract-feature",
+    "inline-feature",
+    "javascript-feature"
+  ],
+  "features_required": [],
+  "files_affected": [
+    "*"
+  ],
+  "modules_touched": [],
+  "depends_on": [],
+  "blocked_by": [],
+  "status": "pending",
+  "complexity": "medium",
+  "created_at": "2026-01-15T00:32:42.686124",
+  "updated_at": "2026-01-15T00:32:42.686124",
+  "similarity_scores": {},
+  "output_format": "standard",
+  "agent_depth": "moderate",
+  "factors": {
+    "estimated_steps": 7,
+    "files_affected": 8,
+    "cross_module": false,
+    "dependencies_external": 1,
+    "risk_level": "low"
+  }
+}

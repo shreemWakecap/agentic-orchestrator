@@ -62,6 +62,43 @@ class TestHelloEndpoint:
         assert response.json() == {"message": "hello world"}
 
 
+class TestHealthEndpoint:
+    """Tests for the /api/health endpoint."""
+
+    @pytest.fixture
+    def client(self):
+        """Create a test client for the FastAPI app."""
+        from fastapi.testclient import TestClient
+        from server.app import app
+        return TestClient(app)
+
+    def test_health_returns_200(self, client):
+        """Test that health endpoint returns 200 status code."""
+        response = client.get("/api/health")
+        assert response.status_code == 200
+
+    def test_health_returns_status_healthy(self, client):
+        """Test that health endpoint returns healthy status."""
+        response = client.get("/api/health")
+        data = response.json()
+        assert data["status"] == "healthy"
+
+    def test_health_returns_version(self, client):
+        """Test that health endpoint returns version string."""
+        response = client.get("/api/health")
+        data = response.json()
+        assert "version" in data
+        assert data["version"] == "1.0.0"
+
+    def test_health_returns_uptime_seconds(self, client):
+        """Test that health endpoint returns uptime in seconds."""
+        response = client.get("/api/health")
+        data = response.json()
+        assert "uptime_seconds" in data
+        assert isinstance(data["uptime_seconds"], (int, float))
+        assert data["uptime_seconds"] >= 0
+
+
 class TestAPIModels:
     """Test Pydantic models for API requests."""
 

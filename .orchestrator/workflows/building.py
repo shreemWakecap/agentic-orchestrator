@@ -13,7 +13,7 @@ Features:
 import json
 import re
 import shutil
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -32,6 +32,7 @@ class BuildStep:
     code_hint: str = ""
     dependencies: list[str] = field(default_factory=list)
     complexity: str = "simple"
+    parallel_group: Optional[str] = None  # Group name for parallel execution
 
 
 @dataclass
@@ -221,6 +222,10 @@ class BuildingWorkflow(Workflow):
         # Build state
         self.build_state: Optional[BuildState] = None
 
+        # Async test execution
+        self._test_executor: Optional[ThreadPoolExecutor] = None
+        self._test_futures: list[Future] = []
+
     def _ensure_specs_structure(self):
         """Create the specs directory structure."""
         # Main plan directories
@@ -239,12 +244,53 @@ class BuildingWorkflow(Workflow):
             except FileNotFoundError:
                 self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
 
+    def _verify_file_creation(self, files_affected: list[str], action: str) -> tuple[bool, str]:
+        """
+        Verify that files were actually created/modified by the builder.
+
+        Args:
+            files_affected: List of file paths that should have been affected
+            action: The action type (create, modify, etc.)
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        if not files_affected:
+            return True, ""  # No files to verify
+
+        missing_files = []
+        empty_files = []
+
+        for file_path in files_affected:
+            # Handle both absolute and relative paths
+            if Path(file_path).is_absolute():
+                full_path = Path(file_path)
+            else:
+                full_path = self.project_root / file_path
+
+            if action in ("create", "created"):
+                if not full_path.exists():
+                    missing_files.append(file_path)
+                elif full_path.stat().st_size == 0:
+                    empty_files.append(file_path)
+            elif action in ("modify", "modified"):
+                if not full_path.exists():
+                    missing_files.append(file_path)
+
+        errors = []
+        if missing_files:
+            errors.append(f"Files not created: {', '.join(missing_files)}")
+        if empty_files:
+            errors.append(f"Files are empty: {', '.join(empty_files)}")
+
+        if errors:
+            return False, "; ".join(errors)
+        return True, ""
+
     def _is_placeholder_response(self, content: str) -> bool:
         """
-        Detect if agent returned a placeholder/greeting instead of actual content.
-
-        This catches cases where the agent system prompt wasn't properly applied
-        and Claude returns generic greeting responses.
+        DEPRECATED: Placeholder detection is now handled in agent.py.
+        Kept for backwards compatibility.
         """
         if not content or len(content.strip()) < 50:
             return True
@@ -284,7 +330,10 @@ class BuildingWorkflow(Workflow):
 
     def _validate_agent_response(self, agent_name: str, result) -> tuple[bool, str]:
         """
-        Validate that an agent response contains actual content, not a placeholder.
+        Validate that an agent response is successful and contains content.
+
+        Note: The agent module now handles placeholder detection and retries internally.
+        This method primarily checks for explicit failures.
 
         Args:
             agent_name: Name of the agent for error messages
@@ -299,11 +348,12 @@ class BuildingWorkflow(Workflow):
         if not result.content or len(result.content.strip()) < 50:
             return False, f"{agent_name} returned empty or too short response"
 
-        if self._is_placeholder_response(result.content):
+        # Check if agent flagged this as a potential placeholder (warning in error field)
+        if result.error and "placeholder" in result.error.lower():
+            # Agent already retried and couldn't get good output - fail
             return False, (
-                f"{agent_name} returned a generic greeting instead of actual content. "
-                "This usually means the agent's system prompt wasn't properly applied. "
-                "Please check the Claude CLI configuration."
+                f"{agent_name} returned a placeholder response after retries. "
+                f"Details: {result.error}"
             )
 
         return True, ""
@@ -445,6 +495,50 @@ class BuildingWorkflow(Workflow):
         except json.JSONDecodeError:
             return {}
 
+    def _validate_parsed_structure(self, parsed_data: dict) -> tuple[bool, str]:
+        """
+        Validate that parser output has the expected structure.
+
+        Args:
+            parsed_data: The parsed JSON from the parser agent
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not parsed_data:
+            return False, "Parser returned empty or invalid JSON"
+
+        if not isinstance(parsed_data, dict):
+            return False, f"Parser returned {type(parsed_data).__name__} instead of dict"
+
+        # Check for phases
+        phases = parsed_data.get("phases", [])
+        if not isinstance(phases, list):
+            return False, "Parser 'phases' field is not a list"
+
+        if not phases:
+            return False, "Parser returned no phases in the plan"
+
+        # Validate each phase structure
+        for i, phase in enumerate(phases):
+            if not isinstance(phase, dict):
+                return False, f"Phase {i} is not a dict"
+
+            steps = phase.get("steps", [])
+            if not isinstance(steps, list):
+                return False, f"Phase {i} 'steps' is not a list"
+
+            # Validate each step structure
+            for j, step in enumerate(steps):
+                if not isinstance(step, dict):
+                    return False, f"Phase {i} step {j} is not a dict"
+
+                # Must have at least action and target or description
+                if not step.get("action") and not step.get("description"):
+                    return False, f"Phase {i} step {j} has no action or description"
+
+        return True, ""
+
     def _get_relevant_context(self, step: BuildStep) -> str:
         """Get relevant file context for a build step."""
         context_parts = []
@@ -533,6 +627,20 @@ After completing, summarize what you did.""",
         elif result.files_modified:
             action_taken = "modified"
 
+        # Verify files were actually created/modified
+        if files_affected and action_taken in ("create", "created", "modify", "modified"):
+            verified, verify_error = self._verify_file_creation(files_affected, action_taken)
+            if not verified:
+                return StepResult(
+                    step_id=step.id,
+                    status="failed",
+                    action_taken=action_taken,
+                    target=step.target,
+                    summary=f"Builder reported success but verification failed: {verify_error}",
+                    files_affected=files_affected,
+                    error=f"File verification failed: {verify_error}"
+                )
+
         return StepResult(
             step_id=step.id,
             status="completed",
@@ -544,6 +652,30 @@ After completing, summarize what you did.""",
         )
 
     def _run_simple_build(self, plan: ParsedPlan, plan_path: Path) -> WorkflowResult:
+        """
+        Run build for simple plans with optional parallel execution.
+
+        If simple_build_parallel is enabled:
+            - Flattens all steps across phases
+            - Computes execution waves based on dependencies and parallel groups
+            - Executes each wave in parallel
+
+        Otherwise:
+            - Runs steps sequentially within each phase
+        """
+        from core.symbols import ARROW_RIGHT, CHECK, CROSS, WARNING
+
+        use_parallel = self._config.parallel.simple_build_parallel
+        steps_completed = []
+
+        if use_parallel:
+            # Parallel wave-based execution
+            return self._run_simple_build_parallel(plan, plan_path)
+        else:
+            # Sequential execution (original behavior)
+            return self._run_simple_build_sequential(plan, plan_path)
+
+    def _run_simple_build_sequential(self, plan: ParsedPlan, plan_path: Path) -> WorkflowResult:
         """Run sequential build for simple plans with step-level tracking."""
         from core.symbols import ARROW_RIGHT, CHECK, CROSS, WARNING
 
@@ -641,10 +773,24 @@ After completing, summarize what you did.""",
                 self._save_state(plan_path)
 
             # Run tests after phase
-            self.console.print(f"\n  [bold]Testing phase {phase_idx + 1}...[/bold]")
-            test_result = self._run_phase_tests(plan, phase_idx)
-            if not test_result:
-                self.console.print(f"  [yellow]{WARNING}[/yellow] Tests had issues (continuing)")
+            if self._config.parallel.overlap_build_test and phase_idx < len(plan.phases) - 1:
+                # Start tests in background, continue to next phase
+                self.console.print(f"\n  [dim]Starting async tests for phase {phase_idx + 1}...[/dim]")
+                self._start_async_phase_test(plan, phase_idx)
+            else:
+                # Run tests synchronously (last phase or overlap disabled)
+                self.console.print(f"\n  [bold]Testing phase {phase_idx + 1}...[/bold]")
+                test_result = self._run_phase_tests(plan, phase_idx)
+                if not test_result:
+                    self.console.print(f"  [yellow]{WARNING}[/yellow] Tests had issues (continuing)")
+
+        # Wait for any background tests
+        if self._test_futures:
+            self.console.print("\n[bold]Waiting for background tests...[/bold]")
+            test_results = self._wait_for_all_tests()
+            failed_count = sum(1 for r in test_results if not r)
+            if failed_count > 0:
+                self.console.print(f"  [yellow]{WARNING}[/yellow] {failed_count} phase test(s) had issues")
 
         # Final review
         self.console.print("\n[bold]Final Review...[/bold]")
@@ -662,41 +808,428 @@ After completing, summarize what you did.""",
             }
         )
 
+    def _run_simple_build_parallel(self, plan: ParsedPlan, plan_path: Path) -> WorkflowResult:
+        """
+        Run parallel wave-based build for simple plans.
+
+        Flattens all steps, computes waves based on dependencies and parallel groups,
+        then executes waves in parallel.
+        """
+        from core.symbols import ARROW_RIGHT, CHECK, CROSS, WARNING
+
+        steps_completed = []
+
+        # Flatten all steps across phases while preserving phase context
+        all_steps: list[tuple[BuildStep, str]] = []  # (step, phase_context)
+        for phase in plan.phases:
+            phase_context = f"Building phase: {phase.name}\nDescription: {phase.name}"
+            for step in phase.steps:
+                all_steps.append((step, phase_context))
+
+        # Build step list for wave computation
+        steps_only = [s for s, _ in all_steps]
+        step_contexts = {s.id: ctx for s, ctx in all_steps}
+
+        # Compute execution waves
+        completed_set = set(self.build_state.completed_steps)
+        waves = self._compute_parallel_waves(steps_only, completed_set)
+
+        total_waves = len(waves)
+        self.console.print(f"\n[bold]Parallel Build:[/bold] {len(steps_only)} steps in {total_waves} waves")
+
+        for wave_idx, wave in enumerate(waves):
+            wave_size = len(wave)
+            self.console.print(f"\n[bold]Wave {wave_idx + 1}/{total_waves}:[/bold] {wave_size} step(s)")
+
+            # Filter out already completed (may have been completed in a previous run)
+            pending_steps = [s for s in wave if s.id not in self.build_state.completed_steps]
+            if not pending_steps:
+                self.console.print("  [dim](all steps already done)[/dim]")
+                continue
+
+            # Mark all steps in wave as in_progress
+            for step in pending_steps:
+                existing_step_state = self.build_state.get_step_state(step.id)
+                step_state = StepState(
+                    step_id=step.id,
+                    status="in_progress",
+                    started_at=datetime.now().isoformat(),
+                    retry_count=(existing_step_state.retry_count if existing_step_state else 0)
+                )
+                self.build_state.set_step_state(step_state)
+            self._save_state(plan_path)
+
+            if wave_size == 1:
+                # Single step - run directly
+                step = pending_steps[0]
+                phase_context = step_contexts.get(step.id, "")
+                self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {step.description[:55]}...")
+                result = self._execute_step(step, phase_context)
+                wave_results = [(step, result)]
+            else:
+                # Multiple steps - run in parallel
+                self.console.print(f"  [cyan]Running {len(pending_steps)} steps in parallel...[/cyan]")
+                # All steps in same wave use first step's context (simplification)
+                phase_context = step_contexts.get(pending_steps[0].id, "")
+                wave_results = self._execute_wave_parallel(pending_steps, phase_context, plan_path)
+
+            # Process wave results
+            wave_failed = False
+            for step, result in wave_results:
+                step_state = self.build_state.get_step_state(step.id) or StepState(
+                    step_id=step.id, status="pending"
+                )
+                step_state.completed_at = datetime.now().isoformat()
+                step_state.files_affected = result.files_affected
+                step_state.summary = result.summary
+
+                if result.status == "completed":
+                    step_state.status = "completed"
+                    self.build_state.set_step_state(step_state)
+                    if step.id not in self.build_state.completed_steps:
+                        self.build_state.completed_steps.append(step.id)
+                    self.build_state.files_created.extend(
+                        [f for f in result.files_affected if result.action_taken == "created"]
+                    )
+                    self.build_state.files_modified.extend(
+                        [f for f in result.files_affected if result.action_taken == "modified"]
+                    )
+                    steps_completed.append(step.id)
+                else:
+                    step_state.status = "failed"
+                    step_state.error = result.error
+                    step_state.retry_count += 1
+                    self.build_state.set_step_state(step_state)
+                    if step.id not in self.build_state.failed_steps:
+                        self.build_state.failed_steps.append(step.id)
+                    wave_failed = True
+
+            self._save_state(plan_path)
+
+            # If any step in wave failed, pause build
+            if wave_failed:
+                self.build_state.status = "paused"
+                self.build_state.last_error = f"Wave {wave_idx + 1} had failures"
+                self._save_state(plan_path)
+
+                self.console.print(f"\n[yellow]Build paused at wave {wave_idx + 1}[/yellow]")
+                self.console.print(f"[dim]Run build again to retry failed steps[/dim]")
+
+                return WorkflowResult(
+                    success=False,
+                    error=f"Wave {wave_idx + 1} had failures",
+                    steps_completed=steps_completed,
+                    data={
+                        "paused_at": f"wave-{wave_idx + 1}",
+                        "can_resume": True,
+                        "completed_steps": len(self.build_state.completed_steps),
+                        "total_steps": self.build_state.total_steps,
+                    }
+                )
+
+        # Run final tests
+        self.console.print("\n[bold]Final Testing...[/bold]")
+        test_result = self._run_phase_tests(plan, -1)  # -1 for final tests
+        if not test_result:
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Tests had issues (continuing)")
+
+        # Final review
+        self.console.print("\n[bold]Final Review...[/bold]")
+        review_result = self._run_review(plan)
+
+        return WorkflowResult(
+            success=True,
+            output_file=plan_path,
+            steps_completed=steps_completed,
+            data={
+                "plan_type": "simple",
+                "parallel_waves": total_waves,
+                "files_created": self.build_state.files_created,
+                "files_modified": self.build_state.files_modified,
+                "review": review_result
+            }
+        )
+
+    def _resolve_step_dependencies(self, steps: list[BuildStep]) -> list[list[BuildStep]]:
+        """
+        Sort steps into execution waves based on dependencies.
+
+        Returns list of waves - steps in each wave can run in parallel,
+        but waves must execute sequentially.
+        """
+        if not steps:
+            return []
+
+        # Build dependency graph
+        step_map = {s.id: s for s in steps}
+        completed = set(self.build_state.completed_steps)
+        remaining = {s.id for s in steps if s.id not in completed}
+
+        waves: list[list[BuildStep]] = []
+
+        # Keep resolving until all steps are scheduled
+        max_iterations = len(steps) + 1
+        for _ in range(max_iterations):
+            if not remaining:
+                break
+
+            # Find steps whose dependencies are all satisfied
+            ready = []
+            for step_id in list(remaining):
+                step = step_map[step_id]
+                deps = set(step.dependencies)
+                # Dependencies satisfied if they're completed or not in our step list
+                if deps.issubset(completed | (set(step_map.keys()) - remaining)):
+                    ready.append(step)
+
+            if not ready:
+                # Circular dependency or unresolvable - just run remaining sequentially
+                for step_id in remaining:
+                    waves.append([step_map[step_id]])
+                break
+
+            waves.append(ready)
+            for step in ready:
+                remaining.discard(step.id)
+                completed.add(step.id)
+
+        return waves
+
+    def _detect_file_conflicts(self, steps: list[BuildStep]) -> dict[str, list[str]]:
+        """
+        Detect steps that modify the same file - these cannot run in parallel.
+
+        Returns:
+            Dict mapping file path -> list of step IDs that touch that file
+        """
+        file_to_steps: dict[str, list[str]] = {}
+        for step in steps:
+            if step.target:
+                # Normalize path for comparison
+                target = step.target.replace("\\", "/")
+                if target not in file_to_steps:
+                    file_to_steps[target] = []
+                file_to_steps[target].append(step.id)
+        return {f: sids for f, sids in file_to_steps.items() if len(sids) > 1}
+
+    def _compute_parallel_waves(
+        self, steps: list[BuildStep], completed: set[str]
+    ) -> list[list[BuildStep]]:
+        """
+        Convert steps into execution waves based on dependencies and parallel groups.
+
+        Steps in the same wave can run in parallel. Waves execute sequentially.
+        File conflicts force steps into separate waves even if dependencies allow parallel.
+
+        Args:
+            steps: List of steps to organize
+            completed: Set of already completed step IDs
+
+        Returns:
+            List of waves, each wave is a list of steps that can run in parallel
+        """
+        if not steps:
+            return []
+
+        # Filter out completed steps
+        pending = [s for s in steps if s.id not in completed]
+        if not pending:
+            return []
+
+        # Detect file conflicts
+        conflicts = self._detect_file_conflicts(pending)
+
+        # Build step map and dependency info
+        step_map = {s.id: s for s in pending}
+        remaining = set(step_map.keys())
+        waves: list[list[BuildStep]] = []
+
+        # Track which files have been touched (for conflict resolution)
+        files_in_progress: set[str] = set()
+
+        max_iterations = len(pending) + 1
+        for _ in range(max_iterations):
+            if not remaining:
+                break
+
+            # Find steps ready to execute (all dependencies satisfied)
+            ready: list[BuildStep] = []
+            for step_id in list(remaining):
+                step = step_map[step_id]
+                deps = set(step.dependencies)
+
+                # Check if dependencies are satisfied
+                deps_satisfied = deps.issubset(completed | (set(step_map.keys()) - remaining))
+                if not deps_satisfied:
+                    continue
+
+                # Check for file conflicts with other ready steps
+                target = step.target.replace("\\", "/") if step.target else None
+                if target and target in files_in_progress:
+                    # This file is being modified by another step in this wave
+                    continue
+
+                ready.append(step)
+                if target:
+                    files_in_progress.add(target)
+
+            if not ready:
+                # Circular dependency or all remaining have conflicts - run one at a time
+                for step_id in list(remaining):
+                    waves.append([step_map[step_id]])
+                    remaining.discard(step_id)
+                    completed.add(step_id)
+                break
+
+            # Group ready steps by parallel_group if set
+            # Steps with same parallel_group can run together
+            # Steps with different groups or no group run in sub-waves
+            if self._config.parallel.simple_build_parallel:
+                # Group by parallel_group for smarter batching
+                groups: dict[Optional[str], list[BuildStep]] = {}
+                for step in ready:
+                    pg = step.parallel_group
+                    if pg not in groups:
+                        groups[pg] = []
+                    groups[pg].append(step)
+
+                # Create wave from largest compatible group
+                # None group items run individually unless they're the only ones
+                if len(groups) == 1:
+                    # All same group (or all None) - run together
+                    waves.append(ready)
+                else:
+                    # Multiple groups - prioritize grouped steps
+                    for pg, group_steps in sorted(groups.items(), key=lambda x: -len(x[1])):
+                        if pg is not None and len(group_steps) > 1:
+                            waves.append(group_steps)
+                            for s in group_steps:
+                                remaining.discard(s.id)
+                                completed.add(s.id)
+                        else:
+                            # Ungrouped or single step - add individually
+                            for s in group_steps:
+                                waves.append([s])
+                                remaining.discard(s.id)
+                                completed.add(s.id)
+                    continue  # Skip normal remaining handling
+            else:
+                waves.append(ready)
+
+            for step in ready:
+                remaining.discard(step.id)
+                completed.add(step.id)
+
+            # Reset files for next wave
+            files_in_progress.clear()
+
+        return waves
+
+    def _execute_wave_parallel(
+        self, steps: list[BuildStep], phase_context: str, plan_path: Path
+    ) -> list[tuple[BuildStep, StepResult]]:
+        """
+        Execute multiple steps in parallel using ThreadPoolExecutor.
+
+        Args:
+            steps: Steps to execute in parallel
+            phase_context: Context string for the current phase
+            plan_path: Path to plan for state saving
+
+        Returns:
+            List of (step, result) tuples in completion order
+        """
+        from core.symbols import CHECK, CROSS
+
+        max_workers = min(len(steps), self._config.parallel.max_build_workers)
+        results: list[tuple[BuildStep, StepResult]] = []
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all steps
+            futures = {
+                executor.submit(self._execute_step, step, phase_context): step
+                for step in steps
+            }
+
+            # Collect results as they complete
+            for future in as_completed(futures):
+                step = futures[future]
+                try:
+                    result = future.result()
+                    results.append((step, result))
+
+                    if result.status == "completed":
+                        self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                    else:
+                        self.console.print(f"    [red]{CROSS}[/red] {step.id}: {result.error or 'Failed'}")
+                except Exception as e:
+                    error_result = StepResult(
+                        step_id=step.id,
+                        status="failed",
+                        action_taken="none",
+                        target=step.target,
+                        summary="",
+                        error=str(e)
+                    )
+                    results.append((step, error_result))
+                    self.console.print(f"    [red]{CROSS}[/red] {step.id}: {e}")
+
+        return results
+
     def _build_phase_parallel(self, phase: BuildPhase, phase_context: str) -> list[StepResult]:
-        """Build steps in a phase with parallelization."""
+        """Build steps in a phase with parallelization and dependency resolution."""
         results = []
 
-        # Group steps for parallel execution
-        if phase.parallel_groups:
-            groups = phase.parallel_groups
+        from core.symbols import CHECK, CROSS
+
+        # First, resolve dependencies to get execution waves
+        if any(s.dependencies for s in phase.steps):
+            # Steps have explicit dependencies - resolve them
+            waves = self._resolve_step_dependencies(phase.steps)
+        elif phase.parallel_groups:
+            # Use explicit parallel groups as waves
+            waves = []
+            for group in phase.parallel_groups:
+                group_steps = [s for s in phase.steps if s.id in group]
+                if group_steps:
+                    waves.append(group_steps)
         else:
-            # Default: all steps can run in parallel
-            groups = [[s.id for s in phase.steps]]
+            # Default: all steps in single wave (can run in parallel)
+            waves = [phase.steps]
 
-        for group in groups:
-            group_steps = [s for s in phase.steps if s.id in group]
+        for wave_idx, wave in enumerate(waves):
+            # Filter out already completed steps
+            pending_steps = [s for s in wave if s.id not in self.build_state.completed_steps]
 
-            if len(group_steps) <= 1:
+            if not pending_steps:
+                continue
+
+            if len(pending_steps) == 1:
                 # Sequential for single step
-                for step in group_steps:
-                    if step.id not in self.build_state.completed_steps:
-                        results.append(self._execute_step(step, phase_context))
+                step = pending_steps[0]
+                result = self._execute_step(step, phase_context)
+                results.append(result)
+                if result.status == "completed":
+                    self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                else:
+                    self.console.print(f"    [red]{CROSS}[/red] {step.id}: {result.error or 'Failed'}")
             else:
-                # Parallel execution
+                # Parallel execution within wave
                 with ThreadPoolExecutor(max_workers=self.max_parallel) as executor:
                     futures = {
                         executor.submit(self._execute_step, step, phase_context): step
-                        for step in group_steps
-                        if step.id not in self.build_state.completed_steps
+                        for step in pending_steps
                     }
 
-                    from core.symbols import CHECK, CROSS
                     for future in as_completed(futures):
                         step = futures[future]
                         try:
                             result = future.result()
                             results.append(result)
-                            self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                            if result.status == "completed":
+                                self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                            else:
+                                self.console.print(f"    [red]{CROSS}[/red] {step.id}: {result.error or 'Failed'}")
                         except Exception as e:
                             results.append(StepResult(
                                 step_id=step.id,
@@ -847,6 +1380,52 @@ After completing, summarize what you did.""",
                 "review": review_result
             }
         )
+
+    def _start_async_phase_test(self, plan: ParsedPlan, phase_idx: int) -> Future:
+        """
+        Start phase test in background, allowing building to continue.
+
+        Args:
+            plan: The parsed plan
+            phase_idx: The phase index to test
+
+        Returns:
+            Future that resolves to test result
+        """
+        if self._test_executor is None:
+            self._test_executor = ThreadPoolExecutor(max_workers=1)
+
+        future = self._test_executor.submit(self._run_phase_tests, plan, phase_idx)
+        self._test_futures.append(future)
+        return future
+
+    def _wait_for_all_tests(self, timeout: Optional[float] = None) -> list[bool]:
+        """
+        Wait for all background tests to complete.
+
+        Args:
+            timeout: Max wait time in seconds (None = wait forever)
+
+        Returns:
+            List of test results (True = passed, False = failed)
+        """
+        results = []
+        for future in self._test_futures:
+            try:
+                result = future.result(timeout=timeout)
+                results.append(result)
+            except Exception:
+                results.append(False)
+
+        # Clear futures list
+        self._test_futures.clear()
+
+        # Cleanup executor if done
+        if self._test_executor:
+            self._test_executor.shutdown(wait=False)
+            self._test_executor = None
+
+        return results
 
     def _run_phase_tests(self, plan: ParsedPlan, phase_idx: int) -> bool:
         """Run tests after a phase."""
@@ -1000,6 +1579,14 @@ Provide a quality assessment.""",
 
         parsed_data = self._parse_json_from_response(parser_result.content)
 
+        # Validate parser output structure
+        valid, error = self._validate_parsed_structure(parsed_data)
+        if not valid:
+            self.build_state.status = "failed"
+            self.build_state.last_error = error
+            self._save_state(plan_path)
+            return WorkflowResult(success=False, error=error)
+
         # Build ParsedPlan from response
         phases = []
         for phase_data in parsed_data.get("phases", []):
@@ -1012,7 +1599,8 @@ Provide a quality assessment.""",
                     description=step_data.get("description", ""),
                     code_hint=step_data.get("code_hint", ""),
                     dependencies=step_data.get("dependencies", []),
-                    complexity=step_data.get("estimated_complexity", "simple")
+                    complexity=step_data.get("estimated_complexity", "simple"),
+                    parallel_group=step_data.get("parallel_group"),
                 ))
 
             phases.append(BuildPhase(

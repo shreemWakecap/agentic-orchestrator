@@ -1,368 +1,154 @@
 {
   "schema_version": "1.0",
-  "last_scan": "2026-01-14T09:50:52.092729",
+  "last_scan": "2026-01-14T18:25:42.923322",
   "plans": {
-    "2": {
-      "path": "pending/002_input-visibility-assertion-existing-test",
-      "status": "pending",
-      "request": "Add input visibility assertion to existing test",
-      "request_hash": "45b1469708a9a675",
+    "1": {
+      "path": "completed/001_test-module-3-independent-model",
+      "status": "completed",
+      "request": "Create a test module with 3 independent model files (user.py, product.py, order.py) in tests/parallel_test/models/, a registry.py that imports all models, and 2 utility files (validators.py, formatters.py) in tests/parallel_test/utils/. Each file should have a simple class or function. This tests parallel build capability.",
+      "request_hash": "622198ff625fe64a",
       "keywords": [
-        "input",
-        "visibility",
-        "assertion",
-        "existing",
-        "test"
+        "test",
+        "module",
+        "independent",
+        "model",
+        "files",
+        "userpy",
+        "productpy",
+        "orderpy",
+        "testsparallel_testmodels",
+        "registrypy",
+        "imports",
+        "all",
+        "models",
+        "utility",
+        "files",
+        "validatorspy",
+        "formatterspy",
+        "testsparallel_testutils",
+        "each",
+        "file",
+        "simple",
+        "class",
+        "function",
+        "tests",
+        "parallel",
+        "capability"
       ],
       "features_provided": [
-        "input-feature",
-        "visibility-feature",
-        "assertion-feature",
-        "existing-feature",
-        "testing"
+        "test-feature",
+        "module-feature",
+        "independent-feature"
       ],
       "files_affected": [
         "tests/*"
       ],
       "depends_on": []
     },
-    "3": {
-      "path": "pending/003_validate-form-elements-render-expected",
+    "2": {
+      "path": "pending/002_playwright-e2e-tests-critical-user",
       "status": "pending",
-      "request": "Validate form elements render with expected classes",
-      "request_hash": "623aacfe37951c20",
-      "keywords": [
-        "validate",
-        "form",
-        "elements",
-        "render",
-        "expected",
-        "classes"
-      ],
-      "features_provided": [
-        "validate-feature",
-        "form-feature",
-        "elements-feature",
-        "render-feature",
-        "expected-feature"
-      ],
-      "files_affected": [
-        "*"
-      ],
-      "depends_on": []
-    },
-    "4": {
-      "path": "pending/004_dd-playwright-e2e-tests-critical",
-      "status": "pending",
-      "request": "dd Playwright E2E tests for critical user flows",
-      "request_hash": "b1b27acc8a7bc9e7",
+      "request": "Add Playwright E2E tests for critical user flows in the orchestrator web UI. Cover: (1) viewing plan list, (2) viewing plan details, (3) starting a build. Create tests/e2e/ directory, add playwright.config.ts, and implement tests using @playwright/test.",
+      "request_hash": "32b6ff2d7c2fcb51",
       "keywords": [
         "playwright",
         "e2e",
         "tests",
         "critical",
         "user",
-        "flows"
+        "flows",
+        "orchestrator",
+        "web",
+        "cover",
+        "viewing",
+        "plan",
+        "list",
+        "viewing",
+        "plan",
+        "details",
+        "starting",
+        "testse2e",
+        "directory",
+        "playwrightconfigts",
+        "tests",
+        "using",
+        "playwrighttest"
       ],
       "features_provided": [
-        "playwright-setup",
-        "e2e-testing",
-        "tests-feature",
-        "critical-feature",
-        "user-feature"
+        "playwright-feature",
+        "e2e-feature",
+        "tests-feature"
       ],
       "files_affected": [
         "tests/e2e/*",
         "playwright.config.*"
       ],
       "depends_on": []
-    },
-    "5": {
-      "path": "pending/005_extract-javascript-separate-files-test",
-      "status": "pending",
-      "request": "Extract JavaScript to separate files, test with Jest",
-      "request_hash": "416b7eb520d20c15",
-      "keywords": [
-        "extract",
-        "javascript",
-        "separate",
-        "files",
-        "test",
-        "jest"
-      ],
-      "features_provided": [
-        "extract-feature",
-        "javascript-feature",
-        "separate-feature",
-        "files-feature",
-        "testing"
-      ],
-      "files_affected": [
-        "tests/*"
-      ],
-      "depends_on": []
-    },
-    "6": {
-      "path": "pending/006_visual-regression-testing-percychromatic",
-      "status": "pending",
-      "request": "Add visual regression testing (Percy/Chromatic)",
-      "request_hash": "99c3992ec4c77eff",
-      "keywords": [
-        "visual",
-        "regression",
-        "testing",
-        "percychromatic"
-      ],
-      "features_provided": [
-        "visual-feature",
-        "regression-feature",
-        "testing-feature",
-        "percychromatic-feature"
-      ],
-      "files_affected": [
-        "*"
-      ],
-      "depends_on": []
-    },
-    "7": {
-      "path": "pending/007_refactor-apppy-better-testability-dependency",
-      "status": "pending",
-      "request": "Refactor app.py for better testability (dependency injection)",
-      "request_hash": "6a2cfb8a938e97a1",
-      "keywords": [
-        "refactor",
-        "apppy",
-        "better",
-        "testability",
-        "dependency",
-        "injection"
-      ],
-      "features_provided": [
-        "refactor-feature",
-        "apppy-feature",
-        "better-feature",
-        "testability-feature",
-        "dependency-feature"
-      ],
-      "files_affected": [
-        "*"
-      ],
-      "depends_on": []
-    },
-    "8": {
-      "path": "pending/008_comprehensive-e2e-test-suite",
-      "status": "pending",
-      "request": "Add comprehensive E2E test suite",
-      "request_hash": "5a48e4d353984118",
-      "keywords": [
-        "comprehensive",
-        "e2e",
-        "test",
-        "suite"
-      ],
-      "features_provided": [
-        "comprehensive-feature",
-        "e2e-testing",
-        "testing",
-        "suite-feature"
-      ],
-      "files_affected": [
-        "tests/e2e/*",
-        "tests/*"
-      ],
-      "depends_on": []
-    },
-    "9": {
-      "path": "pending/009_new-api-health-check-endpoint",
-      "status": "pending",
-      "request": "Add a new API health check endpoint",
-      "request_hash": "ba8de4faef8b542e",
-      "keywords": [
-        "api",
-        "health",
-        "check",
-        "endpoint"
-      ],
-      "features_provided": [
-        "api-feature",
-        "health-feature",
-        "check-feature"
-      ],
-      "files_affected": [
-        "api/*",
-        "routes/*"
-      ],
-      "depends_on": []
-    },
-    "10": {
-      "path": "pending/010_simple-hello-world-endpoint-api",
-      "status": "pending",
-      "request": "Add a simple hello world endpoint to the API",
-      "request_hash": "b99bdefdf93008b1",
-      "keywords": [
-        "simple",
-        "hello",
-        "world",
-        "endpoint",
-        "api"
-      ],
-      "features_provided": [
-        "simple-feature",
-        "hello-feature",
-        "world-feature"
-      ],
-      "files_affected": [
-        "api/*",
-        "routes/*"
-      ],
-      "depends_on": []
     }
   },
   "features_index": {
-    "input-feature": [
-      "2"
+    "test-feature": [
+      "1"
     ],
-    "visibility-feature": [
-      "2"
-    ],
-    "assertion-feature": [
-      "2"
-    ],
-    "existing-feature": [
-      "2"
-    ],
-    "testing": [
-      "2",
-      "5",
-      "8"
-    ],
-    "validate-feature": [
-      "3"
+    "validates-feature": [
+      "1"
     ],
     "form-feature": [
-      "3"
+      "1"
     ],
-    "elements-feature": [
-      "3"
+    "playwright-feature": [
+      "2"
     ],
-    "render-feature": [
-      "3"
-    ],
-    "expected-feature": [
-      "3"
-    ],
-    "playwright-setup": [
-      "4"
-    ],
-    "e2e-testing": [
-      "4",
-      "8"
+    "e2e-feature": [
+      "2"
     ],
     "tests-feature": [
-      "4"
-    ],
-    "critical-feature": [
-      "4"
-    ],
-    "user-feature": [
-      "4"
-    ],
-    "extract-feature": [
-      "5"
-    ],
-    "javascript-feature": [
-      "5"
-    ],
-    "separate-feature": [
-      "5"
-    ],
-    "files-feature": [
-      "5"
-    ],
-    "visual-feature": [
-      "6"
-    ],
-    "regression-feature": [
-      "6"
-    ],
-    "testing-feature": [
-      "6"
-    ],
-    "percychromatic-feature": [
-      "6"
-    ],
-    "refactor-feature": [
-      "7"
-    ],
-    "apppy-feature": [
-      "7"
-    ],
-    "better-feature": [
-      "7"
-    ],
-    "testability-feature": [
-      "7"
-    ],
-    "dependency-feature": [
-      "7"
-    ],
-    "comprehensive-feature": [
-      "8"
-    ],
-    "suite-feature": [
-      "8"
-    ],
-    "api-feature": [
-      "9"
+      "2"
     ],
     "health-feature": [
-      "9"
+      "1"
     ],
-    "check-feature": [
-      "9"
+    "api-feature": [
+      "1"
     ],
-    "simple-feature": [
-      "10"
+    "endpoint-feature": [
+      "1"
     ],
-    "hello-feature": [
-      "10"
+    "assertion-feature": [
+      "1"
     ],
-    "world-feature": [
-      "10"
+    "verify-feature": [
+      "1"
+    ],
+    "module-feature": [
+      "1"
+    ],
+    "independent-feature": [
+      "1"
     ]
   },
   "files_index": {
     "tests/*": [
-      "2",
-      "5",
-      "8"
-    ],
-    "*": [
-      "3",
-      "6",
-      "7"
+      "1"
     ],
     "tests/e2e/*": [
-      "4",
-      "8"
+      "2"
     ],
     "playwright.config.*": [
-      "4"
+      "2"
     ],
     "api/*": [
-      "9",
-      "10"
+      "1"
     ],
     "routes/*": [
-      "9",
-      "10"
+      "1"
     ]
   },
   "stats": {
-    "total_plans": 9,
-    "pending": 9,
+    "total_plans": 5,
+    "pending": 2,
     "in_progress": 0,
-    "completed": 0,
+    "completed": 3,
     "failed": 0
   }
 }

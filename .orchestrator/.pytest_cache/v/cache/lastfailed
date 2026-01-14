@@ -1,1 +1,5 @@
-{}
+{
+  "tests/unit/test_agent.py::TestAgentPromptBuilding::test_build_prompt_basic": true,
+  "tests/unit/test_agent.py::TestAgentPromptBuilding::test_build_prompt_with_context": true,
+  "tests/unit/test_agent.py::TestAgentRetries::test_retries_on_transient_error": true
+}

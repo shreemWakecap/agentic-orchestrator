@@ -47,6 +47,43 @@ class ExpertInsight:
     concerns: list[str] = field(default_factory=list)
 
 
+@dataclass
+class AdaptiveConfig:
+    """Configuration derived from analyzer for adaptive workflow behavior."""
+    complexity: str  # simple, medium, complex, massive
+    output_format: str  # minimal, standard, full
+    agent_depth: str  # brief, moderate, thorough
+    needs_decomposition: bool
+    estimated_steps: int
+    estimated_files: int
+    factors: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_analysis(cls, analysis: dict) -> "AdaptiveConfig":
+        """Create AdaptiveConfig from analyzer output with sensible fallbacks."""
+        return cls(
+            complexity=analysis.get("complexity", "simple"),
+            output_format=analysis.get("output_format", "standard"),
+            agent_depth=analysis.get("agent_depth", "moderate"),
+            needs_decomposition=analysis.get("needs_decomposition", False),
+            estimated_steps=analysis.get("estimated_steps", 5),
+            estimated_files=analysis.get("estimated_files", 3),
+            factors=analysis.get("factors", {})
+        )
+
+    @classmethod
+    def default_simple(cls) -> "AdaptiveConfig":
+        """Default config for when analyzer fails - use moderate settings."""
+        return cls(
+            complexity="simple",
+            output_format="standard",
+            agent_depth="moderate",
+            needs_decomposition=False,
+            estimated_steps=5,
+            estimated_files=3
+        )
+
+
 class PlanningWorkflow(Workflow):
     """
     Smart planning workflow with complexity analysis and decomposition.
@@ -142,6 +179,34 @@ class PlanningWorkflow(Workflow):
             pass
         return ""
 
+    def _load_depth_instructions(self) -> dict:
+        """Load depth instruction templates from config."""
+        config_path = self.project_root / ".orchestrator" / "config" / "depth_instructions.json"
+        if config_path.exists():
+            try:
+                return json.loads(config_path.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        return {}
+
+    def _build_depth_context(self, agent_name: str, depth: str, base_context: str) -> str:
+        """
+        Prepend depth instructions to agent context.
+
+        Args:
+            agent_name: Name of the agent (scout, architect, planner, validator, synthesizer)
+            depth: Depth level (brief, moderate, thorough)
+            base_context: The original context to prepend instructions to
+
+        Returns:
+            Context with depth instructions prepended, or original context if no instructions found
+        """
+        depth_config = self._load_depth_instructions()
+        if agent_name in depth_config and depth in depth_config[agent_name]:
+            instruction = depth_config[agent_name][depth]
+            return f"## Execution Depth: {depth.upper()}\n\n{instruction}\n\n---\n\n{base_context}"
+        return base_context
+
     def _consult_domain_experts(
         self,
         request: str,
@@ -223,21 +288,25 @@ Focus on:
                 self.console.print(f"  [yellow]{WARNING}[/yellow] {expert.name}: {e}")
             return None
 
-        # Run expert consultations in parallel
+        # Run expert consultations in parallel with timeout
         max_expert_workers = self._config.parallel.max_expert_workers
+        expert_timeout = self._config.timeouts.expert_consultation
         with ThreadPoolExecutor(max_workers=max_expert_workers) as executor:
             futures = {
                 executor.submit(consult_expert, expert): expert
                 for expert in domain_experts
             }
 
-            for future in as_completed(futures):
+            for future in as_completed(futures, timeout=expert_timeout + 10):
                 expert = futures[future]
                 try:
-                    insight = future.result()
+                    # Also timeout individual results in case as_completed doesn't catch it
+                    insight = future.result(timeout=expert_timeout)
                     if insight:
                         insights.append(insight)
                         self.console.print(f"  [green]{CHECK}[/green] {expert.name}")
+                except TimeoutError:
+                    self.console.print(f"  [yellow]{WARNING}[/yellow] {expert.name}: Timed out after {expert_timeout}s")
                 except Exception as e:
                     self.console.print(f"  [yellow]{WARNING}[/yellow] {expert.name}: {e}")
 
@@ -290,52 +359,12 @@ Focus on:
 
         return truncated + f"\n\n... [truncated {len(text) - len(truncated)} chars]"
 
-    def _is_placeholder_response(self, content: str) -> bool:
-        """
-        Detect if agent returned a placeholder/greeting instead of actual content.
-
-        This catches cases where the agent system prompt wasn't properly applied
-        and Claude returns generic greeting responses.
-        """
-        if not content or len(content.strip()) < 50:
-            return True
-
-        placeholder_patterns = [
-            # Generic greetings
-            "I'm ready to help you",
-            "I'll help you with software engineering",
-            "How can I help you",
-            "What can I help",
-            "Hello! How can I help",
-            # Confusion indicators
-            "What would you like me to",
-            "What would you like to work on",
-            "Would you like me to",
-            "I understand you've sent",
-            "I understand. I'm ready to help",
-            "I can see you're on the",
-            "I can see you're working",
-            # Empty message indicators
-            "I see you've sent",
-            "I see you've started",
-            "you've sent an empty message",
-            # Context confusion
-            "working in the",
-            "on the developmet branch",
-            "in your git working tree",
-            "Let me know what you'd like",
-        ]
-
-        content_lower = content.lower()
-        for pattern in placeholder_patterns:
-            if pattern.lower() in content_lower:
-                return True
-
-        return False
-
     def _validate_agent_response(self, agent_name: str, result) -> tuple[bool, str]:
         """
-        Validate that an agent response contains actual content, not a placeholder.
+        Validate that an agent response is successful and contains content.
+
+        Note: The agent module now handles placeholder detection and retries internally.
+        This method primarily checks for explicit failures.
 
         Args:
             agent_name: Name of the agent for error messages
@@ -350,11 +379,12 @@ Focus on:
         if not result.content or len(result.content.strip()) < 50:
             return False, f"{agent_name} returned empty or too short response"
 
-        if self._is_placeholder_response(result.content):
+        # Check if agent flagged this as a potential placeholder (warning in error field)
+        if result.error and "placeholder" in result.error.lower():
+            # Agent already retried and couldn't get good output - fail the workflow
             return False, (
-                f"{agent_name} returned a generic greeting instead of actual content. "
-                "This usually means the agent's system prompt wasn't properly applied. "
-                "Please try again or check the Claude CLI configuration."
+                f"{agent_name} returned a placeholder response after retries. "
+                f"Details: {result.error}"
             )
 
         return True, ""
@@ -440,49 +470,76 @@ Focus on:
         except json.JSONDecodeError:
             return {}
 
-    def _run_simple_planning(self, request: str, codebase_context: str) -> WorkflowResult:
-        """Run simple 4-agent planning for non-complex features."""
+    def _run_simple_planning(
+        self,
+        request: str,
+        codebase_context: str,
+        adaptive: Optional[AdaptiveConfig] = None
+    ) -> WorkflowResult:
+        """
+        Run simple 4-agent planning for non-complex features.
+
+        Args:
+            request: User's feature request
+            codebase_context: Basic codebase context
+            adaptive: Optional AdaptiveConfig for depth-aware processing
+        """
         steps_completed = []
 
-        # Scout
+        # Use default config if not provided (backward compatibility)
+        if adaptive is None:
+            adaptive = AdaptiveConfig.default_simple()
+
+        depth = adaptive.agent_depth
+
+        # Scout with depth-aware context
         self.console.print("[bold]Phase 1:[/bold] Scouting codebase...")
+        scout_context = self._build_depth_context("scout", depth, codebase_context)
         scout_result = self.run_agent(
             "scout",
             message=f"User request: {request}\n\nGather context about this codebase.",
-            context=codebase_context
+            context=scout_context
         )
         valid, error = self._validate_agent_response("Scout", scout_result)
         if not valid:
             return WorkflowResult(success=False, error=error)
         steps_completed.append("scout")
 
-        # Architect
+        # Architect with depth-aware context
         self.console.print("\n[bold]Phase 2:[/bold] Designing architecture...")
+        architect_base_context = f"## Codebase Context\n\n{scout_result.content}"
+        architect_context = self._build_depth_context("architect", depth, architect_base_context)
         architect_result = self.run_agent(
             "architect",
             message=f"User request: {request}\n\nDesign the architecture.",
-            context=f"## Codebase Context\n\n{scout_result.content}"
+            context=architect_context
         )
         valid, error = self._validate_agent_response("Architect", architect_result)
         if not valid:
             return WorkflowResult(success=False, error=error)
         steps_completed.append("architect")
 
-        # Expert Consultation (after architect, before planner)
-        expert_insights = self._consult_domain_experts(
-            request=request,
-            architect_result=architect_result.content,
-            codebase_context=scout_result.content
-        )
-        expert_context = self._compile_expert_insights(expert_insights)
-        if expert_insights:
-            steps_completed.append(f"expert_consultation ({len(expert_insights)})")
+        # Expert Consultation - skip for brief depth to save time
+        expert_insights = []
+        expert_context = ""
+        if depth != "brief":
+            expert_insights = self._consult_domain_experts(
+                request=request,
+                architect_result=architect_result.content,
+                codebase_context=scout_result.content
+            )
+            expert_context = self._compile_expert_insights(expert_insights)
+            if expert_insights:
+                steps_completed.append(f"expert_consultation ({len(expert_insights)})")
+        else:
+            self.console.print("\n[dim]Skipping expert consultation (brief mode)[/dim]")
 
-        # Planner
+        # Planner with depth-aware context
         self.console.print("\n[bold]Phase 3:[/bold] Creating implementation plan...")
-        planner_context = f"## Context\n\n{scout_result.content}\n\n## Architecture\n\n{architect_result.content}"
+        planner_base_context = f"## Context\n\n{scout_result.content}\n\n## Architecture\n\n{architect_result.content}"
         if expert_context:
-            planner_context += f"\n\n{expert_context}"
+            planner_base_context += f"\n\n{expert_context}"
+        planner_context = self._build_depth_context("planner", depth, planner_base_context)
 
         planner_result = self.run_agent(
             "planner",
@@ -494,26 +551,29 @@ Focus on:
             return WorkflowResult(success=False, error=error)
         steps_completed.append("planner")
 
-        # Validator
+        # Validator with depth-aware context
         self.console.print("\n[bold]Phase 4:[/bold] Validating plan...")
+        validator_base_context = f"## Plan\n\n{planner_result.content}"
+        validator_context = self._build_depth_context("validator", depth, validator_base_context)
         validator_result = self.run_agent(
             "validator",
             message=f"Validate this implementation plan for: {request}",
-            context=f"## Plan\n\n{planner_result.content}"
+            context=validator_context
         )
         valid, error = self._validate_agent_response("Validator", validator_result)
         if not valid:
             return WorkflowResult(success=False, error=error)
         steps_completed.append("validator")
 
-        # Compile and save as folder with multiple files
-        plan_files = self._compile_simple_plan(
+        # Compile as single plan.md file
+        plan_files = self._compile_single_plan(
             request=request,
             scout=scout_result.content,
             architect=architect_result.content,
             planner=planner_result.content,
             validator=validator_result.content,
-            expert_insights=expert_insights
+            expert_insights=expert_insights,
+            adaptive=adaptive
         )
 
         dirname = self._generate_plan_dirname(request)
@@ -523,13 +583,19 @@ Focus on:
         self._generate_plan_metadata(
             request=request,
             plan_dir=output_path,
-            complexity="simple"
+            complexity=adaptive.complexity,
+            adaptive=adaptive
         )
 
         return WorkflowResult(
             success=True,
             output_file=output_path,
-            steps_completed=steps_completed
+            steps_completed=steps_completed,
+            data={
+                "complexity": adaptive.complexity,
+                "output_format": adaptive.output_format,
+                "agent_depth": adaptive.agent_depth
+            }
         )
 
     def _plan_sub_feature(
@@ -628,7 +694,13 @@ Focus on:
             planner_result=planner_result.content
         )
 
-    def _run_complex_planning(self, request: str, codebase_context: str, analysis: dict) -> WorkflowResult:
+    def _run_complex_planning(
+        self,
+        request: str,
+        codebase_context: str,
+        analysis: dict,
+        adaptive: Optional[AdaptiveConfig] = None
+    ) -> WorkflowResult:
         """Run decomposed planning for complex features."""
         steps_completed = []
 
@@ -714,6 +786,9 @@ Focus on:
         codebase_limit, scout_limit, _ = self._get_context_limits(num_features)
         self.console.print(f"  Context limits: codebase={codebase_limit}, scout={scout_limit} (scaled for {num_features} features)")
 
+        # Track failures for reporting
+        failed_sub_features: list[tuple[str, str]] = []  # (name, error)
+
         if strategy == "decompose_parallel" and num_features > 1:
             # Parallel planning with isolated contexts (but shared cached scout)
             self.console.print(f"  Running up to {self.max_parallel} in parallel...")
@@ -727,22 +802,53 @@ Focus on:
                 }
 
                 from core.symbols import CHECK, CROSS
-            for future in as_completed(futures):
+                for future in as_completed(futures):
                     sf = futures[future]
+                    sf_name = sf.get('name', 'Unknown')
                     try:
                         plan = future.result()
                         sub_plans.append(plan)
                         self.console.print(f"  [green]{CHECK}[/green] {plan.name}")
                     except Exception as e:
-                        self.console.print(f"  [red]{CROSS}[/red] {sf.get('name', 'Unknown')}: {e}")
+                        error_msg = str(e)
+                        failed_sub_features.append((sf_name, error_msg))
+                        self.console.print(f"  [red]{CROSS}[/red] {sf_name}: {error_msg}")
         else:
             # Sequential planning (with cached scout)
-            from core.symbols import CHECK
+            from core.symbols import CHECK, CROSS
             for sf in sub_features:
-                self.console.print(f"  Planning: {sf.get('name', 'Unknown')}...")
-                plan = self._plan_sub_feature(sf, codebase_context, cached_scout_result, num_features)
-                sub_plans.append(plan)
-                self.console.print(f"  [green]{CHECK}[/green] {plan.name}")
+                sf_name = sf.get('name', 'Unknown')
+                self.console.print(f"  Planning: {sf_name}...")
+                try:
+                    plan = self._plan_sub_feature(sf, codebase_context, cached_scout_result, num_features)
+                    sub_plans.append(plan)
+                    self.console.print(f"  [green]{CHECK}[/green] {plan.name}")
+                except Exception as e:
+                    error_msg = str(e)
+                    failed_sub_features.append((sf_name, error_msg))
+                    self.console.print(f"  [red]{CROSS}[/red] {sf_name}: {error_msg}")
+
+        # Check if too many sub-features failed
+        if failed_sub_features:
+            failure_rate = len(failed_sub_features) / len(sub_features)
+            if failure_rate > 0.5:
+                # More than half failed - abort
+                failed_names = [f[0] for f in failed_sub_features]
+                return WorkflowResult(
+                    success=False,
+                    error=f"Too many sub-features failed ({len(failed_sub_features)}/{len(sub_features)}): {', '.join(failed_names)}",
+                    data={"failed_sub_features": failed_sub_features}
+                )
+            elif not sub_plans:
+                # All failed
+                return WorkflowResult(
+                    success=False,
+                    error=f"All {len(sub_features)} sub-features failed to plan",
+                    data={"failed_sub_features": failed_sub_features}
+                )
+            else:
+                # Some failed but we have enough to continue
+                self.console.print(f"\n  [yellow]Warning: {len(failed_sub_features)} sub-feature(s) failed, continuing with {len(sub_plans)}[/yellow]")
 
         steps_completed.append(f"sub_plans ({len(sub_plans)})")
 
@@ -913,7 +1019,8 @@ Focus on:
         request: str,
         plan_dir: Path,
         complexity: str,
-        analysis: Optional[dict] = None
+        analysis: Optional[dict] = None,
+        adaptive: Optional[AdaptiveConfig] = None
     ) -> PlanMetadata:
         """
         Generate metadata.json for a newly created plan.
@@ -923,6 +1030,7 @@ Focus on:
             plan_dir: Path to the plan directory
             complexity: Complexity level (simple, medium, complex, massive)
             analysis: Optional analysis data from analyzer agent
+            adaptive: Optional AdaptiveConfig with output_format and agent_depth
         """
         # Extract plan ID from directory name
         match = re.match(r'^(\d+)[_-](.+)$', plan_dir.name)
@@ -966,10 +1074,16 @@ Focus on:
             updated_at=datetime.now().isoformat()
         )
 
-        # Save metadata.json
+        # Save metadata.json with adaptive info if available
+        metadata_dict = metadata.to_dict()
+        if adaptive:
+            metadata_dict["output_format"] = adaptive.output_format
+            metadata_dict["agent_depth"] = adaptive.agent_depth
+            metadata_dict["factors"] = adaptive.factors
+
         metadata_path = plan_dir / "metadata.json"
         metadata_path.write_text(
-            json.dumps(metadata.to_dict(), indent=2),
+            json.dumps(metadata_dict, indent=2),
             encoding="utf-8"
         )
 
@@ -1045,110 +1159,93 @@ Focus on:
             context=codebase_context
         )
 
-        if not analyzer_result.success:
-            self.console.print("[yellow]Analyzer failed, using simple planning[/yellow]")
-            return self._run_simple_planning(request, codebase_context)
-
-        analysis = self._parse_json_from_response(analyzer_result.content)
-        complexity = analysis.get("complexity", "simple")
-        needs_decomposition = analysis.get("needs_decomposition", False)
-
-        self.console.print(f"  Complexity: [cyan]{complexity}[/cyan]")
-        self.console.print(f"  Decomposition needed: [cyan]{needs_decomposition}[/cyan]")
-
-        if needs_decomposition and complexity in ["complex", "massive"]:
-            return self._run_complex_planning(request, codebase_context, analysis)
+        # Parse analysis and create adaptive config
+        if analyzer_result.success:
+            analysis = self._parse_json_from_response(analyzer_result.content)
+            adaptive = AdaptiveConfig.from_analysis(analysis)
         else:
-            return self._run_simple_planning(request, codebase_context)
+            self.console.print("[yellow]Analyzer failed, using default config[/yellow]")
+            adaptive = AdaptiveConfig.default_simple()
+            analysis = {}
 
-    def _compile_simple_plan(
+        # Display adaptive configuration
+        self.console.print(f"  Complexity: [cyan]{adaptive.complexity}[/cyan]")
+        self.console.print(f"  Output format: [cyan]{adaptive.output_format}[/cyan]")
+        self.console.print(f"  Agent depth: [cyan]{adaptive.agent_depth}[/cyan]")
+        self.console.print(f"  Decomposition needed: [cyan]{adaptive.needs_decomposition}[/cyan]")
+
+        if adaptive.needs_decomposition and adaptive.complexity in ["complex", "massive"]:
+            return self._run_complex_planning(request, codebase_context, analysis, adaptive)
+        else:
+            return self._run_simple_planning(request, codebase_context, adaptive)
+
+    def _compile_single_plan(
         self,
         request: str,
         scout: str,
         architect: str,
         planner: str,
         validator: str,
-        expert_insights: Optional[list[ExpertInsight]] = None
+        expert_insights: Optional[list[ExpertInsight]],
+        adaptive: AdaptiveConfig
     ) -> dict[str, str]:
         """
-        Compile simple plan as multiple files.
+        Compile simple/medium plan as a single file with all phases.
 
-        Returns:
-            Dict mapping filename to content for the plan folder
+        Structure:
+        - plan.md (complete plan: context → architecture → steps → validation)
+        - metadata.json (generated separately)
         """
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        expert_count = len(expert_insights) if expert_insights else 0
 
-        files = {}
+        content = f"""# Plan: {request}
 
-        # 00_overview.md - Summary and metadata
-        files["00_overview.md"] = f"""# Plan: {request}
+> Generated: {timestamp}
+> Complexity: {adaptive.complexity}
+> Depth: {adaptive.agent_depth}
 
-> Generated on {timestamp}
-> Complexity: Simple/Medium (single-pass planning)
-> Domain experts consulted: {expert_count}
-
-## Overview
-
-**Request:** {request}
-
-## Plan Structure
-
-- `01_context.md` - Codebase context and analysis
-- `02_architecture.md` - Architecture design{' and expert insights' if expert_insights else ''}
-- `03_implementation.md` - Step-by-step implementation plan
-- `04_validation.md` - Validation checklist and criteria
-"""
-
-        # 01_context.md - Scout/codebase context
-        files["01_context.md"] = f"""# Codebase Context
-
-> Part of plan: {request}
+## Context
 
 {scout}
-"""
 
-        # 02_architecture.md - Architecture design + expert insights
-        architect_content = f"""# Architecture Design
+---
 
-> Part of plan: {request}
+## Architecture
 
 {architect}
 """
+
         if expert_insights:
-            architect_content += "\n---\n\n## Domain Expert Insights\n\n"
+            content += "\n---\n\n## Expert Insights\n\n"
             for insight in expert_insights:
-                architect_content += f"### {insight.expert_name} ({insight.expert_type})\n\n"
-                architect_content += f"{insight.insights}\n\n"
+                content += f"### {insight.expert_name} ({insight.expert_type})\n\n"
+                content += f"{insight.insights}\n\n"
                 if insight.recommendations:
-                    architect_content += "**Recommendations:**\n"
+                    content += "**Recommendations:**\n"
                     for rec in insight.recommendations:
-                        architect_content += f"- {rec}\n"
-                    architect_content += "\n"
+                        content += f"- {rec}\n"
+                    content += "\n"
                 if insight.concerns:
-                    architect_content += "**Concerns:**\n"
+                    content += "**Concerns:**\n"
                     for concern in insight.concerns:
-                        architect_content += f"- {concern}\n"
-                    architect_content += "\n"
-        files["02_architecture.md"] = architect_content
+                        content += f"- {concern}\n"
+                    content += "\n"
 
-        # 03_implementation.md - Implementation steps
-        files["03_implementation.md"] = f"""# Implementation Plan
+        content += f"""
+---
 
-> Part of plan: {request}
+## Implementation Steps
 
 {planner}
-"""
 
-        # 04_validation.md - Validation
-        files["04_validation.md"] = f"""# Validation
+---
 
-> Part of plan: {request}
+## Validation
 
 {validator}
 """
 
-        return files
+        return {"plan.md": content}
 
     def _compile_master_plan(
         self,

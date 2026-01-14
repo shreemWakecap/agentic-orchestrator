@@ -34,6 +34,9 @@ from workflows.reviewing import ReviewingWorkflow
 from workflows.fixing import FixingWorkflow
 from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
 
+# Server startup time for health endpoint uptime calculation
+START_TIME = datetime.now()
+
 # FastAPI app
 app = FastAPI(
     title="SDLC Orchestrator",
@@ -166,6 +169,17 @@ async def run_detail(request: Request, run_id: str):
 async def api_hello():
     """Return a simple hello world message for testing."""
     return {"message": "hello world"}
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint returning server status, version, and uptime."""
+    uptime_seconds = (datetime.now() - START_TIME).total_seconds()
+    return {
+        "status": "healthy",
+        "version": app.version,
+        "uptime_seconds": round(uptime_seconds, 2)
+    }
 
 
 @app.get("/api/plans")
@@ -529,9 +543,13 @@ async def _get_plan_by_id(plan_id: str) -> Optional[Dict]:
                 except (json.JSONDecodeError, IOError):
                     pass
 
-            # Load plan content from overview file
+            # Load plan content - try plan.md first (new format), then 00_overview.md (legacy)
+            plan_file = plan_dir / "plan.md"
             overview_file = plan_dir / "00_overview.md"
-            if overview_file.exists():
+
+            if plan_file.exists():
+                plan_data["content"] = plan_file.read_text(encoding="utf-8")
+            elif overview_file.exists():
                 plan_data["content"] = overview_file.read_text(encoding="utf-8")
             else:
                 # Fallback: concatenate all .md files

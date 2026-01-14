@@ -1,0 +1,27 @@
+{
+  "scout": {
+    "brief": "BRIEF MODE: Focus ONLY on: (1) Project type and tech stack, (2) 2-3 most relevant files to modify, (3) One critical pattern if any. Skip comprehensive exploration. Keep JSON output minimal - just essential fields. No need for exhaustive file listings.",
+    "moderate": "MODERATE MODE: Gather focused context - project type, 5-10 relevant files with their purposes, key patterns to follow, main internal dependencies. Standard exploration depth with essential details only.",
+    "thorough": "THOROUGH MODE: Full exploration - complete project analysis, comprehensive file listing with relevance scores, all detected patterns, full dependency mapping (internal and external), detailed risk assessment, integration points."
+  },
+  "architect": {
+    "brief": "BRIEF MODE: Minimal design - list 1-3 components with file paths and actions only. Skip data flow diagrams, skip alternatives analysis. One-sentence approach summary. Get straight to the point.",
+    "moderate": "MODERATE MODE: Focused design - key components with exact paths, main data flow (3-5 steps), primary technical decision with brief rationale. Standard architecture depth without exhaustive alternatives.",
+    "thorough": "THOROUGH MODE: Complete architecture - all components with interfaces and responsibilities, full data flow sequence, multiple technical decisions with alternatives and trade-offs, all integration points, open questions, risk areas."
+  },
+  "planner": {
+    "brief": "BRIEF MODE: Direct implementation - maximum 5 steps total, single phase, inline code snippets, skip detailed descriptions. No separate testing phase (validation checklist only). Get straight to the actionable steps.",
+    "moderate": "MODERATE MODE: Structured plan - 2-3 phases, 5-10 steps with proper dependencies, code snippets for each step, basic testing strategy with key test cases. Standard implementation depth.",
+    "thorough": "THOROUGH MODE: Comprehensive plan - multiple phases (setup, core, testing, cleanup), detailed steps with full code, explicit dependency graph, parallel execution markers, complete testing strategy with edge cases, validation commands."
+  },
+  "validator": {
+    "brief": "BRIEF MODE: Quick validation - check only critical items (every step has action + target + code). Skip pattern compliance checks, skip style warnings. Pass threshold: 70. Brief summary only.",
+    "moderate": "MODERATE MODE: Standard validation - all checks at normal severity thresholds. Pass threshold: 80. Include key warnings and recommendations.",
+    "thorough": "THOROUGH MODE: Deep validation - all checks at strict thresholds, detailed warnings for every issue, pattern compliance verification, code quality assessment. Pass threshold: 90. Comprehensive summary with all recommendations."
+  },
+  "synthesizer": {
+    "brief": "BRIEF MODE: Simple merge - combine sub-plans linearly, skip dependency graph visualization, minimal execution notes. Focus on getting a working plan.",
+    "moderate": "MODERATE MODE: Structured synthesis - proper phasing across sub-features, clear inter-feature dependencies, basic parallelization hints where safe.",
+    "thorough": "THOROUGH MODE: Complete synthesis - detailed phasing with rationale, ASCII dependency graph, risk areas highlighted, comprehensive integration notes, rollback considerations."
+  }
+}

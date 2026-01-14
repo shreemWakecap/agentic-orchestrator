@@ -69,18 +69,52 @@ class StepResult:
 
 
 @dataclass
+class StepState:
+    """Tracks the state of a single step."""
+    step_id: str
+    status: str  # pending, in_progress, completed, failed, skipped
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    retry_count: int = 0
+    error: Optional[str] = None
+    files_affected: list[str] = field(default_factory=list)
+    summary: str = ""
+
+    def to_dict(self) -> dict:
+        return {
+            "step_id": self.step_id,
+            "status": self.status,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "retry_count": self.retry_count,
+            "error": self.error,
+            "files_affected": self.files_affected,
+            "summary": self.summary,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "StepState":
+        return cls(**data)
+
+
+@dataclass
 class BuildState:
-    """Tracks the current state of a build."""
+    """Tracks the current state of a build with step-level granularity."""
     plan_id: str
     plan_file: str
-    status: str  # pending, in_progress, completed, failed
+    status: str  # pending, building, completed, failed, paused
     started_at: str
+    updated_at: str = ""
     current_phase: int = 0
+    current_step: str = ""  # Current step being executed
+    total_steps: int = 0
     completed_steps: list[str] = field(default_factory=list)
     failed_steps: list[str] = field(default_factory=list)
-    step_results: dict[str, dict] = field(default_factory=dict)
+    skipped_steps: list[str] = field(default_factory=list)
+    step_states: dict[str, dict] = field(default_factory=dict)  # step_id -> StepState
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
+    last_error: Optional[str] = None
 
     def to_dict(self) -> dict:
         return {
@@ -88,17 +122,64 @@ class BuildState:
             "plan_file": self.plan_file,
             "status": self.status,
             "started_at": self.started_at,
+            "updated_at": self.updated_at,
             "current_phase": self.current_phase,
+            "current_step": self.current_step,
+            "total_steps": self.total_steps,
             "completed_steps": self.completed_steps,
             "failed_steps": self.failed_steps,
-            "step_results": self.step_results,
+            "skipped_steps": self.skipped_steps,
+            "step_states": self.step_states,
             "files_created": self.files_created,
             "files_modified": self.files_modified,
+            "last_error": self.last_error,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "BuildState":
+        # Handle backwards compatibility
+        if "step_results" in data and "step_states" not in data:
+            # Migrate old format to new format
+            data["step_states"] = {}
+            for step_id, result in data.pop("step_results", {}).items():
+                data["step_states"][step_id] = {
+                    "step_id": step_id,
+                    "status": result.get("status", "completed"),
+                    "summary": result.get("summary", ""),
+                    "files_affected": result.get("files_affected", []),
+                }
+        # Remove old fields if present
+        data.pop("step_results", None)
+        # Add new fields with defaults if missing
+        data.setdefault("updated_at", data.get("started_at", ""))
+        data.setdefault("current_step", "")
+        data.setdefault("total_steps", 0)
+        data.setdefault("skipped_steps", [])
+        data.setdefault("step_states", {})
+        data.setdefault("last_error", None)
         return cls(**data)
+
+    def get_step_state(self, step_id: str) -> Optional[StepState]:
+        """Get the state of a specific step."""
+        if step_id in self.step_states:
+            return StepState.from_dict(self.step_states[step_id])
+        return None
+
+    def set_step_state(self, step_state: StepState):
+        """Update the state of a step."""
+        self.step_states[step_state.step_id] = step_state.to_dict()
+        self.updated_at = datetime.now().isoformat()
+
+    def get_progress(self) -> tuple[int, int]:
+        """Get (completed_count, total_count)."""
+        return len(self.completed_steps), self.total_steps
+
+    def can_retry_step(self, step_id: str, max_retries: int = 3) -> bool:
+        """Check if a step can be retried."""
+        state = self.get_step_state(step_id)
+        if not state:
+            return True
+        return state.retry_count < max_retries
 
 
 class BuildingWorkflow(Workflow):
@@ -142,9 +223,12 @@ class BuildingWorkflow(Workflow):
 
     def _ensure_specs_structure(self):
         """Create the specs directory structure."""
-        dirs = ["pending", "in-progress", "completed", "failed"]
+        # Main plan directories
+        dirs = ["pending", "completed", "failed", "state"]
         for d in dirs:
             (self.specs_dir / d).mkdir(parents=True, exist_ok=True)
+        # Note: "in-progress" is no longer used - plans stay in pending during build
+        # State is tracked in specs/state/{plan_id}.state.json
 
     def _load_agents(self):
         """Load all agents needed for building."""
@@ -155,28 +239,116 @@ class BuildingWorkflow(Workflow):
             except FileNotFoundError:
                 self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
 
+    def _is_placeholder_response(self, content: str) -> bool:
+        """
+        Detect if agent returned a placeholder/greeting instead of actual content.
+
+        This catches cases where the agent system prompt wasn't properly applied
+        and Claude returns generic greeting responses.
+        """
+        if not content or len(content.strip()) < 50:
+            return True
+
+        placeholder_patterns = [
+            # Generic greetings
+            "I'm ready to help you",
+            "I'll help you with software engineering",
+            "How can I help you",
+            "What can I help",
+            "Hello! How can I help",
+            # Confusion indicators
+            "What would you like me to",
+            "What would you like to work on",
+            "Would you like me to",
+            "I understand you've sent",
+            "I understand. I'm ready to help",
+            "I can see you're on the",
+            "I can see you're working",
+            # Empty message indicators
+            "I see you've sent",
+            "I see you've started",
+            "you've sent an empty message",
+            # Context confusion
+            "working in the",
+            "on the developmet branch",
+            "in your git working tree",
+            "Let me know what you'd like",
+        ]
+
+        content_lower = content.lower()
+        for pattern in placeholder_patterns:
+            if pattern.lower() in content_lower:
+                return True
+
+        return False
+
+    def _validate_agent_response(self, agent_name: str, result) -> tuple[bool, str]:
+        """
+        Validate that an agent response contains actual content, not a placeholder.
+
+        Args:
+            agent_name: Name of the agent for error messages
+            result: AgentResult object
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not result.success:
+            return False, f"{agent_name} failed: {result.error}"
+
+        if not result.content or len(result.content.strip()) < 50:
+            return False, f"{agent_name} returned empty or too short response"
+
+        if self._is_placeholder_response(result.content):
+            return False, (
+                f"{agent_name} returned a generic greeting instead of actual content. "
+                "This usually means the agent's system prompt wasn't properly applied. "
+                "Please check the Claude CLI configuration."
+            )
+
+        return True, ""
+
     def _get_state_file(self, plan_path: Path) -> Path:
-        """Get the state file path for a plan."""
-        return plan_path.parent / f".{plan_path.stem}.state.json"
+        """Get the centralized state file path for a plan."""
+        # State files are stored in specs/state/{plan_id}.state.json
+        return self.specs_dir / "state" / f"{plan_path.stem}.state.json"
 
     def _save_state(self, plan_path: Path):
-        """Save current build state."""
+        """Save current build state to centralized location."""
         if self.build_state:
+            self.build_state.updated_at = datetime.now().isoformat()
             state_file = self._get_state_file(plan_path)
+            state_file.parent.mkdir(parents=True, exist_ok=True)
             state_file.write_text(
                 json.dumps(self.build_state.to_dict(), indent=2),
                 encoding="utf-8"
             )
 
     def _load_state(self, plan_path: Path) -> Optional[BuildState]:
-        """Load existing build state if available."""
+        """Load existing build state from centralized location."""
         state_file = self._get_state_file(plan_path)
         if state_file.exists():
             try:
                 data = json.loads(state_file.read_text(encoding="utf-8"))
                 return BuildState.from_dict(data)
-            except Exception:
+            except Exception as e:
+                self.console.print(f"[yellow]Warning: Could not load state file: {e}[/yellow]")
                 return None
+
+        # Backwards compatibility: check old location (hidden file in plan directory)
+        old_state_file = plan_path.parent / f".{plan_path.stem}.state.json"
+        if old_state_file.exists():
+            try:
+                data = json.loads(old_state_file.read_text(encoding="utf-8"))
+                state = BuildState.from_dict(data)
+                # Migrate to new location
+                self.build_state = state
+                self._save_state(plan_path)
+                old_state_file.unlink()  # Remove old file
+                self.console.print("[dim]Migrated state file to centralized location[/dim]")
+                return state
+            except Exception:
+                pass
         return None
 
     def _load_plan_content(self, plan_path: Path) -> str:
@@ -211,21 +383,53 @@ class BuildingWorkflow(Workflow):
             # Single file plan (legacy format)
             return plan_path.read_text(encoding="utf-8")
 
-    def _move_plan(self, plan_path: Path, destination: str):
-        """Move plan file to a destination folder."""
+    def _archive_plan(self, plan_path: Path, destination: str) -> Path:
+        """
+        Archive a plan to completed or failed folder.
+
+        This should ONLY be called when a build is fully complete or has
+        permanently failed. Plans stay in pending during active building.
+        State is tracked separately in specs/state/.
+
+        Args:
+            plan_path: Path to the plan folder
+            destination: Either "completed" or "failed"
+
+        Returns:
+            New path to the archived plan
+        """
+        if destination not in ("completed", "failed"):
+            raise ValueError(f"Invalid archive destination: {destination}")
+
         dest_dir = self.specs_dir / destination
         dest_dir.mkdir(parents=True, exist_ok=True)
 
         dest_path = dest_dir / plan_path.name
 
-        # Handle state file too
-        state_file = self._get_state_file(plan_path)
-        if state_file.exists():
-            dest_state = dest_dir / state_file.name
-            shutil.move(str(state_file), str(dest_state))
+        # If destination already exists, remove it first (re-running failed plan)
+        if dest_path.exists():
+            shutil.rmtree(str(dest_path))
 
+        # Move the plan folder
         shutil.move(str(plan_path), str(dest_path))
+
+        # Update state file to reflect new location
+        if self.build_state:
+            self.build_state.plan_file = str(dest_path)
+            self._save_state(dest_path)
+
         return dest_path
+
+    def _get_plan_status(self, plan_path: Path) -> str:
+        """
+        Get the current status of a plan based on state file.
+
+        Returns: pending, building, completed, failed, or unknown
+        """
+        state = self._load_state(plan_path)
+        if state:
+            return state.status
+        return "pending"
 
     def _parse_json_from_response(self, response: str) -> dict:
         """Extract JSON from agent response."""
@@ -301,14 +505,16 @@ After completing, summarize what you did.""",
             show_progress=False
         )
 
-        if not result.success:
+        # Validate builder response (check for success AND placeholder detection)
+        valid, error = self._validate_agent_response("Builder", result)
+        if not valid:
             return StepResult(
                 step_id=step.id,
                 status="failed",
                 action_taken="none",
                 target=step.target,
                 summary="",
-                error=result.error
+                error=error
             )
 
         # Get files from agentic result
@@ -338,7 +544,9 @@ After completing, summarize what you did.""",
         )
 
     def _run_simple_build(self, plan: ParsedPlan, plan_path: Path) -> WorkflowResult:
-        """Run sequential build for simple plans."""
+        """Run sequential build for simple plans with step-level tracking."""
+        from core.symbols import ARROW_RIGHT, CHECK, CROSS, WARNING
+
         steps_completed = []
 
         for phase_idx, phase in enumerate(plan.phases):
@@ -350,24 +558,51 @@ After completing, summarize what you did.""",
             phase_context = f"Building phase: {phase.name}\nDescription: {phase.name}"
 
             for step in phase.steps:
-                # Skip already completed
+                # Check step state for resume capability
+                existing_step_state = self.build_state.get_step_state(step.id)
+
+                # Skip already completed steps
                 if step.id in self.build_state.completed_steps:
                     self.console.print(f"  [dim]↷ {step.id} (already done)[/dim]")
                     continue
 
-                from core.symbols import ARROW_RIGHT, CHECK, CROSS
-                self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {step.description[:60]}...")
+                # Check if step previously failed - attempt retry
+                if step.id in self.build_state.failed_steps:
+                    if not self.build_state.can_retry_step(step.id):
+                        self.console.print(f"  [red]{CROSS}[/red] {step.id} (max retries exceeded)")
+                        continue
+                    retry_count = existing_step_state.retry_count if existing_step_state else 0
+                    self.console.print(f"  [yellow]↻[/yellow] Retrying {step.id} (attempt {retry_count + 1})...")
+                    # Remove from failed list for retry
+                    self.build_state.failed_steps.remove(step.id)
 
+                # Mark step as in_progress
+                self.build_state.current_step = step.id
+                step_state = StepState(
+                    step_id=step.id,
+                    status="in_progress",
+                    started_at=datetime.now().isoformat(),
+                    retry_count=(existing_step_state.retry_count if existing_step_state else 0)
+                )
+                self.build_state.set_step_state(step_state)
+                self._save_state(plan_path)
+
+                # Display progress
+                completed, total = self.build_state.get_progress()
+                progress_str = f"[{completed}/{total}]"
+                self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {progress_str} {step.description[:55]}...")
+
+                # Execute the step
                 result = self._execute_step(step, phase_context)
 
-                # Track result
-                self.build_state.step_results[step.id] = {
-                    "status": result.status,
-                    "summary": result.summary,
-                    "files_affected": result.files_affected
-                }
+                # Update step state based on result
+                step_state.completed_at = datetime.now().isoformat()
+                step_state.files_affected = result.files_affected
+                step_state.summary = result.summary
 
                 if result.status == "completed":
+                    step_state.status = "completed"
+                    self.build_state.set_step_state(step_state)
                     self.build_state.completed_steps.append(step.id)
                     self.build_state.files_created.extend(
                         [f for f in result.files_affected if result.action_taken == "created"]
@@ -378,13 +613,29 @@ After completing, summarize what you did.""",
                     self.console.print(f"  [green]{CHECK}[/green] {result.summary[:50]}")
                     steps_completed.append(step.id)
                 else:
+                    step_state.status = "failed"
+                    step_state.error = result.error
+                    step_state.retry_count += 1
+                    self.build_state.set_step_state(step_state)
                     self.build_state.failed_steps.append(step.id)
-                    self.console.print(f"  [red]{CROSS}[/red] {result.error or 'Failed'}")
+                    self.build_state.last_error = f"Step {step.id}: {result.error}"
+                    self.build_state.status = "paused"  # Paused, not failed - can resume
                     self._save_state(plan_path)
+
+                    self.console.print(f"  [red]{CROSS}[/red] {result.error or 'Failed'}")
+                    self.console.print(f"\n[yellow]Build paused at step {step.id}[/yellow]")
+                    self.console.print(f"[dim]Run build again to retry from this step[/dim]")
+
                     return WorkflowResult(
                         success=False,
                         error=f"Step {step.id} failed: {result.error}",
-                        steps_completed=steps_completed
+                        steps_completed=steps_completed,
+                        data={
+                            "paused_at": step.id,
+                            "can_resume": True,
+                            "completed_steps": len(self.build_state.completed_steps),
+                            "total_steps": self.build_state.total_steps,
+                        }
                     )
 
                 self._save_state(plan_path)
@@ -393,7 +644,6 @@ After completing, summarize what you did.""",
             self.console.print(f"\n  [bold]Testing phase {phase_idx + 1}...[/bold]")
             test_result = self._run_phase_tests(plan, phase_idx)
             if not test_result:
-                from core.symbols import WARNING
                 self.console.print(f"  [yellow]{WARNING}[/yellow] Tests had issues (continuing)")
 
         # Final review
@@ -461,7 +711,9 @@ After completing, summarize what you did.""",
         return results
 
     def _run_complex_build(self, plan: ParsedPlan, plan_path: Path, coordination: dict) -> WorkflowResult:
-        """Run coordinated parallel build for complex plans."""
+        """Run coordinated parallel build for complex plans with step-level tracking."""
+        from core.symbols import ARROW_RIGHT, CHECK, CROSS
+
         steps_completed = []
         execution_plan = coordination.get("execution_plan", [])
 
@@ -495,41 +747,79 @@ After completing, summarize what you did.""",
                 )
             else:
                 results = []
-                from core.symbols import ARROW_RIGHT, CHECK, CROSS
                 for step in steps_to_build:
+                    # Skip completed steps
                     if step.id in self.build_state.completed_steps:
+                        self.console.print(f"  [dim]↷ {step.id} (already done)[/dim]")
                         continue
-                    self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {step.description[:50]}...")
+
+                    # Track step state
+                    existing_step_state = self.build_state.get_step_state(step.id)
+                    self.build_state.current_step = step.id
+                    step_state = StepState(
+                        step_id=step.id,
+                        status="in_progress",
+                        started_at=datetime.now().isoformat(),
+                        retry_count=(existing_step_state.retry_count if existing_step_state else 0)
+                    )
+                    self.build_state.set_step_state(step_state)
+                    self._save_state(plan_path)
+
+                    # Display progress
+                    completed, total = self.build_state.get_progress()
+                    self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] [{completed}/{total}] {step.description[:50]}...")
+
                     result = self._execute_step(step, phase_context)
                     results.append(result)
 
+                    # Update step state
+                    step_state.completed_at = datetime.now().isoformat()
+                    step_state.files_affected = result.files_affected
+                    step_state.summary = result.summary
+
                     if result.status == "completed":
+                        step_state.status = "completed"
                         self.console.print(f"  [green]{CHECK}[/green] Done")
                     else:
+                        step_state.status = "failed"
+                        step_state.error = result.error
+                        step_state.retry_count += 1
                         self.console.print(f"  [red]{CROSS}[/red] {result.error}")
+
+                    self.build_state.set_step_state(step_state)
 
             # Process results
             for result in results:
-                self.build_state.step_results[result.step_id] = {
-                    "status": result.status,
-                    "summary": result.summary
-                }
-
                 if result.status == "completed":
-                    self.build_state.completed_steps.append(result.step_id)
+                    if result.step_id not in self.build_state.completed_steps:
+                        self.build_state.completed_steps.append(result.step_id)
                     steps_completed.append(result.step_id)
                 else:
-                    self.build_state.failed_steps.append(result.step_id)
+                    if result.step_id not in self.build_state.failed_steps:
+                        self.build_state.failed_steps.append(result.step_id)
 
             self._save_state(plan_path)
 
-            # Check for failures
+            # Check for failures - pause build for resume
             failed = [r for r in results if r.status == "failed"]
             if failed:
+                self.build_state.status = "paused"
+                self.build_state.last_error = f"Batch {batch_id}: {len(failed)} step(s) failed"
+                self._save_state(plan_path)
+
+                self.console.print(f"\n[yellow]Build paused at batch {batch_id}[/yellow]")
+                self.console.print(f"[dim]Run build again to retry failed steps[/dim]")
+
                 return WorkflowResult(
                     success=False,
                     error=f"Batch {batch_id} had {len(failed)} failures",
-                    steps_completed=steps_completed
+                    steps_completed=steps_completed,
+                    data={
+                        "paused_at": f"batch-{batch_id}",
+                        "can_resume": True,
+                        "completed_steps": len(self.build_state.completed_steps),
+                        "total_steps": self.build_state.total_steps,
+                    }
                 )
 
         # Integration phase for master plans
@@ -619,6 +909,10 @@ Provide a quality assessment.""",
         """
         Execute the building workflow for a plan file.
 
+        Plans stay in their current location during building. State is tracked
+        in a centralized state file. Plans only move to completed/failed when
+        fully done.
+
         Args:
             plan_path_str: Path to the plan file (relative or absolute)
         """
@@ -628,8 +922,8 @@ Provide a quality assessment.""",
             plan_path = self.project_root / plan_path_str
 
         if not plan_path.exists():
-            # Try in specs directories
-            for subdir in ["pending", "in-progress", ""]:
+            # Try in specs directories (pending first, then others)
+            for subdir in ["pending", "failed", "completed", ""]:
                 test_path = self.specs_dir / subdir / plan_path.name if subdir else self.specs_dir / plan_path.name
                 if test_path.exists():
                     plan_path = test_path
@@ -644,22 +938,31 @@ Provide a quality assessment.""",
 
         # Load or create build state
         existing_state = self._load_state(plan_path)
-        if existing_state and existing_state.completed_steps:
-            self.console.print(f"[yellow]Resuming build ({len(existing_state.completed_steps)} steps done)[/yellow]")
+        if existing_state:
+            completed_count = len(existing_state.completed_steps)
+            failed_count = len(existing_state.failed_steps)
+            total = existing_state.total_steps
+
+            if existing_state.status == "paused":
+                self.console.print(f"[yellow]Resuming paused build[/yellow]")
+                self.console.print(f"  Progress: {completed_count}/{total} steps completed")
+                if failed_count > 0:
+                    self.console.print(f"  Failed steps to retry: {failed_count}")
+                if existing_state.last_error:
+                    self.console.print(f"  Last error: [dim]{existing_state.last_error[:60]}...[/dim]")
+            elif completed_count > 0:
+                self.console.print(f"[yellow]Resuming build ({completed_count}/{total} steps done)[/yellow]")
+
             self.build_state = existing_state
-            self.build_state.status = "in_progress"
+            self.build_state.status = "building"
         else:
             self.build_state = BuildState(
                 plan_id=plan_path.stem,
                 plan_file=str(plan_path),
-                status="in_progress",
-                started_at=datetime.now().isoformat()
+                status="building",
+                started_at=datetime.now().isoformat(),
+                updated_at=datetime.now().isoformat()
             )
-
-        # Move to in-progress
-        if plan_path.parent.name != "in-progress":
-            plan_path = self._move_plan(plan_path, "in-progress")
-            self.build_state.plan_file = str(plan_path)
 
         self._save_state(plan_path)
 
@@ -673,7 +976,9 @@ Provide a quality assessment.""",
             if line.strip() and not line.startswith('#') and not line.startswith('*') and not line.startswith('>')  and not line.startswith('---')
         ]
         if len(content_lines) < 5:
-            self._move_plan(plan_path, "failed")
+            self.build_state.status = "failed"
+            self.build_state.last_error = "Plan is empty or incomplete"
+            self._save_state(plan_path)
             return WorkflowResult(
                 success=False,
                 error=f"Plan appears to be empty or incomplete. Expected implementation steps but found only {len(content_lines)} content lines. Please re-run the planning workflow to generate a complete plan."
@@ -685,9 +990,13 @@ Provide a quality assessment.""",
             context=f"## Plan File: {plan_path.name}\n\n{plan_content[:8000]}"
         )
 
-        if not parser_result.success:
-            self._move_plan(plan_path, "failed")
-            return WorkflowResult(success=False, error=f"Parser failed: {parser_result.error}")
+        # Validate parser response (check for success AND placeholder detection)
+        valid, error = self._validate_agent_response("Parser", parser_result)
+        if not valid:
+            self.build_state.status = "failed"
+            self.build_state.last_error = error
+            self._save_state(plan_path)
+            return WorkflowResult(success=False, error=error)
 
         parsed_data = self._parse_json_from_response(parser_result.content)
 
@@ -725,13 +1034,21 @@ Provide a quality assessment.""",
         )
 
         total_steps = sum(len(p.steps) for p in phases)
+        from core.symbols import CHECK
+        self.console.print(f"  [green]{CHECK}[/green] parser complete")
         self.console.print(f"  Plan type: [cyan]{plan.plan_type}[/cyan]")
         self.console.print(f"  Phases: [cyan]{len(phases)}[/cyan]")
         self.console.print(f"  Total steps: [cyan]{total_steps}[/cyan]")
 
+        # Store total steps in build state for progress tracking
+        self.build_state.total_steps = total_steps
+        self._save_state(plan_path)
+
         # CRITICAL: Fail if no steps were extracted from the plan
         if total_steps == 0:
-            self._move_plan(plan_path, "failed")
+            self.build_state.status = "failed"
+            self.build_state.last_error = "No implementation steps found in plan"
+            self._save_state(plan_path)
             return WorkflowResult(
                 success=False,
                 error=(
@@ -763,20 +1080,43 @@ Provide a quality assessment.""",
             # Simple sequential build
             result = self._run_simple_build(plan, plan_path)
 
-        # Move plan based on result
+        # Handle result - only archive on full completion
         if result.success:
             self.build_state.status = "completed"
+            self.build_state.current_step = ""
             self._save_state(plan_path)
-            final_path = self._move_plan(plan_path, "completed")
+
+            # Archive to completed folder
+            final_path = self._archive_plan(plan_path, "completed")
             result.output_file = final_path
             final_display = str(final_path).replace("\\", "/")
-            self.console.print(f"\n[green]Plan moved to:[/green] {final_display}")
+
+            completed, total = self.build_state.get_progress()
+            self.console.print(f"\n[green]Build completed successfully![/green]")
+            self.console.print(f"  Steps: {completed}/{total}")
+            self.console.print(f"  Files created: {len(self.build_state.files_created)}")
+            self.console.print(f"  Files modified: {len(self.build_state.files_modified)}")
+            self.console.print(f"  Archived to: {final_display}")
         else:
-            self.build_state.status = "failed"
-            self._save_state(plan_path)
-            final_path = self._move_plan(plan_path, "failed")
-            final_display = str(final_path).replace("\\", "/")
-            self.console.print(f"\n[red]Plan moved to:[/red] {final_display}")
+            # Check if this is a pausable failure (can resume) or permanent failure
+            is_paused = result.data and result.data.get("can_resume", False)
+
+            if is_paused:
+                # Build is paused - state already saved, plan stays in place
+                self.console.print(f"\n[yellow]Build paused - can be resumed[/yellow]")
+                completed, total = self.build_state.get_progress()
+                self.console.print(f"  Progress: {completed}/{total} steps completed")
+                self.console.print(f"  State saved to: specs/state/{plan_path.stem}.state.json")
+                self.console.print(f"\n[dim]Run 'build {plan_path.name}' again to resume[/dim]")
+            else:
+                # Permanent failure - archive to failed
+                self.build_state.status = "failed"
+                self._save_state(plan_path)
+
+                final_path = self._archive_plan(plan_path, "failed")
+                final_display = str(final_path).replace("\\", "/")
+                self.console.print(f"\n[red]Build failed permanently[/red]")
+                self.console.print(f"  Archived to: {final_display}")
 
         return result
 

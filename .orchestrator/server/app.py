@@ -162,6 +162,12 @@ async def run_detail(request: Request, run_id: str):
 
 # ============== API Routes ==============
 
+@app.get("/api/hello")
+async def api_hello():
+    """Return a simple hello world message for testing."""
+    return {"message": "hello world"}
+
+
 @app.get("/api/plans")
 async def api_list_plans():
     """List all plans."""

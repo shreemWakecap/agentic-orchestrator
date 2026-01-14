@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "last_scan": "2026-01-14T02:05:32.041307",
+  "last_scan": "2026-01-14T02:20:11.618844",
   "plans": {
     "1": {
       "path": "pending/001_simple-hello-world-feature",
@@ -215,11 +215,35 @@
         "routes/*"
       ],
       "depends_on": []
+    },
+    "10": {
+      "path": "pending/010_simple-test-endpoint-that-returns",
+      "status": "pending",
+      "request": "Add a simple test endpoint that returns hello world",
+      "request_hash": "f77b5015ab85ef99",
+      "keywords": [
+        "simple",
+        "test",
+        "endpoint",
+        "returns",
+        "hello",
+        "world"
+      ],
+      "features_provided": [
+        "simple-feature",
+        "test-feature",
+        "endpoint-feature"
+      ],
+      "files_affected": [
+        "tests/*"
+      ],
+      "depends_on": []
     }
   },
   "features_index": {
     "simple-feature": [
-      "1"
+      "1",
+      "10"
     ],
     "hello-feature": [
       "1"
@@ -331,6 +355,12 @@
     ],
     "check-feature": [
       "9"
+    ],
+    "test-feature": [
+      "10"
+    ],
+    "endpoint-feature": [
+      "10"
     ]
   },
   "files_index": {
@@ -343,7 +373,8 @@
     "tests/*": [
       "2",
       "5",
-      "8"
+      "8",
+      "10"
     ],
     "tests/e2e/*": [
       "4",
@@ -360,8 +391,8 @@
     ]
   },
   "stats": {
-    "total_plans": 9,
-    "pending": 9,
+    "total_plans": 10,
+    "pending": 10,
     "in_progress": 0,
     "completed": 0,
     "failed": 0

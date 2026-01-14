@@ -543,9 +543,13 @@ async def _get_plan_by_id(plan_id: str) -> Optional[Dict]:
                 except (json.JSONDecodeError, IOError):
                     pass
 
-            # Load plan content from overview file
+            # Load plan content - try plan.md first (new format), then 00_overview.md (legacy)
+            plan_file = plan_dir / "plan.md"
             overview_file = plan_dir / "00_overview.md"
-            if overview_file.exists():
+
+            if plan_file.exists():
+                plan_data["content"] = plan_file.read_text(encoding="utf-8")
+            elif overview_file.exists():
                 plan_data["content"] = overview_file.read_text(encoding="utf-8")
             else:
                 # Fallback: concatenate all .md files

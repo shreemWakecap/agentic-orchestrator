@@ -937,146 +937,24 @@ def cmd_test(args):
 
 def cmd_sync_remote(args=None):
     """Commit changes and create PR with AI-generated messages."""
-    import subprocess
-    from datetime import datetime
+    from workflows.syncing import SyncingWorkflow
 
-    def run_git(cmd, capture=True, check=True):
-        result = subprocess.run(
-            ["git"] + cmd, cwd=PROJECT_ROOT, capture_output=capture,
-            text=True, encoding="utf-8", errors="replace",
-        )
-        if check and result.returncode != 0:
-            raise RuntimeError(f"Git failed: {' '.join(cmd)}\n{result.stderr}")
-        return result.stdout.strip() if capture else result
+    workflow = SyncingWorkflow(project_root=PROJECT_ROOT)
+    result = workflow.run("")
 
-    def run_gh(cmd, capture=True, check=True):
-        result = subprocess.run(
-            ["gh"] + cmd, cwd=PROJECT_ROOT, capture_output=capture,
-            text=True, encoding="utf-8", errors="replace",
-        )
-        if check and result.returncode != 0:
-            raise RuntimeError(f"GitHub CLI failed: {' '.join(cmd)}\n{result.stderr}")
-        return result.stdout.strip() if capture else result
-
-    def get_ai_response(prompt):
-        try:
-            claude_path = shutil.which("claude")
-            if not claude_path:
-                return None
-            result = subprocess.run(
-                [claude_path, "--print", "-p", prompt], cwd=PROJECT_ROOT,
-                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
-            )
-            return result.stdout.strip() if result.returncode == 0 else None
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            return None
-
-    print("=" * 60)
-    print("SYNC REMOTE - Push changes via PR")
-    print("=" * 60)
-
-    # Step 1: Check for changes
-    print("\n[1/6] Checking for changes...")
-    status = run_git(["status", "--porcelain"])
-    if not status:
-        print("  [X] No changes to commit")
-        return 1
-    changed_files = [line.split()[-1] for line in status.split("\n") if line]
-    print(f"  [OK] Found {len(changed_files)} changed file(s)")
-
-    # Step 2: Get current branch
-    print("\n[2/6] Getting current branch...")
-    base_branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
-    print(f"  [OK] Base branch: {base_branch}")
-
-    # Step 3: Create new branch
-    print("\n[3/6] Creating feature branch...")
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    new_branch = f"sync/{base_branch}/{timestamp}"
-    run_git(["checkout", "-b", new_branch])
-    print(f"  [OK] Created branch: {new_branch}")
-
-    # Step 4: Stage and generate commit message
-    print("\n[4/6] Staging changes and generating commit message...")
-    run_git(["add", "-A"])
-    diff = run_git(["diff", "--cached", "--stat"])
-    diff_content = run_git(["diff", "--cached"])
-    if len(diff_content) > 8000:
-        diff_content = diff_content[:8000] + "\n... (truncated)"
-
-    commit_prompt = f"""Analyze this git diff and generate a concise commit message.
-
-DIFF STATS:
-{diff}
-
-DIFF CONTENT:
-{diff_content}
-
-Rules:
-- First line: type(scope): description (max 72 chars)
-- Types: feat, fix, refactor, docs, test, chore
-- Be specific about what changed
-- No body needed for simple changes
-
-Return ONLY the commit message, nothing else."""
-
-    print("  -> Generating commit message with AI...")
-    commit_msg = get_ai_response(commit_prompt)
-    if not commit_msg:
-        commit_msg = f"chore: sync changes ({len(changed_files)} files)"
-        print("  [WARN] AI unavailable, using fallback message")
+    if result.success:
+        print("\n" + "=" * 60)
+        print("SYNC SUMMARY")
+        print(f"  Branch: {result.data.get('branch_name')}")
+        print(f"  Commit: {result.data.get('commit_hash')}")
+        print(f"  PR: {result.data.get('pr_url')}")
+        print("=" * 60)
+        return 0
     else:
-        commit_msg = commit_msg.strip('"\'')
-        print(f"  [OK] Commit message: {commit_msg.split(chr(10))[0]}")
-
-    # Step 5: Commit and push
-    print("\n[5/6] Committing and pushing...")
-    run_git(["commit", "-m", commit_msg])
-    print("  [OK] Changes committed")
-    run_git(["push", "-u", "origin", new_branch])
-    print(f"  [OK] Pushed to origin/{new_branch}")
-
-    # Step 6: Create PR
-    print("\n[6/6] Creating pull request...")
-    pr_prompt = f"""Create a pull request description for these changes.
-
-BRANCH: {new_branch} -> {base_branch}
-COMMIT: {commit_msg}
-
-CHANGED FILES:
-{diff}
-
-Format:
-## Summary
-<2-3 bullet points describing the changes>
-
-## Changes
-<list of specific changes>
-
-Return ONLY the PR body markdown, nothing else."""
-
-    pr_body = get_ai_response(pr_prompt)
-    if not pr_body:
-        pr_body = f"## Summary\n- Synced local changes\n\n## Changes\n{diff}"
-
-    pr_title = commit_msg.split("\n")[0]
-    try:
-        pr_url = run_gh(["pr", "create", "--base", base_branch, "--head", new_branch,
-                         "--title", pr_title, "--body", pr_body])
-        print(f"  [OK] PR created: {pr_url}")
-    except RuntimeError as e:
-        print(f"  [WARN] PR creation failed: {e}")
-        print(f"  -> Manual: gh pr create --base {base_branch} --head {new_branch}")
-        run_git(["checkout", base_branch])
+        print(f"\n[ERROR] Sync failed: {result.error}")
+        if result.data.get('branch_name'):
+            print(f"  Branch created: {result.data.get('branch_name')}")
         return 1
-
-    run_git(["checkout", base_branch])
-    print("\n" + "=" * 60)
-    print("[OK] SYNC COMPLETE")
-    print(f"  Branch: {new_branch}")
-    print(f"  PR: {pr_url}")
-    print("=" * 60)
-    return 0
 
 
 # =============================================================================

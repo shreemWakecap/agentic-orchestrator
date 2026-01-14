@@ -321,13 +321,18 @@ class PlanRegistry:
             except json.JSONDecodeError:
                 logger.warning(f"Invalid metadata.json in {plan_dir}")
 
-        # Generate metadata from overview
+        # Generate metadata from plan content
+        # Try plan.md first (new single-file format), then 00_overview.md (legacy format)
+        plan_file = plan_dir / "plan.md"
         overview_file = plan_dir / "00_overview.md"
-        if not overview_file.exists():
-            logger.debug(f"No overview file in {plan_dir}")
-            return None
 
-        content = overview_file.read_text(encoding="utf-8")
+        if plan_file.exists():
+            content = plan_file.read_text(encoding="utf-8")
+        elif overview_file.exists():
+            content = overview_file.read_text(encoding="utf-8")
+        else:
+            logger.debug(f"No plan.md or 00_overview.md in {plan_dir}")
+            return None
         metadata = self._extract_metadata_from_overview(plan_dir, content, status)
 
         # Save generated metadata for future use

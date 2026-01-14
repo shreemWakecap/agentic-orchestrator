@@ -5,8 +5,14 @@ AI-powered software development lifecycle automation using Claude Code.
 ## Quick Start
 
 ```bash
-.\.orchestrator\setup.ps1                    # Setup (one time)
-uv run python .orchestrator/cli.py <command> # Run commands
+# Setup (one time)
+.\.orchestrator\setup.ps1
+
+# Navigate to orchestrator directory
+cd .orchestrator
+
+# Run commands
+uv run cli.py <command>
 ```
 
 ## Commands
@@ -15,9 +21,10 @@ uv run python .orchestrator/cli.py <command> # Run commands
 |---------|-------|-------------|
 | `setup` | `cli.py setup` | Initialize environment and fetch documentation |
 | `plan` | `cli.py plan "Add user auth"` | Create implementation plan from request |
-| `build` | `cli.py build .orchestrator/specs/pending/plan.md` | Execute plan and write code |
-| `review` | `cli.py review .orchestrator/specs/completed/plan.md` | Review completed build for issues |
-| `fix` | `cli.py fix .orchestrator/specs/reviews/review.md` | Auto-fix issues from review |
+| `build` | `cli.py build specs/pending/001_feature-name` | Execute plan folder and write code |
+| `status` | `cli.py status specs/pending/001_feature-name` | Show build progress for a plan |
+| `review` | `cli.py review specs/completed/001_feature-name` | Review completed build for issues |
+| `fix` | `cli.py fix specs/reviews/review-feature.md` | Auto-fix issues from review |
 | `list` | `cli.py list` | List all plans by status |
 | `docs` | `cli.py docs` | Check/refresh AI documentation cache |
 | `experts` | `cli.py experts list` | Manage expert agents |
@@ -32,28 +39,40 @@ uv run python .orchestrator/cli.py <command> # Run commands
 Takes a feature request and creates a detailed implementation plan.
 
 ```bash
-cli.py plan "Add JWT authentication"
-# Output: .orchestrator/specs/pending/jwt-authentication.md
+uv run cli.py plan "Add JWT authentication"
+# Output: specs/pending/001_jwt-authentication/
+#   ├── 00_overview.md       # Plan metadata
+#   ├── 01_context.md        # Codebase analysis (JSON)
+#   ├── 02_architecture.md   # Architecture design (JSON)
+#   ├── 03_implementation.md # Step-by-step plan
+#   └── 04_validation.md     # Validation criteria
 ```
 
-**Process:** Scout codebase → Architect design → Consult experts → Generate plan
+**Process:** Analyze complexity → Scout codebase → Architect design → Create plan → Validate
 
 ### Building
-Executes a plan step-by-step, writing actual code.
+Executes a plan folder step-by-step, writing actual code.
 
 ```bash
-cli.py build .orchestrator/specs/pending/jwt-authentication.md
-# Output: Code changes + plan moved to /completed/
+# Build a plan (pass the FOLDER path, not individual files)
+uv run cli.py build specs/pending/001_jwt-authentication
+
+# Check build status
+uv run cli.py status specs/pending/001_jwt-authentication
+
+# Output: Code changes written to project + plan moved to /completed/
 ```
 
-**Process:** Parse steps → Execute each step → Run tests → Self-review
+**Process:** Parse all .md files in folder → Execute each step → Run tests → Self-review
+
+**Note:** The build command takes the plan **folder** path. All `.md` files inside are read in sorted order (00_overview.md, 01_context.md, etc.) and combined for execution.
 
 ### Reviewing
 Reviews completed work against best practices and documentation.
 
 ```bash
-cli.py review .orchestrator/specs/completed/jwt-authentication.md
-# Output: .orchestrator/specs/reviews/review-jwt-authentication.md
+uv run cli.py review specs/completed/001_jwt-authentication
+# Output: specs/reviews/review-jwt-authentication.md
 ```
 
 **Process:** Detect tech stack → Check compliance → Expert reviews → Generate report
@@ -62,8 +81,8 @@ cli.py review .orchestrator/specs/completed/jwt-authentication.md
 Automatically fixes issues identified in review.
 
 ```bash
-cli.py fix .orchestrator/specs/reviews/review-jwt-authentication.md
-cli.py fix .orchestrator/specs/reviews/review.md --dry-run  # Preview only
+uv run cli.py fix specs/reviews/review-jwt-authentication.md
+uv run cli.py fix specs/reviews/review.md --dry-run  # Preview only
 ```
 
 **Process:** Parse issues → Prioritize by severity → Apply fixes → Verify
@@ -72,7 +91,7 @@ cli.py fix .orchestrator/specs/reviews/review.md --dry-run  # Preview only
 Commits local changes and creates a PR with AI-generated messages.
 
 ```bash
-cli.py sync-remote
+uv run cli.py sync-remote
 # Creates branch, commits, pushes, opens PR - all automatic
 ```
 
@@ -85,16 +104,41 @@ project/
 ├── .orchestrator/
 │   ├── cli.py              # Entry point
 │   ├── setup.ps1           # Setup script
-│   ├── agents/             # AI agent definitions
+│   ├── pyproject.toml      # Python dependencies
+│   ├── agents/             # AI agent definitions (scout, architect, planner, etc.)
 │   ├── specs/              # Plan lifecycle
-│   │   ├── pending/        # New plans
-│   │   ├── in-progress/    # Being built
-│   │   ├── completed/      # Built successfully
-│   │   ├── failed/         # Build failed
-│   │   └── reviews/        # Review reports
+│   │   ├── pending/        # Plans ready to build
+│   │   │   └── 001_feature/  # Each plan is a folder
+│   │   │       ├── 00_overview.md
+│   │   │       ├── 01_context.md
+│   │   │       ├── 02_architecture.md
+│   │   │       ├── 03_implementation.md
+│   │   │       └── 04_validation.md
+│   │   ├── completed/      # Successfully built plans
+│   │   ├── failed/         # Failed builds
+│   │   ├── reviews/        # Review reports
+│   │   └── state/          # Build state tracking (for resume)
 │   ├── docs/               # Cached documentation
 │   └── tests/              # Test suite
 └── src/                    # Your project code
+```
+
+## Plan Lifecycle
+
+```
+plan "Add feature" → specs/pending/001_feature/
+                           ↓
+                    build (execute steps)
+                           ↓
+              ┌────────────┴────────────┐
+              ↓                         ↓
+    specs/completed/001_feature   specs/failed/001_feature
+              ↓                         ↓
+         review                    fix & rebuild
+              ↓
+    specs/reviews/review-feature.md
+              ↓
+         fix (auto-apply)
 ```
 
 ## Requirements

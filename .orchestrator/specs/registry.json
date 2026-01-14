@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "last_scan": "2026-01-14T15:03:12.969106",
+  "plans": {
+    "1": {
+      "path": "pending/001_health-api-endpoint-orchestrator-server",
+      "status": "pending",
+      "request": "Add a /health API endpoint to the orchestrator server (server/app.py). The endpoint should return JSON with status, version, and uptime. Include pytest tests in tests/unit/test_portal.py.",
+      "request_hash": "664a49a1648ca5a0",
+      "keywords": [
+        "health",
+        "api",
+        "endpoint",
+        "orchestrator",
+        "server",
+        "serverapppy",
+        "endpoint",
+        "return",
+        "json",
+        "status",
+        "version",
+        "uptime",
+        "include",
+        "pytest",
+        "tests",
+        "testsunittest_portalpy"
+      ],
+      "features_provided": [
+        "health-feature",
+        "api-feature",
+        "endpoint-feature"
+      ],
+      "files_affected": [
+        "api/*",
+        "routes/*"
+      ],
+      "depends_on": []
+    }
+  },
+  "features_index": {
+    "health-feature": [
+      "1"
+    ],
+    "api-feature": [
+      "1"
+    ],
+    "endpoint-feature": [
+      "1"
+    ]
+  },
+  "files_index": {
+    "api/*": [
+      "1"
+    ],
+    "routes/*": [
+      "1"
+    ]
+  },
+  "stats": {
+    "total_plans": 1,
+    "pending": 1,
+    "in_progress": 0,
+    "completed": 0,
+    "failed": 0
+  }
+}

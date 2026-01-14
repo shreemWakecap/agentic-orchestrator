@@ -34,6 +34,9 @@ from workflows.reviewing import ReviewingWorkflow
 from workflows.fixing import FixingWorkflow
 from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
 
+# Server startup time for health endpoint uptime calculation
+START_TIME = datetime.now()
+
 # FastAPI app
 app = FastAPI(
     title="SDLC Orchestrator",
@@ -166,6 +169,17 @@ async def run_detail(request: Request, run_id: str):
 async def api_hello():
     """Return a simple hello world message for testing."""
     return {"message": "hello world"}
+
+
+@app.get("/api/health")
+async def health_check():
+    """Health check endpoint returning server status, version, and uptime."""
+    uptime_seconds = (datetime.now() - START_TIME).total_seconds()
+    return {
+        "status": "healthy",
+        "version": app.version,
+        "uptime_seconds": round(uptime_seconds, 2)
+    }
 
 
 @app.get("/api/plans")

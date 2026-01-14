@@ -10,10 +10,8 @@ Two modes:
 """
 import json
 import logging
-import os
 import shutil
 import subprocess
-import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -377,28 +375,31 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
 
         return base_prompt + enforcement
 
-    def _build_user_message(self, message: str, context: Optional[str] = None) -> str:
-        """Build the user message with task and optional context."""
+    def _build_user_message(
+        self, message: str, context: Optional[str] = None, include_system: bool = False
+    ) -> str:
+        """
+        Build the user message with task and optional context.
+
+        Args:
+            message: The task/message
+            context: Optional context from previous agents
+            include_system: If True, embed the system prompt in the message
+                           (needed for Windows where command line is limited)
+        """
+        parts = []
+
+        # On Windows, embed system prompt in user message to avoid cmd line limits
+        if include_system:
+            enhanced_prompt = self._build_enhanced_system_prompt(is_retry=False)
+            parts.append(f"## Your Role\n\n{enhanced_prompt}")
+
         if context:
-            return f"## Context\n\n{context}\n\n## Task\n\n{message}"
-        return message
+            parts.append(f"## Context\n\n{context}")
 
-    def _write_prompt_file(self, content: str) -> str:
-        """
-        Write prompt content to a temporary file for safe passing to CLI.
+        parts.append(f"## Task\n\n{message}")
 
-        Returns the path to the temp file.
-        """
-        # Use a temp file to avoid shell escaping issues on Windows
-        fd, path = tempfile.mkstemp(suffix=".txt", prefix="claude_prompt_")
-        try:
-            with os.fdopen(fd, 'w', encoding='utf-8') as f:
-                f.write(content)
-            return path
-        except Exception:
-            os.close(fd)
-            os.unlink(path)
-            raise
+        return "\n\n".join(parts)
 
     def run(
         self,
@@ -445,42 +446,47 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
             try:
                 validated_cwd = _validate_cwd(self.cwd)
 
-                # Build prompts - use stronger version on retry
+                # Build user message with embedded system prompt
+                # (Windows has ~8000 char command line limit, so we embed in message)
                 is_retry = placeholder_retries > 0
-                system_prompt = self._build_enhanced_system_prompt(is_retry=is_retry)
-                user_message = self._build_user_message(message, context)
 
-                # Write system prompt to temp file to avoid escaping issues
-                prompt_file = None
-                try:
-                    prompt_file = self._write_prompt_file(system_prompt)
+                # Build message with system prompt embedded for reliability
+                user_message = self._build_user_message(
+                    message, context, include_system=True
+                )
 
-                    # Read the system prompt from file using shell
-                    # This avoids Windows command line escaping issues
-                    cmd = [
-                        _get_claude_executable(),
-                        "--print",
-                        "--system-prompt", system_prompt,
-                    ]
-
-                    result = subprocess.run(
-                        cmd,
-                        cwd=str(validated_cwd),
-                        capture_output=True,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                        timeout=effective_timeout,
-                        shell=False,
-                        input=user_message,
+                # Add retry emphasis if this is a retry
+                if is_retry:
+                    user_message = (
+                        "IMPORTANT: Your previous response was rejected. "
+                        "You MUST output the structured format NOW.\n\n"
+                        + user_message
                     )
-                finally:
-                    # Clean up temp file
-                    if prompt_file and os.path.exists(prompt_file):
-                        try:
-                            os.unlink(prompt_file)
-                        except OSError:
-                            pass
+
+                # Use short append-system-prompt for output format enforcement
+                # The full agent instructions are embedded in user message
+                short_system = (
+                    "You are a specialized agent. Follow the role instructions in the message exactly. "
+                    "Output ONLY the structured format specified - no greetings, no preamble."
+                )
+
+                cmd = [
+                    _get_claude_executable(),
+                    "--print",
+                    "--append-system-prompt", short_system,
+                ]
+
+                result = subprocess.run(
+                    cmd,
+                    cwd=str(validated_cwd),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=effective_timeout,
+                    shell=False,
+                    input=user_message,
+                )
 
                 if result.returncode != 0:
                     error_msg = result.stderr or f"Exit code: {result.returncode}"
@@ -596,16 +602,30 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
             try:
                 validated_cwd = _validate_cwd(self.cwd)
 
-                # Build prompts
-                system_prompt = self._build_enhanced_system_prompt(is_retry=state.attempt > 0)
-                user_message = self._build_user_message(message, context)
+                # Build user message with embedded system prompt
+                # (Windows has ~8000 char command line limit, so we embed in message)
+                user_message = self._build_user_message(
+                    message, context, include_system=True
+                )
+
+                if state.attempt > 0:
+                    user_message = (
+                        "IMPORTANT: Previous attempt failed. Execute the task now.\n\n"
+                        + user_message
+                    )
+
+                # Use short append-system-prompt for enforcement
+                short_system = (
+                    "You are a specialized agent. Follow the role instructions exactly. "
+                    "Use the tools provided to complete the task."
+                )
 
                 cmd = [
                     _get_claude_executable(),
                     "--permission-mode", "acceptEdits",
                     "--output-format", "json",
                     "--allowedTools", ",".join(tools),
-                    "--system-prompt", system_prompt,
+                    "--append-system-prompt", short_system,
                 ]
 
                 result = subprocess.run(

@@ -47,6 +47,21 @@ class TestServerAppImport:
         assert callable(run_server)
 
 
+class TestHelloEndpoint:
+    """Tests for the hello world API endpoint."""
+
+    def test_api_hello_returns_hello_world(self):
+        """Test that /api/hello returns the expected message."""
+        from fastapi.testclient import TestClient
+        from server.app import app
+
+        client = TestClient(app)
+        response = client.get("/api/hello")
+
+        assert response.status_code == 200
+        assert response.json() == {"message": "hello world"}
+
+
 class TestAPIModels:
     """Test Pydantic models for API requests."""
 

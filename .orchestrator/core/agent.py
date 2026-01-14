@@ -232,11 +232,29 @@ class Agent:
 
         return cls(name=name, system_prompt=system_prompt, cwd=project_root)
 
-    def _build_user_prompt(self, message: str, context: Optional[str] = None) -> str:
-        """Build the user prompt with optional context (system prompt passed separately)."""
+    def _build_full_prompt(self, message: str, context: Optional[str] = None) -> str:
+        """
+        Build the complete prompt with embedded system instructions.
+
+        On Windows, passing complex system prompts via --system-prompt flag causes
+        issues with special characters (|, <, >, quotes, braces) being interpreted
+        by cmd.exe even with shell=False (because claude.CMD is a batch file).
+
+        Solution: Embed the system prompt in the user message and pass via stdin.
+        This avoids all Windows command-line escaping issues.
+        """
+        # Build the user message part
         if context:
-            return f"## Context\n\n{context}\n\n## Task\n\n{message}"
-        return message
+            user_message = f"## Context\n\n{context}\n\n## Task\n\n{message}"
+        else:
+            user_message = message
+
+        # Embed system instructions with clear delimiters
+        return f"""<system-instructions>
+{self.system_prompt}
+</system-instructions>
+
+{user_message}"""
 
     def run(
         self,
@@ -277,14 +295,14 @@ class Agent:
         def execute(state: RetryState) -> AgentResult:
             try:
                 validated_cwd = _validate_cwd(self.cwd)
-                user_prompt = self._build_user_prompt(message, context)
 
-                # Use --system-prompt flag for agent's system prompt
-                # Pass user prompt via stdin to avoid Windows command-line issues with newlines
+                # Build full prompt with embedded system instructions
+                # This avoids Windows command-line escaping issues with --system-prompt
+                full_prompt = self._build_full_prompt(message, context)
+
                 cmd = [
                     _get_claude_executable(),
                     "--print",
-                    "--system-prompt", self.system_prompt,
                 ]
 
                 result = subprocess.run(
@@ -296,7 +314,7 @@ class Agent:
                     errors="replace",
                     timeout=effective_timeout,
                     shell=False,
-                    input=user_prompt,  # Pass prompt via stdin
+                    input=full_prompt,  # Pass everything via stdin
                 )
 
                 if result.returncode != 0:
@@ -387,14 +405,14 @@ class Agent:
         def execute(state: RetryState) -> AgentResult:
             try:
                 validated_cwd = _validate_cwd(self.cwd)
-                user_prompt = self._build_user_prompt(message, context)
 
-                # Use --system-prompt flag for agent's system prompt
-                # Pass user prompt via stdin to avoid Windows command-line issues with newlines
+                # Build full prompt with embedded system instructions
+                # This avoids Windows command-line escaping issues with --system-prompt
+                full_prompt = self._build_full_prompt(message, context)
+
                 cmd = [
                     _get_claude_executable(),
-                    "--system-prompt", self.system_prompt,
-                    "--yes",
+                    "--permission-mode", "acceptEdits",
                     "--output-format", "json",
                     "--allowedTools", ",".join(tools),
                 ]
@@ -408,7 +426,7 @@ class Agent:
                     errors="replace",
                     timeout=effective_timeout,
                     shell=False,
-                    input=user_prompt,  # Pass prompt via stdin
+                    input=full_prompt,  # Pass everything via stdin
                 )
 
                 if result.returncode != 0:

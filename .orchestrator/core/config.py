@@ -45,6 +45,9 @@ class ParallelConfig:
     """Parallelism settings."""
     max_sub_features: int = 3
     max_expert_workers: int = 3
+    max_build_workers: int = 3  # Max parallel builder agents
+    overlap_build_test: bool = True  # Run tests async while building next phase
+    simple_build_parallel: bool = True  # Enable parallelization for simple builds
 
 
 @dataclass(frozen=True)
@@ -152,6 +155,9 @@ class ConfigLoader:
             parallel=ParallelConfig(
                 max_sub_features=parallel_data.get("max_sub_features", 3),
                 max_expert_workers=parallel_data.get("max_expert_workers", 3),
+                max_build_workers=parallel_data.get("max_build_workers", 3),
+                overlap_build_test=parallel_data.get("overlap_build_test", True),
+                simple_build_parallel=parallel_data.get("simple_build_parallel", True),
             ),
             deduplication=DeduplicationConfig(
                 enabled=dedup_data.get("enabled", True),

@@ -44,6 +44,7 @@ A plan file in markdown format with:
           "description": "Create User model with fields",
           "code_hint": "class User with id, email, password_hash",
           "dependencies": [],
+          "parallel_group": null,
           "estimated_complexity": "simple|medium|complex"
         },
         {
@@ -98,8 +99,16 @@ A plan file in markdown format with:
    - Model before controller
    - Schema before migrations
    - Install before use
-6. **Preserve Code Snippets**: Extract code blocks as `code_hint`
-7. **Handle Master Plans**: For master plans, identify sub-feature boundaries
+6. **Extract Parallel Groups**:
+   - `**Parallel:** no` → parallel_group: null (sequential execution)
+   - `**Parallel:** yes` → parallel_group: "auto" (can run with any other "auto" step)
+   - `**Parallel:** group-name` → parallel_group: "group-name" (can run with same group)
+   - If `**Parallel:**` is missing → parallel_group: null (default to sequential)
+7. **Preserve Code Snippets**: Extract code blocks as `code_hint`
+8. **Handle Master Plans**: For master plans, identify sub-feature boundaries
+9. **Auto-detect Parallel Opportunities** (when not explicitly marked):
+   - Steps with same dependencies and different targets may run in parallel
+   - Steps modifying the same file MUST stay sequential (parallel_group: null)
 
 ## Edge Case Handling
 
@@ -160,6 +169,7 @@ If same ID appears twice:
 **Action:** create
 **Target:** src/routes/health.py
 **Dependencies:** none
+**Parallel:** routes
 **Description:** Create health check endpoint
 
 ```python
@@ -172,15 +182,34 @@ async def health_check():
     return {"status": "healthy"}
 ```
 
-#### Step 1.2: modify src/main.py
+#### Step 1.2: create src/routes/version.py
+**Action:** create
+**Target:** src/routes/version.py
+**Dependencies:** none
+**Parallel:** routes
+**Description:** Create version endpoint
+
+```python
+from fastapi import APIRouter
+
+router = APIRouter()
+
+@router.get("/version")
+async def get_version():
+    return {"version": "1.0.0"}
+```
+
+#### Step 1.3: modify src/main.py
 **Action:** modify
 **Target:** src/main.py
-**Dependencies:** Step 1.1
-**Description:** Register health router
+**Dependencies:** Step 1.1, Step 1.2
+**Description:** Register routers
 
 ```python
 from routes.health import router as health_router
+from routes.version import router as version_router
 app.include_router(health_router)
+app.include_router(version_router)
 ```
 
 ### Phase 2: Testing
@@ -188,7 +217,7 @@ app.include_router(health_router)
 #### Step 2.1: create tests/test_health.py
 **Action:** create
 **Target:** tests/test_health.py
-**Dependencies:** Step 1.2
+**Dependencies:** Step 1.3
 **Description:** Add health endpoint test
 
 ```python
@@ -210,13 +239,14 @@ curl http://localhost:8000/health
 {
   "plan_id": "health-check-endpoint",
   "plan_type": "simple",
-  "total_steps": 3,
+  "total_steps": 4,
   "phases": [
     {
       "id": "phase-1",
       "name": "Core Implementation",
       "description": "Main feature code",
-      "can_parallelize": false,
+      "can_parallelize": true,
+      "parallel_groups": [["step-1-1", "step-1-2"], ["step-1-3"]],
       "steps": [
         {
           "id": "step-1-1",
@@ -225,15 +255,27 @@ curl http://localhost:8000/health
           "description": "Create health check endpoint",
           "code_hint": "from fastapi import APIRouter\n\nrouter = APIRouter()\n\n@router.get(\"/health\")\nasync def health_check():\n    return {\"status\": \"healthy\"}",
           "dependencies": [],
+          "parallel_group": "routes",
           "estimated_complexity": "simple"
         },
         {
           "id": "step-1-2",
+          "action": "create",
+          "target": "src/routes/version.py",
+          "description": "Create version endpoint",
+          "code_hint": "from fastapi import APIRouter\n\nrouter = APIRouter()\n\n@router.get(\"/version\")\nasync def get_version():\n    return {\"version\": \"1.0.0\"}",
+          "dependencies": [],
+          "parallel_group": "routes",
+          "estimated_complexity": "simple"
+        },
+        {
+          "id": "step-1-3",
           "action": "modify",
           "target": "src/main.py",
-          "description": "Register health router",
-          "code_hint": "from routes.health import router as health_router\napp.include_router(health_router)",
-          "dependencies": ["step-1-1"],
+          "description": "Register routers",
+          "code_hint": "from routes.health import router as health_router\nfrom routes.version import router as version_router\napp.include_router(health_router)\napp.include_router(version_router)",
+          "dependencies": ["step-1-1", "step-1-2"],
+          "parallel_group": null,
           "estimated_complexity": "simple"
         }
       ]
@@ -250,7 +292,8 @@ curl http://localhost:8000/health
           "target": "tests/test_health.py",
           "description": "Add health endpoint test",
           "code_hint": "def test_health(client):\n    response = client.get(\"/health\")\n    assert response.status_code == 200",
-          "dependencies": ["step-1-2"],
+          "dependencies": ["step-1-3"],
+          "parallel_group": null,
           "estimated_complexity": "simple"
         }
       ]

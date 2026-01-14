@@ -10,8 +10,10 @@ Two modes:
 """
 import json
 import logging
+import os
 import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -34,6 +36,7 @@ def _get_claude_executable() -> str:
         )
     return claude_path
 
+
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
@@ -48,6 +51,65 @@ TRANSIENT_ERRORS = (
     "502",
     "429",
 )
+
+# Expected output markers for each agent type - used to validate responses
+# If an agent's output doesn't contain these markers, it's likely a placeholder
+AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
+    # JSON-output agents (structured data)
+    "scout": ['"project_type"', '"tech_stack"', '"relevant_files"'],
+    "architect": ['"approach"', '"components"', '"data_flow"'],
+    "validator": ['"status"', '"score"', '"checks"'],
+    "parser": ['"phases"', '"steps"', '"plan_id"'],
+    # Markdown-output agents
+    "planner": ["## Implementation Steps", "### Phase", "**Action:**"],
+    "synthesizer": ["## Master Plan", "## Implementation"],
+    "decomposer": ["## Sub-Features", "###"],
+    "analyzer": ["## Complexity", "##"],
+    "fixer": ["## Fix", "##"],
+    "reviewer": ["## Review", "##"],
+    # Agentic agents (use tools, not text output)
+    "builder": [],
+    "tester": [],
+    "integrator": [],
+    # Expert agents (JSON output for code review)
+    "python": ['"findings"', '"summary"', '"score"'],
+}
+
+# Placeholder patterns that indicate the agent didn't follow its role
+PLACEHOLDER_PATTERNS = [
+    # Generic greetings
+    "I'm ready to help you",
+    "I'll help you with software engineering",
+    "How can I help you",
+    "What can I help",
+    "Hello! How can I help",
+    "Hi! How can I",
+    "I'd be happy to help",
+    # Confusion indicators
+    "What would you like me to",
+    "What would you like to work on",
+    "Would you like me to",
+    "I understand you've sent",
+    "I understand. I'm ready to help",
+    "I can see you're on the",
+    "I can see you're working",
+    "Let me know what",
+    "Please let me know",
+    # Empty message indicators
+    "I see you've sent",
+    "I see you've started",
+    "you've sent an empty message",
+    # Context confusion
+    "working in the",
+    "in your git working tree",
+    "on the developmet branch",
+    "on the main branch",
+    # Meta-commentary
+    "I'll analyze",
+    "I'll start by",
+    "Let me first",
+    "First, I'll",
+]
 
 
 def _is_transient_error(error: str) -> bool:
@@ -73,11 +135,49 @@ def _safe_get(data: dict | list, key: str, default=None):
     return default
 
 
+def _is_placeholder_response(content: str, agent_name: str) -> tuple[bool, str]:
+    """
+    Check if the response is a placeholder/greeting instead of actual agent output.
+
+    Returns:
+        Tuple of (is_placeholder, reason)
+    """
+    if not content:
+        return True, "Empty response"
+
+    content_stripped = content.strip()
+
+    # Too short to be useful
+    if len(content_stripped) < 50:
+        return True, f"Response too short ({len(content_stripped)} chars)"
+
+    content_lower = content_stripped.lower()
+
+    # Check for placeholder patterns
+    for pattern in PLACEHOLDER_PATTERNS:
+        if pattern.lower() in content_lower:
+            return True, f"Contains placeholder pattern: '{pattern}'"
+
+    # Check for expected output markers
+    markers = AGENT_OUTPUT_MARKERS.get(agent_name, [])
+    if markers:
+        found_marker = False
+        for marker in markers:
+            if marker.lower() in content_lower:
+                found_marker = True
+                break
+        if not found_marker:
+            return True, f"Missing expected markers for {agent_name}: {markers}"
+
+    return False, ""
+
+
 @dataclass
 class RetryState:
     """Tracks state across retry attempts."""
     attempt: int = 0
     last_error: Optional[str] = None
+    placeholder_retries: int = 0  # Track placeholder-specific retries
 
 
 def _run_with_retry(
@@ -152,6 +252,13 @@ class _NonTransientError(Exception):
     pass
 
 
+class _PlaceholderError(Exception):
+    """Internal: agent returned placeholder instead of real output."""
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(reason)
+
+
 @dataclass
 class AgentResult:
     """Result from an agent execution."""
@@ -189,6 +296,9 @@ class Agent:
         "Glob", "Grep", "Bash",
         "TodoRead", "TodoWrite"
     ]
+
+    # Maximum placeholder retries before giving up
+    MAX_PLACEHOLDER_RETRIES = 2
 
     def __init__(
         self,
@@ -232,36 +342,63 @@ class Agent:
 
         return cls(name=name, system_prompt=system_prompt, cwd=project_root)
 
-    def _build_user_prompt(self, message: str, context: Optional[str] = None) -> str:
+    def _build_enhanced_system_prompt(self, is_retry: bool = False) -> str:
         """
-        Build the complete prompt with embedded role instructions.
+        Build an enhanced system prompt with strict output format enforcement.
 
-        We embed the system prompt at the START of the message with explicit
-        instructions to follow the role. This avoids Windows CLI escaping
-        issues with --system-prompt flag.
-
-        The format uses imperative instructions that Claude WILL follow.
+        Args:
+            is_retry: If True, add extra-strict formatting instructions
         """
-        # Role block with STRONG instructions to follow it
-        role_block = f"""# YOUR ROLE AND INSTRUCTIONS
+        base_prompt = self.system_prompt
 
-{self.system_prompt}
+        # Add strict output format enforcement
+        enforcement = """
 
-# CRITICAL RULES
-- You MUST follow the role and output format described above
-- Do NOT greet the user or ask clarifying questions
-- Do NOT say "How can I help you?" or similar phrases
-- Do NOT ask what the user wants - the task is provided below
-- IMMEDIATELY perform the task and output the required format
-- Output ONLY what your role specifies - nothing else"""
+## CRITICAL INSTRUCTIONS
 
-        # Build user message part
+You are operating as a specialized agent in an automated orchestration system.
+Your output will be parsed programmatically - you MUST follow the exact output format specified above.
+
+REQUIREMENTS:
+1. Start your response with the first expected section header (e.g., "## Project Overview" or "## Implementation Steps")
+2. Do NOT include any greeting, introduction, or preamble
+3. Do NOT ask clarifying questions - work with what you're given
+4. Do NOT say "I'll help you" or similar phrases
+5. Do NOT reference the working directory, git branch, or file system state
+6. Output ONLY the structured format specified in your role - nothing else
+7. Begin immediately with the content in the required format
+"""
+
+        if is_retry:
+            enforcement += """
+IMPORTANT: Your previous response was rejected because it didn't follow the format.
+This is a RETRY - you MUST output the structured format NOW, starting with the first header.
+"""
+
+        return base_prompt + enforcement
+
+    def _build_user_message(self, message: str, context: Optional[str] = None) -> str:
+        """Build the user message with task and optional context."""
         if context:
-            user_block = f"# CONTEXT\n\n{context}\n\n# YOUR TASK\n\n{message}"
-        else:
-            user_block = f"# YOUR TASK\n\n{message}"
+            return f"## Context\n\n{context}\n\n## Task\n\n{message}"
+        return message
 
-        return f"{role_block}\n\n{user_block}"
+    def _write_prompt_file(self, content: str) -> str:
+        """
+        Write prompt content to a temporary file for safe passing to CLI.
+
+        Returns the path to the temp file.
+        """
+        # Use a temp file to avoid shell escaping issues on Windows
+        fd, path = tempfile.mkstemp(suffix=".txt", prefix="claude_prompt_")
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                f.write(content)
+            return path
+        except Exception:
+            os.close(fd)
+            os.unlink(path)
+            raise
 
     def run(
         self,
@@ -299,30 +436,51 @@ class Agent:
         )
         effective_timeout = timeout or self._config.timeouts.print_mode
 
+        # Track placeholder retries separately
+        placeholder_retries = 0
+
         def execute(state: RetryState) -> AgentResult:
+            nonlocal placeholder_retries
+
             try:
                 validated_cwd = _validate_cwd(self.cwd)
 
-                # Build complete prompt with embedded role instructions
-                # This avoids Windows escaping issues with --system-prompt flag
-                full_prompt = self._build_user_prompt(message, context)
+                # Build prompts - use stronger version on retry
+                is_retry = placeholder_retries > 0
+                system_prompt = self._build_enhanced_system_prompt(is_retry=is_retry)
+                user_message = self._build_user_message(message, context)
 
-                cmd = [
-                    _get_claude_executable(),
-                    "--print",
-                ]
+                # Write system prompt to temp file to avoid escaping issues
+                prompt_file = None
+                try:
+                    prompt_file = self._write_prompt_file(system_prompt)
 
-                result = subprocess.run(
-                    cmd,
-                    cwd=str(validated_cwd),
-                    capture_output=True,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                    timeout=effective_timeout,
-                    shell=False,
-                    input=full_prompt,  # Role + context + task all in stdin
-                )
+                    # Read the system prompt from file using shell
+                    # This avoids Windows command line escaping issues
+                    cmd = [
+                        _get_claude_executable(),
+                        "--print",
+                        "--system-prompt", system_prompt,
+                    ]
+
+                    result = subprocess.run(
+                        cmd,
+                        cwd=str(validated_cwd),
+                        capture_output=True,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                        timeout=effective_timeout,
+                        shell=False,
+                        input=user_message,
+                    )
+                finally:
+                    # Clean up temp file
+                    if prompt_file and os.path.exists(prompt_file):
+                        try:
+                            os.unlink(prompt_file)
+                        except OSError:
+                            pass
 
                 if result.returncode != 0:
                     error_msg = result.stderr or f"Exit code: {result.returncode}"
@@ -335,8 +493,33 @@ class Agent:
                         error=error_msg
                     )
 
+                content = result.stdout.strip()
+
+                # Validate response isn't a placeholder
+                is_placeholder, reason = _is_placeholder_response(content, self.name)
+                if is_placeholder:
+                    placeholder_retries += 1
+                    if placeholder_retries <= self.MAX_PLACEHOLDER_RETRIES:
+                        logger.warning(
+                            f"Agent {self.name}: Placeholder response detected ({reason}). "
+                            f"Retry {placeholder_retries}/{self.MAX_PLACEHOLDER_RETRIES}..."
+                        )
+                        raise _TransientError(f"Placeholder response: {reason}")
+                    else:
+                        # Exhausted placeholder retries - return what we got with warning
+                        logger.error(
+                            f"Agent {self.name}: Still getting placeholder after {placeholder_retries} retries. "
+                            f"Returning response anyway."
+                        )
+                        return AgentResult(
+                            content=content,
+                            agent_name=self.name,
+                            success=True,  # Mark as success but content may be bad
+                            error=f"Warning: Response may be placeholder ({reason})"
+                        )
+
                 return AgentResult(
-                    content=result.stdout.strip(),
+                    content=content,
                     agent_name=self.name,
                     success=True,
                 )
@@ -413,15 +596,16 @@ class Agent:
             try:
                 validated_cwd = _validate_cwd(self.cwd)
 
-                # Build complete prompt with embedded role instructions
-                # This avoids Windows escaping issues with --system-prompt flag
-                full_prompt = self._build_user_prompt(message, context)
+                # Build prompts
+                system_prompt = self._build_enhanced_system_prompt(is_retry=state.attempt > 0)
+                user_message = self._build_user_message(message, context)
 
                 cmd = [
                     _get_claude_executable(),
                     "--permission-mode", "acceptEdits",
                     "--output-format", "json",
                     "--allowedTools", ",".join(tools),
+                    "--system-prompt", system_prompt,
                 ]
 
                 result = subprocess.run(
@@ -433,7 +617,7 @@ class Agent:
                     errors="replace",
                     timeout=effective_timeout,
                     shell=False,
-                    input=full_prompt,  # Role + context + task all in stdin
+                    input=user_message,
                 )
 
                 if result.returncode != 0:
@@ -539,7 +723,14 @@ class Agent:
                 if isinstance(stats, dict):
                     tokens_used = _safe_get(stats, "total_tokens", 0) or 0
 
-            # Extract file operations from tool calls
+            # Also check for costUSD field and estimate tokens from it
+            if tokens_used == 0:
+                cost_usd = _safe_get(data, "costUSD", 0) or 0
+                if cost_usd > 0:
+                    # Rough estimate: $0.015 per 1K tokens average
+                    tokens_used = int(cost_usd / 0.000015)
+
+            # Extract file operations from tool calls - check multiple locations
             messages = _safe_get(data, "messages", [])
             if not isinstance(messages, list):
                 logger.debug(f"Agent {self.name}: 'messages' is not a list: {type(messages)}")
@@ -549,30 +740,20 @@ class Agent:
                 if not isinstance(msg, dict):
                     continue
 
-                if _safe_get(msg, "type") != "tool_use":
-                    continue
+                # Check for tool_use type
+                if _safe_get(msg, "type") == "tool_use":
+                    tool_name = _safe_get(msg, "name", "")
+                    tool_input = _safe_get(msg, "input", {})
+                    self._extract_file_ops(tool_name, tool_input, files_created, files_modified, commands_run)
 
-                tool_name = _safe_get(msg, "name", "")
-                tool_input = _safe_get(msg, "input", {})
-
-                if not isinstance(tool_input, dict):
-                    logger.debug(
-                        f"Agent {self.name}: tool_input is not a dict for {tool_name}: {type(tool_input)}"
-                    )
-                    continue
-
-                if tool_name == "Write":
-                    file_path = _safe_get(tool_input, "file_path", "")
-                    if file_path:
-                        files_created.append(file_path)
-                elif tool_name in ("Edit", "MultiEdit"):
-                    file_path = _safe_get(tool_input, "file_path", "")
-                    if file_path:
-                        files_modified.append(file_path)
-                elif tool_name == "Bash":
-                    command = _safe_get(tool_input, "command", "")
-                    if command:
-                        commands_run.append(command)
+                # Also check for nested content with tool_use
+                msg_content = _safe_get(msg, "content", [])
+                if isinstance(msg_content, list):
+                    for item in msg_content:
+                        if isinstance(item, dict) and _safe_get(item, "type") == "tool_use":
+                            tool_name = _safe_get(item, "name", "")
+                            tool_input = _safe_get(item, "input", {})
+                            self._extract_file_ops(tool_name, tool_input, files_created, files_modified, commands_run)
 
             return (True, content, files_created, files_modified, commands_run, tokens_used)
 
@@ -582,6 +763,31 @@ class Agent:
         except Exception as e:
             logger.warning(f"Agent {self.name}: Unexpected error parsing output: {e}")
             return (False, output, [], [], [], 0)
+
+    def _extract_file_ops(
+        self,
+        tool_name: str,
+        tool_input: dict,
+        files_created: list[str],
+        files_modified: list[str],
+        commands_run: list[str],
+    ) -> None:
+        """Extract file operations from a tool call."""
+        if not isinstance(tool_input, dict):
+            return
+
+        if tool_name == "Write":
+            file_path = _safe_get(tool_input, "file_path", "")
+            if file_path and file_path not in files_created:
+                files_created.append(file_path)
+        elif tool_name in ("Edit", "MultiEdit"):
+            file_path = _safe_get(tool_input, "file_path", "")
+            if file_path and file_path not in files_modified:
+                files_modified.append(file_path)
+        elif tool_name == "Bash":
+            command = _safe_get(tool_input, "command", "")
+            if command and command not in commands_run:
+                commands_run.append(command)
 
     def __repr__(self) -> str:
         return f"Agent(name={self.name!r}, agentic={self.name in self.AGENTIC_AGENTS})"

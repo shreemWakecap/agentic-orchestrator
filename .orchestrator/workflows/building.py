@@ -239,12 +239,53 @@ class BuildingWorkflow(Workflow):
             except FileNotFoundError:
                 self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
 
+    def _verify_file_creation(self, files_affected: list[str], action: str) -> tuple[bool, str]:
+        """
+        Verify that files were actually created/modified by the builder.
+
+        Args:
+            files_affected: List of file paths that should have been affected
+            action: The action type (create, modify, etc.)
+
+        Returns:
+            Tuple of (success, error_message)
+        """
+        if not files_affected:
+            return True, ""  # No files to verify
+
+        missing_files = []
+        empty_files = []
+
+        for file_path in files_affected:
+            # Handle both absolute and relative paths
+            if Path(file_path).is_absolute():
+                full_path = Path(file_path)
+            else:
+                full_path = self.project_root / file_path
+
+            if action in ("create", "created"):
+                if not full_path.exists():
+                    missing_files.append(file_path)
+                elif full_path.stat().st_size == 0:
+                    empty_files.append(file_path)
+            elif action in ("modify", "modified"):
+                if not full_path.exists():
+                    missing_files.append(file_path)
+
+        errors = []
+        if missing_files:
+            errors.append(f"Files not created: {', '.join(missing_files)}")
+        if empty_files:
+            errors.append(f"Files are empty: {', '.join(empty_files)}")
+
+        if errors:
+            return False, "; ".join(errors)
+        return True, ""
+
     def _is_placeholder_response(self, content: str) -> bool:
         """
-        Detect if agent returned a placeholder/greeting instead of actual content.
-
-        This catches cases where the agent system prompt wasn't properly applied
-        and Claude returns generic greeting responses.
+        DEPRECATED: Placeholder detection is now handled in agent.py.
+        Kept for backwards compatibility.
         """
         if not content or len(content.strip()) < 50:
             return True
@@ -284,7 +325,10 @@ class BuildingWorkflow(Workflow):
 
     def _validate_agent_response(self, agent_name: str, result) -> tuple[bool, str]:
         """
-        Validate that an agent response contains actual content, not a placeholder.
+        Validate that an agent response is successful and contains content.
+
+        Note: The agent module now handles placeholder detection and retries internally.
+        This method primarily checks for explicit failures.
 
         Args:
             agent_name: Name of the agent for error messages
@@ -299,11 +343,12 @@ class BuildingWorkflow(Workflow):
         if not result.content or len(result.content.strip()) < 50:
             return False, f"{agent_name} returned empty or too short response"
 
-        if self._is_placeholder_response(result.content):
+        # Check if agent flagged this as a potential placeholder (warning in error field)
+        if result.error and "placeholder" in result.error.lower():
+            # Agent already retried and couldn't get good output - fail
             return False, (
-                f"{agent_name} returned a generic greeting instead of actual content. "
-                "This usually means the agent's system prompt wasn't properly applied. "
-                "Please check the Claude CLI configuration."
+                f"{agent_name} returned a placeholder response after retries. "
+                f"Details: {result.error}"
             )
 
         return True, ""
@@ -445,6 +490,50 @@ class BuildingWorkflow(Workflow):
         except json.JSONDecodeError:
             return {}
 
+    def _validate_parsed_structure(self, parsed_data: dict) -> tuple[bool, str]:
+        """
+        Validate that parser output has the expected structure.
+
+        Args:
+            parsed_data: The parsed JSON from the parser agent
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not parsed_data:
+            return False, "Parser returned empty or invalid JSON"
+
+        if not isinstance(parsed_data, dict):
+            return False, f"Parser returned {type(parsed_data).__name__} instead of dict"
+
+        # Check for phases
+        phases = parsed_data.get("phases", [])
+        if not isinstance(phases, list):
+            return False, "Parser 'phases' field is not a list"
+
+        if not phases:
+            return False, "Parser returned no phases in the plan"
+
+        # Validate each phase structure
+        for i, phase in enumerate(phases):
+            if not isinstance(phase, dict):
+                return False, f"Phase {i} is not a dict"
+
+            steps = phase.get("steps", [])
+            if not isinstance(steps, list):
+                return False, f"Phase {i} 'steps' is not a list"
+
+            # Validate each step structure
+            for j, step in enumerate(steps):
+                if not isinstance(step, dict):
+                    return False, f"Phase {i} step {j} is not a dict"
+
+                # Must have at least action and target or description
+                if not step.get("action") and not step.get("description"):
+                    return False, f"Phase {i} step {j} has no action or description"
+
+        return True, ""
+
     def _get_relevant_context(self, step: BuildStep) -> str:
         """Get relevant file context for a build step."""
         context_parts = []
@@ -532,6 +621,20 @@ After completing, summarize what you did.""",
             action_taken = "created"
         elif result.files_modified:
             action_taken = "modified"
+
+        # Verify files were actually created/modified
+        if files_affected and action_taken in ("create", "created", "modify", "modified"):
+            verified, verify_error = self._verify_file_creation(files_affected, action_taken)
+            if not verified:
+                return StepResult(
+                    step_id=step.id,
+                    status="failed",
+                    action_taken=action_taken,
+                    target=step.target,
+                    summary=f"Builder reported success but verification failed: {verify_error}",
+                    files_affected=files_affected,
+                    error=f"File verification failed: {verify_error}"
+                )
 
         return StepResult(
             step_id=step.id,
@@ -662,41 +765,105 @@ After completing, summarize what you did.""",
             }
         )
 
+    def _resolve_step_dependencies(self, steps: list[BuildStep]) -> list[list[BuildStep]]:
+        """
+        Sort steps into execution waves based on dependencies.
+
+        Returns list of waves - steps in each wave can run in parallel,
+        but waves must execute sequentially.
+        """
+        if not steps:
+            return []
+
+        # Build dependency graph
+        step_map = {s.id: s for s in steps}
+        completed = set(self.build_state.completed_steps)
+        remaining = {s.id for s in steps if s.id not in completed}
+
+        waves: list[list[BuildStep]] = []
+
+        # Keep resolving until all steps are scheduled
+        max_iterations = len(steps) + 1
+        for _ in range(max_iterations):
+            if not remaining:
+                break
+
+            # Find steps whose dependencies are all satisfied
+            ready = []
+            for step_id in list(remaining):
+                step = step_map[step_id]
+                deps = set(step.dependencies)
+                # Dependencies satisfied if they're completed or not in our step list
+                if deps.issubset(completed | (set(step_map.keys()) - remaining)):
+                    ready.append(step)
+
+            if not ready:
+                # Circular dependency or unresolvable - just run remaining sequentially
+                for step_id in remaining:
+                    waves.append([step_map[step_id]])
+                break
+
+            waves.append(ready)
+            for step in ready:
+                remaining.discard(step.id)
+                completed.add(step.id)
+
+        return waves
+
     def _build_phase_parallel(self, phase: BuildPhase, phase_context: str) -> list[StepResult]:
-        """Build steps in a phase with parallelization."""
+        """Build steps in a phase with parallelization and dependency resolution."""
         results = []
 
-        # Group steps for parallel execution
-        if phase.parallel_groups:
-            groups = phase.parallel_groups
+        from core.symbols import CHECK, CROSS
+
+        # First, resolve dependencies to get execution waves
+        if any(s.dependencies for s in phase.steps):
+            # Steps have explicit dependencies - resolve them
+            waves = self._resolve_step_dependencies(phase.steps)
+        elif phase.parallel_groups:
+            # Use explicit parallel groups as waves
+            waves = []
+            for group in phase.parallel_groups:
+                group_steps = [s for s in phase.steps if s.id in group]
+                if group_steps:
+                    waves.append(group_steps)
         else:
-            # Default: all steps can run in parallel
-            groups = [[s.id for s in phase.steps]]
+            # Default: all steps in single wave (can run in parallel)
+            waves = [phase.steps]
 
-        for group in groups:
-            group_steps = [s for s in phase.steps if s.id in group]
+        for wave_idx, wave in enumerate(waves):
+            # Filter out already completed steps
+            pending_steps = [s for s in wave if s.id not in self.build_state.completed_steps]
 
-            if len(group_steps) <= 1:
+            if not pending_steps:
+                continue
+
+            if len(pending_steps) == 1:
                 # Sequential for single step
-                for step in group_steps:
-                    if step.id not in self.build_state.completed_steps:
-                        results.append(self._execute_step(step, phase_context))
+                step = pending_steps[0]
+                result = self._execute_step(step, phase_context)
+                results.append(result)
+                if result.status == "completed":
+                    self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                else:
+                    self.console.print(f"    [red]{CROSS}[/red] {step.id}: {result.error or 'Failed'}")
             else:
-                # Parallel execution
+                # Parallel execution within wave
                 with ThreadPoolExecutor(max_workers=self.max_parallel) as executor:
                     futures = {
                         executor.submit(self._execute_step, step, phase_context): step
-                        for step in group_steps
-                        if step.id not in self.build_state.completed_steps
+                        for step in pending_steps
                     }
 
-                    from core.symbols import CHECK, CROSS
                     for future in as_completed(futures):
                         step = futures[future]
                         try:
                             result = future.result()
                             results.append(result)
-                            self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                            if result.status == "completed":
+                                self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                            else:
+                                self.console.print(f"    [red]{CROSS}[/red] {step.id}: {result.error or 'Failed'}")
                         except Exception as e:
                             results.append(StepResult(
                                 step_id=step.id,
@@ -999,6 +1166,14 @@ Provide a quality assessment.""",
             return WorkflowResult(success=False, error=error)
 
         parsed_data = self._parse_json_from_response(parser_result.content)
+
+        # Validate parser output structure
+        valid, error = self._validate_parsed_structure(parsed_data)
+        if not valid:
+            self.build_state.status = "failed"
+            self.build_state.last_error = error
+            self._save_state(plan_path)
+            return WorkflowResult(success=False, error=error)
 
         # Build ParsedPlan from response
         phases = []

@@ -151,3 +151,13 @@ plan "Add feature" → specs/pending/001_feature/
 ## License
 
 MIT
+uv run cli.py plan "Extract inline JavaScript from server/templates/*.html into separate .js files in server/static/js/. Add Jest for testing. Create package.json with jest dependency, configure Jest, and add unit tests for extracted JS functions."
+
+
+uv run cli.py plan "Add visual regression testing using Percy.io for the orchestrator web UI. Integrate Percy with the existing Playwright tests (or create new ones). Configure Percy in CI, add percy.yml config, and capture snapshots of key pages: plan list, plan detail, and build progress."
+
+
+uv run cli.py plan "Refactor server/app.py to use dependency injection for better testability. Extract hard-coded dependencies (file paths, plan registry) into injectable services. Create a services/ module with interfaces. Update tests to use mock services."
+
+
+uv run cli.py plan "Create a comprehensive E2E test suite for the orchestrator. Use Playwright to test: (1) full planning workflow - create plan from request, (2) build workflow - execute plan and verify files created, (3) review workflow - review built code. Structure tests in tests/e2e/ with fixtures for test data."

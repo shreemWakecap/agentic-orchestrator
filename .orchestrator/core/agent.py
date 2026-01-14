@@ -58,6 +58,7 @@ AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
     "architect": ['"approach"', '"components"', '"data_flow"'],
     "validator": ['"status"', '"score"', '"checks"'],
     "parser": ['"phases"', '"steps"', '"plan_id"'],
+    "syncer": ['"commit_message"', '"pr_description"'],
     # Markdown-output agents
     "planner": ["## Implementation Steps", "### Phase", "**Action:**"],
     "synthesizer": ["## Master Plan", "## Implementation"],

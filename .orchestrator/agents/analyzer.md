@@ -29,6 +29,29 @@ Decompose if:
 - Touches > 4 different system layers
 - Has independent sub-features that can be planned separately
 
+## Adaptive Output Configuration
+
+Based on your complexity analysis, determine the appropriate output format and agent depth:
+
+### Output Format
+- **minimal**: Simple tasks (1-3 steps, 1-2 files, low risk) - single implementation.md file
+- **standard**: Medium tasks (4-8 steps, 3-5 files, moderate deps) - overview + implementation + validation
+- **full**: Complex/massive tasks (9+ steps, 6+ files, cross-module) - complete 5-file structure
+
+### Agent Depth
+- **brief**: Minimal context gathering, direct steps, skip optional analysis
+- **moderate**: Focused context, essential architecture, structured steps
+- **thorough**: Full context exploration, detailed architecture, phased implementation
+
+## Decision Matrix
+
+| Complexity | Steps | Files | Cross-Module | Risk   | Output Format | Agent Depth |
+|------------|-------|-------|--------------|--------|---------------|-------------|
+| simple     | 1-3   | 1-2   | No           | Low    | minimal       | brief       |
+| medium     | 4-8   | 3-5   | Maybe        | Medium | standard      | moderate    |
+| complex    | 9-15  | 6-10  | Yes          | High   | full          | thorough    |
+| massive    | 15+   | 10+   | Yes          | High   | full          | thorough    |
+
 ## Output Format
 
 ```json
@@ -45,7 +68,16 @@ Decompose if:
   "dependencies": [
     {"from": "Feature 1", "to": "Feature 2", "reason": "why"}
   ],
-  "strategy": "single_pass|decompose_sequential|decompose_parallel"
+  "strategy": "single_pass|decompose_sequential|decompose_parallel",
+  "factors": {
+    "estimated_steps": 10,
+    "files_affected": 15,
+    "cross_module": true,
+    "dependencies_external": 2,
+    "risk_level": "low|medium|high"
+  },
+  "output_format": "minimal|standard|full",
+  "agent_depth": "brief|moderate|thorough"
 }
 ```
 

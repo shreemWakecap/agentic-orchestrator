@@ -151,10 +151,6 @@ plan "Add feature" → specs/pending/001_feature/
 ## License
 
 MIT
-
-
-
-
 uv run cli.py plan "Extract inline JavaScript from server/templates/*.html into separate .js files in server/static/js/. Add Jest for testing. Create package.json with jest dependency, configure Jest, and add unit tests for extracted JS functions."
 
 

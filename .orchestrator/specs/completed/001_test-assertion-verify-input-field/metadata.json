@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "1",
+  "plan_name": "test-assertion-verify-input-field",
+  "request": "Add a test assertion to verify input field visibility in the existing test suite. The test should check that form inputs are visible and interactable before attempting to fill them. Add to tests/unit/ following the existing pytest patterns.",
+  "request_hash": "d2e3b99601214b60",
+  "keywords": [
+    "test",
+    "assertion",
+    "verify",
+    "input",
+    "field",
+    "visibility",
+    "existing",
+    "test",
+    "suite",
+    "test",
+    "check",
+    "form",
+    "inputs",
+    "visible",
+    "interactable",
+    "before",
+    "attempting",
+    "fill",
+    "them",
+    "testsunit",
+    "following",
+    "existing",
+    "pytest",
+    "patterns"
+  ],
+  "features_provided": [
+    "test-feature",
+    "assertion-feature",
+    "verify-feature"
+  ],
+  "features_required": [],
+  "files_affected": [
+    "tests/*"
+  ],
+  "modules_touched": [],
+  "depends_on": [],
+  "blocked_by": [],
+  "status": "pending",
+  "complexity": "simple",
+  "created_at": "2026-01-14T18:01:37.993290",
+  "updated_at": "2026-01-14T18:01:37.993290",
+  "similarity_scores": {},
+  "output_format": "minimal",
+  "agent_depth": "brief",
+  "factors": {
+    "estimated_steps": 3,
+    "files_affected": 1,
+    "cross_module": false,
+    "dependencies_external": 0,
+    "risk_level": "low"
+  }
+}

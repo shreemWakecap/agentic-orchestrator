@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "2",
+  "plan_name": "playwright-e2e-tests-critical-user",
+  "request": "Add Playwright E2E tests for critical user flows in the orchestrator web UI. Cover: (1) viewing plan list, (2) viewing plan details, (3) starting a build. Create tests/e2e/ directory, add playwright.config.ts, and implement tests using @playwright/test.",
+  "request_hash": "32b6ff2d7c2fcb51",
+  "keywords": [
+    "playwright",
+    "e2e",
+    "tests",
+    "critical",
+    "user",
+    "flows",
+    "orchestrator",
+    "web",
+    "cover",
+    "viewing",
+    "plan",
+    "list",
+    "viewing",
+    "plan",
+    "details",
+    "starting",
+    "testse2e",
+    "directory",
+    "playwrightconfigts",
+    "tests",
+    "using",
+    "playwrighttest"
+  ],
+  "features_provided": [
+    "playwright-feature",
+    "e2e-feature",
+    "tests-feature"
+  ],
+  "features_required": [],
+  "files_affected": [
+    "tests/e2e/*",
+    "playwright.config.*"
+  ],
+  "modules_touched": [],
+  "depends_on": [],
+  "blocked_by": [],
+  "status": "pending",
+  "complexity": "medium",
+  "created_at": "2026-01-14T18:25:42.879366",
+  "updated_at": "2026-01-14T18:25:42.879366",
+  "similarity_scores": {},
+  "output_format": "standard",
+  "agent_depth": "moderate",
+  "factors": {
+    "estimated_steps": 6,
+    "files_affected": 5,
+    "cross_module": false,
+    "dependencies_external": 1,
+    "risk_level": "low"
+  }
+}

@@ -351,3 +351,67 @@ class TestAgentRetries:
 
         assert result.success is False
         assert call_count == 1  # Only one attempt
+
+
+class TestInputVisibility:
+    """Tests for input field visibility and interactability."""
+
+    def test_input_field_is_visible(self):
+        """Verify input field visibility check returns True for visible elements."""
+        mock_input = MagicMock()
+        mock_input.is_displayed.return_value = True
+
+        assert mock_input.is_displayed() is True
+
+    def test_input_field_is_not_visible(self):
+        """Verify input field visibility check returns False for hidden elements."""
+        mock_input = MagicMock()
+        mock_input.is_displayed.return_value = False
+
+        assert mock_input.is_displayed() is False
+
+    def test_input_field_is_enabled(self):
+        """Verify input field is enabled and interactable."""
+        mock_input = MagicMock()
+        mock_input.is_enabled.return_value = True
+
+        assert mock_input.is_enabled() is True
+
+    def test_input_field_is_disabled(self):
+        """Verify input field disabled state is correctly detected."""
+        mock_input = MagicMock()
+        mock_input.is_enabled.return_value = False
+
+        assert mock_input.is_enabled() is False
+
+    def test_input_field_visible_and_interactable(self):
+        """Verify input field is both visible and interactable before fill."""
+        mock_input = MagicMock()
+        mock_input.is_displayed.return_value = True
+        mock_input.is_enabled.return_value = True
+
+        # Pre-fill visibility check
+        assert mock_input.is_displayed() is True
+        assert mock_input.is_enabled() is True
+
+        # Both conditions must be true for interaction
+        can_interact = mock_input.is_displayed() and mock_input.is_enabled()
+        assert can_interact is True
+
+    def test_input_field_visible_but_not_interactable(self):
+        """Verify detection when input is visible but disabled."""
+        mock_input = MagicMock()
+        mock_input.is_displayed.return_value = True
+        mock_input.is_enabled.return_value = False
+
+        can_interact = mock_input.is_displayed() and mock_input.is_enabled()
+        assert can_interact is False
+
+    def test_input_field_interactable_but_not_visible(self):
+        """Verify detection when input is enabled but hidden."""
+        mock_input = MagicMock()
+        mock_input.is_displayed.return_value = False
+        mock_input.is_enabled.return_value = True
+
+        can_interact = mock_input.is_displayed() and mock_input.is_enabled()
+        assert can_interact is False

@@ -173,14 +173,28 @@ def cmd_fix(args):
 # =============================================================================
 
 def cmd_list():
-    """List all plans."""
+    """List all plans with their build status."""
+    import json
+
     print("SDLC Plans\n" + "=" * 50)
 
     colors = {
-        "pending": "\033[33m", "in-progress": "\033[36m",
+        "pending": "\033[33m",
         "completed": "\033[32m", "failed": "\033[31m",
         "reviews": "\033[35m", "fixes": "\033[34m"
     }
+
+    # Load state files for progress info
+    state_dir = SPECS_DIR / "state"
+    states = {}
+    if state_dir.exists():
+        for state_file in state_dir.glob("*.state.json"):
+            try:
+                data = json.loads(state_file.read_text(encoding="utf-8"))
+                plan_id = state_file.stem.replace(".state", "")
+                states[plan_id] = data
+            except Exception:
+                pass
 
     for status in colors:
         status_dir = SPECS_DIR / status
@@ -199,11 +213,165 @@ def cmd_list():
             print(f"\n{colors[status]}{status.upper()}\033[0m ({len(plans)})")
             for p in sorted(plans, key=lambda x: x.name):
                 if p.is_dir():
-                    # Show folder with file count
+                    # Show folder with build state info
                     file_count = len(list(p.glob("*.md")))
-                    print(f"  {p.name}/ ({file_count} files)")
+                    state = states.get(p.stem)
+                    if state:
+                        completed = len(state.get("completed_steps", []))
+                        total = state.get("total_steps", 0)
+                        build_status = state.get("status", "pending")
+                        if build_status == "paused":
+                            print(f"  {p.name}/ \033[33m[PAUSED {completed}/{total}]\033[0m")
+                        elif build_status == "building":
+                            print(f"  {p.name}/ \033[36m[BUILDING {completed}/{total}]\033[0m")
+                        elif build_status == "completed":
+                            print(f"  {p.name}/ \033[32m[DONE {completed}/{total}]\033[0m")
+                        elif build_status == "failed":
+                            print(f"  {p.name}/ \033[31m[FAILED {completed}/{total}]\033[0m")
+                        else:
+                            print(f"  {p.name}/ ({file_count} files)")
+                    else:
+                        print(f"  {p.name}/ ({file_count} files)")
                 else:
                     print(f"  {p.name}")
+
+    # Show active builds from state
+    active_builds = [s for s in states.values() if s.get("status") in ("building", "paused")]
+    if active_builds:
+        print(f"\n\033[36mACTIVE BUILDS\033[0m ({len(active_builds)})")
+        for state in active_builds:
+            plan_id = state.get("plan_id", "unknown")
+            completed = len(state.get("completed_steps", []))
+            total = state.get("total_steps", 0)
+            status = state.get("status", "unknown")
+            current = state.get("current_step", "")
+            if status == "paused":
+                print(f"  {plan_id}: \033[33mpaused\033[0m at step {current} ({completed}/{total})")
+            else:
+                print(f"  {plan_id}: \033[36mbuilding\033[0m ({completed}/{total})")
+
+    return 0
+
+
+def cmd_status(args):
+    """Show detailed build status for a plan."""
+    import json
+    from datetime import datetime
+
+    if not args:
+        print("Usage: cli.py status <plan-name>")
+        print("\nShows detailed step-by-step build progress for a plan.")
+        print("\nExample:")
+        print("  cli.py status 001_simple-hello-world-feature")
+        return 1
+
+    plan_name = args[0]
+
+    # Find state file
+    state_file = SPECS_DIR / "state" / f"{plan_name}.state.json"
+    if not state_file.exists():
+        print(f"No build state found for: {plan_name}")
+        print(f"Expected: {state_file}")
+        return 1
+
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"Error reading state file: {e}")
+        return 1
+
+    # Display status
+    print(f"\nBuild Status: {plan_name}")
+    print("=" * 60)
+
+    status = state.get("status", "unknown")
+    status_colors = {
+        "pending": "\033[33m",
+        "building": "\033[36m",
+        "paused": "\033[33m",
+        "completed": "\033[32m",
+        "failed": "\033[31m",
+    }
+    color = status_colors.get(status, "")
+    print(f"Status: {color}{status.upper()}\033[0m")
+
+    # Progress
+    completed_steps = state.get("completed_steps", [])
+    failed_steps = state.get("failed_steps", [])
+    total_steps = state.get("total_steps", 0)
+    print(f"Progress: {len(completed_steps)}/{total_steps} steps completed")
+
+    if failed_steps:
+        print(f"Failed steps: {len(failed_steps)}")
+
+    # Timing
+    started = state.get("started_at", "")
+    updated = state.get("updated_at", "")
+    if started:
+        print(f"Started: {started[:19]}")
+    if updated:
+        print(f"Last update: {updated[:19]}")
+
+    # Current step
+    current_step = state.get("current_step", "")
+    if current_step:
+        print(f"Current step: {current_step}")
+
+    # Last error
+    last_error = state.get("last_error", "")
+    if last_error:
+        print(f"\n\033[31mLast error:\033[0m {last_error}")
+
+    # Step details
+    step_states = state.get("step_states", {})
+    if step_states:
+        print(f"\n{'─' * 60}")
+        print("Step Details:")
+        print(f"{'─' * 60}")
+
+        for step_id, step_data in step_states.items():
+            step_status = step_data.get("status", "unknown")
+            retry_count = step_data.get("retry_count", 0)
+
+            if step_status == "completed":
+                icon = "\033[32m✓\033[0m"
+            elif step_status == "failed":
+                icon = "\033[31m✗\033[0m"
+            elif step_status == "in_progress":
+                icon = "\033[36m→\033[0m"
+            else:
+                icon = "\033[33m○\033[0m"
+
+            retry_str = f" (retry {retry_count})" if retry_count > 0 else ""
+            print(f"  {icon} {step_id}{retry_str}")
+
+            if step_data.get("summary"):
+                print(f"      {step_data['summary'][:50]}")
+            if step_data.get("error"):
+                print(f"      \033[31mError: {step_data['error'][:50]}\033[0m")
+
+    # Files affected
+    files_created = state.get("files_created", [])
+    files_modified = state.get("files_modified", [])
+    if files_created or files_modified:
+        print(f"\n{'─' * 60}")
+        print("Files Affected:")
+        if files_created:
+            print(f"  Created: {len(files_created)}")
+            for f in files_created[:5]:
+                print(f"    + {f}")
+            if len(files_created) > 5:
+                print(f"    ... and {len(files_created) - 5} more")
+        if files_modified:
+            print(f"  Modified: {len(files_modified)}")
+            for f in files_modified[:5]:
+                print(f"    ~ {f}")
+            if len(files_modified) > 5:
+                print(f"    ... and {len(files_modified) - 5} more")
+
+    # Resume hint
+    if status == "paused":
+        print(f"\n\033[33mTo resume:\033[0m cli.py build {plan_name}")
 
     return 0
 
@@ -919,6 +1087,7 @@ COMMANDS = {
     'setup': (cmd_setup, "Initialize environment"),
     'plan': (cmd_plan, "Create implementation plan"),
     'build': (cmd_build, "Execute a plan"),
+    'status': (cmd_status, "Show build status for a plan"),
     'review': (cmd_review, "Review completed build"),
     'fix': (cmd_fix, "Fix issues from review"),
     'list': (cmd_list, "List all plans"),

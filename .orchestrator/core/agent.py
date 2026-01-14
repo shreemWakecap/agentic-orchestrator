@@ -232,29 +232,36 @@ class Agent:
 
         return cls(name=name, system_prompt=system_prompt, cwd=project_root)
 
-    def _build_full_prompt(self, message: str, context: Optional[str] = None) -> str:
+    def _build_user_prompt(self, message: str, context: Optional[str] = None) -> str:
         """
-        Build the complete prompt with embedded system instructions.
+        Build the complete prompt with embedded role instructions.
 
-        On Windows, passing complex system prompts via --system-prompt flag causes
-        issues with special characters (|, <, >, quotes, braces) being interpreted
-        by cmd.exe even with shell=False (because claude.CMD is a batch file).
+        We embed the system prompt at the START of the message with explicit
+        instructions to follow the role. This avoids Windows CLI escaping
+        issues with --system-prompt flag.
 
-        Solution: Embed the system prompt in the user message and pass via stdin.
-        This avoids all Windows command-line escaping issues.
+        The format uses imperative instructions that Claude WILL follow.
         """
-        # Build the user message part
-        if context:
-            user_message = f"## Context\n\n{context}\n\n## Task\n\n{message}"
-        else:
-            user_message = message
+        # Role block with STRONG instructions to follow it
+        role_block = f"""# YOUR ROLE AND INSTRUCTIONS
 
-        # Embed system instructions with clear delimiters
-        return f"""<system-instructions>
 {self.system_prompt}
-</system-instructions>
 
-{user_message}"""
+# CRITICAL RULES
+- You MUST follow the role and output format described above
+- Do NOT greet the user or ask clarifying questions
+- Do NOT say "How can I help you?" or similar phrases
+- Do NOT ask what the user wants - the task is provided below
+- IMMEDIATELY perform the task and output the required format
+- Output ONLY what your role specifies - nothing else"""
+
+        # Build user message part
+        if context:
+            user_block = f"# CONTEXT\n\n{context}\n\n# YOUR TASK\n\n{message}"
+        else:
+            user_block = f"# YOUR TASK\n\n{message}"
+
+        return f"{role_block}\n\n{user_block}"
 
     def run(
         self,
@@ -296,9 +303,9 @@ class Agent:
             try:
                 validated_cwd = _validate_cwd(self.cwd)
 
-                # Build full prompt with embedded system instructions
-                # This avoids Windows command-line escaping issues with --system-prompt
-                full_prompt = self._build_full_prompt(message, context)
+                # Build complete prompt with embedded role instructions
+                # This avoids Windows escaping issues with --system-prompt flag
+                full_prompt = self._build_user_prompt(message, context)
 
                 cmd = [
                     _get_claude_executable(),
@@ -314,7 +321,7 @@ class Agent:
                     errors="replace",
                     timeout=effective_timeout,
                     shell=False,
-                    input=full_prompt,  # Pass everything via stdin
+                    input=full_prompt,  # Role + context + task all in stdin
                 )
 
                 if result.returncode != 0:
@@ -406,9 +413,9 @@ class Agent:
             try:
                 validated_cwd = _validate_cwd(self.cwd)
 
-                # Build full prompt with embedded system instructions
-                # This avoids Windows command-line escaping issues with --system-prompt
-                full_prompt = self._build_full_prompt(message, context)
+                # Build complete prompt with embedded role instructions
+                # This avoids Windows escaping issues with --system-prompt flag
+                full_prompt = self._build_user_prompt(message, context)
 
                 cmd = [
                     _get_claude_executable(),
@@ -426,7 +433,7 @@ class Agent:
                     errors="replace",
                     timeout=effective_timeout,
                     shell=False,
-                    input=full_prompt,  # Pass everything via stdin
+                    input=full_prompt,  # Role + context + task all in stdin
                 )
 
                 if result.returncode != 0:

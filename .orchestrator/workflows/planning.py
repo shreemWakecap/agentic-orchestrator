@@ -301,14 +301,29 @@ Focus on:
             return True
 
         placeholder_patterns = [
+            # Generic greetings
             "I'm ready to help you",
             "I'll help you with software engineering",
+            "How can I help you",
+            "What can I help",
+            "Hello! How can I help",
+            # Confusion indicators
             "What would you like me to",
             "What would you like to work on",
+            "Would you like me to",
             "I understand you've sent",
             "I understand. I'm ready to help",
-            "How can I help you",
             "I can see you're on the",
+            "I can see you're working",
+            # Empty message indicators
+            "I see you've sent",
+            "I see you've started",
+            "you've sent an empty message",
+            # Context confusion
+            "working in the",
+            "on the developmet branch",
+            "in your git working tree",
+            "Let me know what you'd like",
         ]
 
         content_lower = content.lower()
@@ -317,6 +332,32 @@ Focus on:
                 return True
 
         return False
+
+    def _validate_agent_response(self, agent_name: str, result) -> tuple[bool, str]:
+        """
+        Validate that an agent response contains actual content, not a placeholder.
+
+        Args:
+            agent_name: Name of the agent for error messages
+            result: AgentResult object
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not result.success:
+            return False, f"{agent_name} failed: {result.error}"
+
+        if not result.content or len(result.content.strip()) < 50:
+            return False, f"{agent_name} returned empty or too short response"
+
+        if self._is_placeholder_response(result.content):
+            return False, (
+                f"{agent_name} returned a generic greeting instead of actual content. "
+                "This usually means the agent's system prompt wasn't properly applied. "
+                "Please try again or check the Claude CLI configuration."
+            )
+
+        return True, ""
 
     def _get_next_plan_number(self) -> int:
         """
@@ -410,8 +451,9 @@ Focus on:
             message=f"User request: {request}\n\nGather context about this codebase.",
             context=codebase_context
         )
-        if not scout_result.success:
-            return WorkflowResult(success=False, error=f"Scout failed: {scout_result.error}")
+        valid, error = self._validate_agent_response("Scout", scout_result)
+        if not valid:
+            return WorkflowResult(success=False, error=error)
         steps_completed.append("scout")
 
         # Architect
@@ -421,8 +463,9 @@ Focus on:
             message=f"User request: {request}\n\nDesign the architecture.",
             context=f"## Codebase Context\n\n{scout_result.content}"
         )
-        if not architect_result.success:
-            return WorkflowResult(success=False, error=f"Architect failed: {architect_result.error}")
+        valid, error = self._validate_agent_response("Architect", architect_result)
+        if not valid:
+            return WorkflowResult(success=False, error=error)
         steps_completed.append("architect")
 
         # Expert Consultation (after architect, before planner)
@@ -446,20 +489,9 @@ Focus on:
             message=f"User request: {request}\n\nCreate detailed implementation steps.",
             context=planner_context
         )
-        if not planner_result.success:
-            return WorkflowResult(success=False, error=f"Planner failed: {planner_result.error}")
-
-        # Validate that planner returned actual implementation steps, not a placeholder/greeting
-        if self._is_placeholder_response(planner_result.content):
-            return WorkflowResult(
-                success=False,
-                error=(
-                    "Planner returned a generic response instead of implementation steps. "
-                    "This may indicate an issue with the agent system prompt configuration. "
-                    "Please check that the Claude CLI is properly configured and try again."
-                )
-            )
-
+        valid, error = self._validate_agent_response("Planner", planner_result)
+        if not valid:
+            return WorkflowResult(success=False, error=error)
         steps_completed.append("planner")
 
         # Validator
@@ -469,8 +501,9 @@ Focus on:
             message=f"Validate this implementation plan for: {request}",
             context=f"## Plan\n\n{planner_result.content}"
         )
-        if not validator_result.success:
-            return WorkflowResult(success=False, error=f"Validator failed: {validator_result.error}")
+        valid, error = self._validate_agent_response("Validator", validator_result)
+        if not valid:
+            return WorkflowResult(success=False, error=error)
         steps_completed.append("validator")
 
         # Compile and save as folder with multiple files
@@ -558,6 +591,9 @@ Focus on:
             context=focused_context,
             show_progress=False
         )
+        valid, error = self._validate_agent_response("Scout", scout_result)
+        if not valid:
+            raise ValueError(f"Sub-feature '{sf_name}': {error}")
 
         # Architect for this sub-feature
         scout_for_architect = self._smart_truncate(scout_result.content, scout_limit)
@@ -567,6 +603,9 @@ Focus on:
             context=f"## Scout Context\n\n{scout_for_architect}",
             show_progress=False
         )
+        valid, error = self._validate_agent_response("Architect", architect_result)
+        if not valid:
+            raise ValueError(f"Sub-feature '{sf_name}': {error}")
 
         # Planner for this sub-feature
         scout_for_planner = self._smart_truncate(scout_result.content, architect_limit)
@@ -577,6 +616,9 @@ Focus on:
             context=f"## Context\n\n{scout_for_planner}\n\n## Architecture\n\n{arch_for_planner}",
             show_progress=False
         )
+        valid, error = self._validate_agent_response("Planner", planner_result)
+        if not valid:
+            raise ValueError(f"Sub-feature '{sf_name}': {error}")
 
         return SubFeaturePlan(
             id=sf_id,
@@ -598,13 +640,16 @@ Focus on:
             message=f"User request: {request}\n\nGather comprehensive context about this codebase for multi-feature planning.",
             context=codebase_context
         )
-        cached_scout_result = global_scout.content if global_scout.success else None
         from core.symbols import CHECK, WARNING
-        if global_scout.success:
+        # Check for both failure AND placeholder responses
+        valid, _ = self._validate_agent_response("Global Scout", global_scout)
+        if valid:
+            cached_scout_result = global_scout.content
             steps_completed.append("global_scout")
             self.console.print(f"  [green]{CHECK}[/green] Global scout cached")
         else:
-            self.console.print(f"  [yellow]{WARNING}[/yellow] Global scout failed, sub-features will scout independently")
+            cached_scout_result = None
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Global scout failed or returned placeholder, sub-features will scout independently")
 
         # Phase 2b: Expert Consultation (for complex features)
         # Run a preliminary architect to get high-level design for expert consultation
@@ -614,9 +659,14 @@ Focus on:
             message=f"User request: {request}\n\nProvide high-level architectural overview for a complex multi-feature implementation.",
             context=f"## Analysis\n\n{json.dumps(analysis, indent=2)}\n\n## Codebase Context\n\n{cached_scout_result or codebase_context}"
         )
-        prelim_arch_result = prelim_architect.content if prelim_architect.success else ""
-        if prelim_architect.success:
+        # Check for both failure AND placeholder responses
+        valid, _ = self._validate_agent_response("Prelim Architect", prelim_architect)
+        if valid:
+            prelim_arch_result = prelim_architect.content
             steps_completed.append("prelim_architect")
+        else:
+            prelim_arch_result = ""
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Preliminary architect returned placeholder, continuing without")
 
         # Consult domain experts
         expert_insights = self._consult_domain_experts(
@@ -642,8 +692,9 @@ Focus on:
             message=f"Original request: {request}\n\nBreak this into independent sub-features for parallel planning.",
             context=decomposer_context
         )
-        if not decomposer_result.success:
-            return WorkflowResult(success=False, error=f"Decomposer failed: {decomposer_result.error}")
+        valid, error = self._validate_agent_response("Decomposer", decomposer_result)
+        if not valid:
+            return WorkflowResult(success=False, error=error)
         steps_completed.append("decomposer")
 
         decomposition = self._parse_json_from_response(decomposer_result.content)
@@ -712,8 +763,9 @@ Focus on:
             message=f"Original request: {request}\n\nCombine these sub-feature plans into a master plan.",
             context=synthesizer_context
         )
-        if not synthesizer_result.success:
-            return WorkflowResult(success=False, error=f"Synthesizer failed: {synthesizer_result.error}")
+        valid, error = self._validate_agent_response("Synthesizer", synthesizer_result)
+        if not valid:
+            return WorkflowResult(success=False, error=error)
         steps_completed.append("synthesizer")
 
         # Validate
@@ -723,8 +775,9 @@ Focus on:
             message=f"Validate this master implementation plan for: {request}",
             context=f"## Master Plan\n\n{synthesizer_result.content}"
         )
-        if not validator_result.success:
-            return WorkflowResult(success=False, error=f"Validator failed: {validator_result.error}")
+        valid, error = self._validate_agent_response("Validator", validator_result)
+        if not valid:
+            return WorkflowResult(success=False, error=error)
         steps_completed.append("validator")
 
         # Save master plan as folder with multiple files

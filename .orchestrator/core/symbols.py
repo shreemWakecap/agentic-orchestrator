@@ -6,35 +6,29 @@ import os
 
 def _supports_unicode() -> bool:
     """Check if the current terminal supports Unicode."""
-    # First, always check the actual stdout encoding - this is the most reliable
-    try:
-        encoding = getattr(sys.stdout, 'encoding', None) or ''
-        stdout_is_utf8 = encoding.lower() in ('utf-8', 'utf8')
-    except Exception:
-        stdout_is_utf8 = False
-
-    # On Windows, be very conservative - require actual UTF-8 encoding
+    # On Windows, ALWAYS default to ASCII unless we're absolutely certain UTF-8 works
+    # Rich library's LegacyWindowsTerm bypasses normal stdout encoding checks
     if sys.platform == 'win32':
-        # If stdout is already UTF-8, we're good
-        if stdout_is_utf8:
+        # Check if we're running with UTF-8 mode enabled
+        if os.environ.get("PYTHONUTF8") == "1":
             return True
-
-        # Check for explicit UTF-8 encoding in environment
         if os.environ.get("PYTHONIOENCODING", "").lower().startswith("utf"):
             return True
-
-        # For all other cases on Windows, default to ASCII for safety
-        # Even if we detect Windows Terminal, VSCode, etc., the actual
-        # encoding might still be cp1252 which can't handle Unicode
+        # Check console code page (65001 = UTF-8)
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            if kernel32.GetConsoleOutputCP() == 65001:
+                return True
+        except Exception:
+            pass
+        # Default to ASCII on Windows - safer
         return False
 
     # Unix-like systems: check encoding
-    if stdout_is_utf8:
-        return True
-
     try:
         encoding = getattr(sys.stdout, 'encoding', None) or ''
-        if encoding.lower().startswith('utf'):
+        if encoding.lower() in ('utf-8', 'utf8') or encoding.lower().startswith('utf'):
             return True
     except Exception:
         pass

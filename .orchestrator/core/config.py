@@ -51,23 +51,12 @@ class ParallelConfig:
 
 
 @dataclass(frozen=True)
-class DeduplicationConfig:
-    """Deduplication and cross-plan dependency settings."""
-    enabled: bool = True
-    similarity_warn_threshold: float = 0.6
-    similarity_block_threshold: float = 0.85
-    use_ai_analysis: bool = True
-    auto_scan_on_start: bool = True
-
-
-@dataclass(frozen=True)
 class AgentConfig:
     """Complete agent configuration."""
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
     retry: RetryConfig = field(default_factory=RetryConfig)
     context_limits: ContextLimitsConfig = field(default_factory=ContextLimitsConfig)
     parallel: ParallelConfig = field(default_factory=ParallelConfig)
-    deduplication: DeduplicationConfig = field(default_factory=DeduplicationConfig)
 
 
 @dataclass(frozen=True)
@@ -131,7 +120,6 @@ class ConfigLoader:
         retry_data = data.get("retry", {})
         context_data = data.get("context_limits", {})
         parallel_data = data.get("parallel", {})
-        dedup_data = data.get("deduplication", {})
 
         config = AgentConfig(
             timeouts=TimeoutConfig(
@@ -158,13 +146,6 @@ class ConfigLoader:
                 max_build_workers=parallel_data.get("max_build_workers", 3),
                 overlap_build_test=parallel_data.get("overlap_build_test", True),
                 simple_build_parallel=parallel_data.get("simple_build_parallel", True),
-            ),
-            deduplication=DeduplicationConfig(
-                enabled=dedup_data.get("enabled", True),
-                similarity_warn_threshold=dedup_data.get("similarity_warn_threshold", 0.6),
-                similarity_block_threshold=dedup_data.get("similarity_block_threshold", 0.85),
-                use_ai_analysis=dedup_data.get("use_ai_analysis", True),
-                auto_scan_on_start=dedup_data.get("auto_scan_on_start", True),
             ),
         )
 

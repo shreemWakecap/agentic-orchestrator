@@ -32,6 +32,7 @@ from workflows.planning import PlanningWorkflow
 from workflows.building import BuildingWorkflow
 from workflows.reviewing import ReviewingWorkflow
 from workflows.fixing import FixingWorkflow
+from workflows.syncing import SyncingWorkflow
 from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
 
 # Server startup time for health endpoint uptime calculation
@@ -182,6 +183,17 @@ async def health_check():
     }
 
 
+@app.get("/health")
+async def health():
+    """Simple health check endpoint at root level."""
+    uptime_seconds = (datetime.now() - START_TIME).total_seconds()
+    return {
+        "status": "ok",
+        "version": app.version,
+        "uptime_seconds": round(uptime_seconds, 2)
+    }
+
+
 @app.get("/api/plans")
 async def api_list_plans():
     """List all plans."""
@@ -318,6 +330,28 @@ async def api_start_fix(request: FixRequest, background_tasks: BackgroundTasks):
         request.dry_run,
         request.min_severity
     )
+
+    return {"run_id": run_id, "status": "started"}
+
+
+@app.post("/api/workflows/sync-remote")
+async def api_sync_remote(background_tasks: BackgroundTasks):
+    """Start a sync-remote workflow to commit changes and create PR."""
+    run_id = str(uuid.uuid4())[:8]
+
+    active_runs[run_id] = {
+        "id": run_id,
+        "workflow": "syncing",
+        "status": "pending",
+        "started_at": datetime.now().isoformat(),
+        "progress": 0,
+        "current_step": None,
+        "events": [],
+        "output_file": None,
+        "error": None
+    }
+
+    background_tasks.add_task(_run_syncing_workflow, run_id)
 
     return {"run_id": run_id, "status": "started"}
 
@@ -466,6 +500,35 @@ def _extract_plan_number(plan_id: str) -> int:
         return 999999  # Sort plans without numeric prefix at the end
 
 
+def _extract_plan_info(plan_dir: Path) -> Dict[str, str]:
+    """Extract plan info (name, request, complexity) from plan.md headers."""
+    info = {}
+    plan_file = plan_dir / "plan.md"
+
+    if not plan_file.exists():
+        return info
+
+    try:
+        content = plan_file.read_text(encoding="utf-8")
+        lines = content.split("\n")[:10]  # Only check first 10 lines
+
+        for line in lines:
+            line = line.strip()
+            # Extract title from "# Plan: XXX"
+            if line.startswith("# Plan:"):
+                info["name"] = line[7:].strip()
+            # Extract request from "Request: XXX"
+            elif line.startswith("Request:"):
+                info["request"] = line[8:].strip()
+            # Extract complexity from "Complexity: XXX"
+            elif line.startswith("Complexity:"):
+                info["complexity"] = line[11:].strip()
+    except IOError:
+        pass
+
+    return info
+
+
 async def _get_all_plans() -> List[Dict]:
     """Get all plans across all states, sorted by numeric prefix."""
     specs_dir = ORCHESTRATOR_DIR / "specs"
@@ -492,16 +555,14 @@ async def _get_all_plans() -> List[Dict]:
                         "modified": datetime.fromtimestamp(plan_dir.stat().st_mtime).isoformat()
                     }
 
-                    # Try to load metadata for additional info
-                    metadata_file = plan_dir / "metadata.json"
-                    if metadata_file.exists():
-                        try:
-                            metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
-                            plan_data["name"] = metadata.get("name", plan_data["name"])
-                            plan_data["request"] = metadata.get("request", "")
-                            plan_data["complexity"] = metadata.get("complexity", "unknown")
-                        except (json.JSONDecodeError, IOError):
-                            pass
+                    # Extract info from plan.md headers
+                    plan_info = _extract_plan_info(plan_dir)
+                    if plan_info.get("name"):
+                        plan_data["name"] = plan_info["name"]
+                    if plan_info.get("request"):
+                        plan_data["request"] = plan_info["request"]
+                    if plan_info.get("complexity"):
+                        plan_data["complexity"] = plan_info["complexity"]
 
                     plans.append(plan_data)
 
@@ -531,17 +592,14 @@ async def _get_plan_by_id(plan_id: str) -> Optional[Dict]:
                 "modified": datetime.fromtimestamp(plan_dir.stat().st_mtime).isoformat()
             }
 
-            # Load metadata if available
-            metadata_file = plan_dir / "metadata.json"
-            if metadata_file.exists():
-                try:
-                    metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
-                    plan_data["name"] = metadata.get("name", plan_data["name"])
-                    plan_data["request"] = metadata.get("request", "")
-                    plan_data["complexity"] = metadata.get("complexity", "unknown")
-                    plan_data["metadata"] = metadata
-                except (json.JSONDecodeError, IOError):
-                    pass
+            # Extract info from plan.md headers
+            plan_info = _extract_plan_info(plan_dir)
+            if plan_info.get("name"):
+                plan_data["name"] = plan_info["name"]
+            if plan_info.get("request"):
+                plan_data["request"] = plan_info["request"]
+            if plan_info.get("complexity"):
+                plan_data["complexity"] = plan_info["complexity"]
 
             # Load plan content - try plan.md first (new format), then 00_overview.md (legacy)
             plan_file = plan_dir / "plan.md"
@@ -715,6 +773,34 @@ async def _run_fixing_workflow(run_id: str, review_path: str, dry_run: bool, min
             "type": "complete",
             "success": result.success,
             "fixes_applied": result.data.get("fixes_applied", 0) if result.data else 0
+        })
+
+    except Exception as e:
+        run["status"] = "failed"
+        run["error"] = str(e)
+        _add_event(run_id, {"type": "error", "message": str(e)})
+
+
+async def _run_syncing_workflow(run_id: str):
+    """Execute syncing workflow to commit changes and create PR."""
+    run = active_runs[run_id]
+    run["status"] = "running"
+    _add_event(run_id, {"type": "start", "workflow": "syncing"})
+
+    try:
+        workflow = SyncingWorkflow(project_root=PROJECT_ROOT)
+        result = workflow.run()
+
+        run["status"] = "completed" if result.success else "failed"
+        run["completed_at"] = datetime.now().isoformat()
+        run["output_file"] = str(result.output_file) if result.output_file else None
+        run["progress"] = 100
+        run["data"] = result.data
+
+        _add_event(run_id, {
+            "type": "complete",
+            "success": result.success,
+            "output": str(result.output_file) if result.output_file else None
         })
 
     except Exception as e:

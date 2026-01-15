@@ -24,7 +24,8 @@ from typing import Optional
 from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.expert_loader import ExpertLoader, ExpertType
 from core.docs_loader import DocsLoader
-from core.plan_registry import PlanRegistry, PlanMetadata, ScanResult
+from core.scout_cache import ScoutCache
+from core.checkpoint import CheckpointManager, PlanningCheckpoint
 
 
 @dataclass
@@ -131,15 +132,19 @@ class PlanningWorkflow(Workflow):
         # Initialize expert loader for domain/module expert consultation
         self.expert_loader = ExpertLoader(project_root)
 
-        # Initialize plan registry for cross-plan dependency tracking
-        self.plan_registry = PlanRegistry(project_root)
+        # Initialize scout cache for avoiding redundant codebase exploration
+        self.scout_cache = ScoutCache(project_root)
+
+        # Initialize checkpoint manager for recovery
+        specs_dir = project_root / ".orchestrator" / "specs"
+        self.checkpoint_mgr = CheckpointManager(specs_dir)
 
         # Load all agents from .claude/agents/
         self._load_agents()
 
     def _load_agents(self):
         """Load all agents from .claude/agents/"""
-        agents = ["analyzer", "decomposer", "scout", "architect", "planner", "validator", "synthesizer", "deduplicator"]
+        agents = ["analyzer", "decomposer", "scout", "architect", "planner", "validator", "synthesizer"]
         for agent_name in agents:
             try:
                 self.register_agent(Agent.load(agent_name, self.project_root))
@@ -179,32 +184,13 @@ class PlanningWorkflow(Workflow):
             pass
         return ""
 
-    def _load_depth_instructions(self) -> dict:
-        """Load depth instruction templates from config."""
-        config_path = self.project_root / ".orchestrator" / "config" / "depth_instructions.json"
-        if config_path.exists():
-            try:
-                return json.loads(config_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-        return {}
-
     def _build_depth_context(self, agent_name: str, depth: str, base_context: str) -> str:
         """
-        Prepend depth instructions to agent context.
+        Build context for an agent.
 
-        Args:
-            agent_name: Name of the agent (scout, architect, planner, validator, synthesizer)
-            depth: Depth level (brief, moderate, thorough)
-            base_context: The original context to prepend instructions to
-
-        Returns:
-            Context with depth instructions prepended, or original context if no instructions found
+        Note: Depth instructions have been removed for simplicity.
+        All plans now use a single minimal format.
         """
-        depth_config = self._load_depth_instructions()
-        if agent_name in depth_config and depth in depth_config[agent_name]:
-            instruction = depth_config[agent_name][depth]
-            return f"## Execution Depth: {depth.upper()}\n\n{instruction}\n\n---\n\n{base_context}"
         return base_context
 
     def _consult_domain_experts(
@@ -389,6 +375,78 @@ Focus on:
 
         return True, ""
 
+    def _count_required_steps_in_request(self, request: str) -> int:
+        """
+        Count the number of numbered steps explicitly listed in the request.
+
+        Looks for patterns like (1), (2), (3) or 1), 2), 3) or numbered lists.
+        Returns 0 if no explicit numbering found (simple request).
+        """
+        # Pattern 1: (1), (2), etc.
+        paren_matches = re.findall(r'\(\d+\)', request)
+        if len(paren_matches) >= 2:
+            return len(paren_matches)
+
+        # Pattern 2: 1), 2), etc.
+        bracket_matches = re.findall(r'\d+\)', request)
+        if len(bracket_matches) >= 2:
+            return len(bracket_matches)
+
+        # Pattern 3: 1., 2., etc. at start of lines or after newline
+        dot_matches = re.findall(r'(?:^|\n)\s*\d+\.', request)
+        if len(dot_matches) >= 2:
+            return len(dot_matches)
+
+        return 0  # No explicit numbered requirements
+
+    def _count_steps_in_plan(self, plan_content: str) -> int:
+        """
+        Count the number of steps in the generated plan output.
+
+        Looks for numbered steps in STEPS section (1., 2., 3., etc.)
+        """
+        # Extract STEPS section
+        steps_match = re.search(r'STEPS?:\s*(.*?)(?:VERIFY:|$)', plan_content, re.DOTALL | re.IGNORECASE)
+        if not steps_match:
+            # Try legacy format
+            steps_match = re.search(r'## Steps?\s*(.*?)(?:## |$)', plan_content, re.DOTALL | re.IGNORECASE)
+
+        if not steps_match:
+            return 0
+
+        steps_content = steps_match.group(1)
+
+        # Count numbered steps (1., 2., etc.)
+        step_numbers = re.findall(r'^\s*(\d+)\.', steps_content, re.MULTILINE)
+        return len(step_numbers)
+
+    def _validate_plan_coverage(self, request: str, plan_content: str) -> tuple[bool, str]:
+        """
+        Validate that the plan covers all numbered requirements in the request.
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        required_steps = self._count_required_steps_in_request(request)
+        plan_steps = self._count_steps_in_plan(plan_content)
+
+        # If request doesn't have explicit numbered requirements, skip this check
+        if required_steps == 0:
+            return True, ""
+
+        # Allow some flexibility (plan might combine or split steps)
+        # But if plan has significantly fewer steps, it's incomplete
+        min_acceptable = max(1, required_steps - 2)  # Allow up to 2 fewer steps (combining)
+
+        if plan_steps < min_acceptable:
+            return False, (
+                f"Plan is incomplete: request specifies {required_steps} numbered steps "
+                f"but plan only has {plan_steps} step(s). "
+                f"The planner must generate ALL {required_steps} steps from the request."
+            )
+
+        return True, ""
+
     def _get_next_plan_number(self) -> int:
         """
         Get the next sequential plan number.
@@ -491,23 +549,49 @@ Focus on:
             adaptive = AdaptiveConfig.default_simple()
 
         depth = adaptive.agent_depth
+        request_hash = self.checkpoint_mgr.compute_request_hash(request)
 
-        # Scout with depth-aware context
+        # Check for existing checkpoint to resume from
+        existing_checkpoint = self.checkpoint_mgr.load(request)
+        if existing_checkpoint and existing_checkpoint.phase != "completed":
+            from core.symbols import WARNING
+            self.console.print(f"[yellow]{WARNING} Found checkpoint at phase: {existing_checkpoint.phase}[/yellow]")
+            self.console.print("  Resuming from last successful phase...")
+
+        # Check for cached scout result
         self.console.print("[bold]Phase 1:[/bold] Scouting codebase...")
-        scout_context = self._build_depth_context("scout", depth, codebase_context)
-        scout_result = self.run_agent(
-            "scout",
-            message=f"User request: {request}\n\nGather context about this codebase.",
-            context=scout_context
-        )
-        valid, error = self._validate_agent_response("Scout", scout_result)
-        if not valid:
-            return WorkflowResult(success=False, error=error)
+        cached_scout = self.scout_cache.get(request)
+        if cached_scout:
+            from core.symbols import CHECK
+            self.console.print(f"  [green]{CHECK}[/green] Using cached scout result")
+            scout_content = cached_scout
+        else:
+            scout_context = self._build_depth_context("scout", depth, codebase_context)
+            scout_result = self.run_agent(
+                "scout",
+                message=f"User request: {request}\n\nGather context about this codebase.",
+                context=scout_context
+            )
+            valid, error = self._validate_agent_response("Scout", scout_result)
+            if not valid:
+                return WorkflowResult(success=False, error=error)
+            scout_content = scout_result.content
+            # Cache the result
+            self.scout_cache.set(request, scout_content)
         steps_completed.append("scout")
+
+        # Save checkpoint after scout
+        self.checkpoint_mgr.save(PlanningCheckpoint(
+            request=request,
+            request_hash=request_hash,
+            phase="scout",
+            complexity=adaptive.complexity,
+            scout_result=scout_content
+        ))
 
         # Architect with depth-aware context
         self.console.print("\n[bold]Phase 2:[/bold] Designing architecture...")
-        architect_base_context = f"## Codebase Context\n\n{scout_result.content}"
+        architect_base_context = f"## Codebase Context\n\n{scout_content}"
         architect_context = self._build_depth_context("architect", depth, architect_base_context)
         architect_result = self.run_agent(
             "architect",
@@ -519,6 +603,16 @@ Focus on:
             return WorkflowResult(success=False, error=error)
         steps_completed.append("architect")
 
+        # Save checkpoint after architect
+        self.checkpoint_mgr.save(PlanningCheckpoint(
+            request=request,
+            request_hash=request_hash,
+            phase="architect",
+            complexity=adaptive.complexity,
+            scout_result=scout_content,
+            architect_result=architect_result.content
+        ))
+
         # Expert Consultation - skip for brief depth to save time
         expert_insights = []
         expert_context = ""
@@ -526,7 +620,7 @@ Focus on:
             expert_insights = self._consult_domain_experts(
                 request=request,
                 architect_result=architect_result.content,
-                codebase_context=scout_result.content
+                codebase_context=scout_content
             )
             expert_context = self._compile_expert_insights(expert_insights)
             if expert_insights:
@@ -536,20 +630,52 @@ Focus on:
 
         # Planner with depth-aware context
         self.console.print("\n[bold]Phase 3:[/bold] Creating implementation plan...")
-        planner_base_context = f"## Context\n\n{scout_result.content}\n\n## Architecture\n\n{architect_result.content}"
+        planner_base_context = f"## Context\n\n{scout_content}\n\n## Architecture\n\n{architect_result.content}"
         if expert_context:
             planner_base_context += f"\n\n{expert_context}"
         planner_context = self._build_depth_context("planner", depth, planner_base_context)
 
+        # Count required steps from request BEFORE calling planner
+        required_steps = self._count_required_steps_in_request(request)
+        if required_steps > 0:
+            self.console.print(f"  [dim]Request specifies {required_steps} numbered step(s)[/dim]")
+
         planner_result = self.run_agent(
             "planner",
-            message=f"User request: {request}\n\nCreate detailed implementation steps.",
+            message=f"User request: {request}\n\nCreate detailed implementation steps.\n\nIMPORTANT: If the request lists numbered items like (1), (2), (3)... you MUST create a separate step for EACH numbered item. Do not skip any.",
             context=planner_context
         )
         valid, error = self._validate_agent_response("Planner", planner_result)
         if not valid:
             return WorkflowResult(success=False, error=error)
+
+        # COVERAGE CHECK: Validate plan has enough steps to cover the request
+        valid, error = self._validate_plan_coverage(request, planner_result.content)
+        if not valid:
+            from core.symbols import CROSS
+            self.console.print(f"\n[red]{CROSS} Plan coverage validation failed[/red]")
+            self.console.print(f"  {error}")
+            return WorkflowResult(
+                success=False,
+                error=error,
+                data={"validation_type": "coverage"}
+            )
+
+        plan_steps = self._count_steps_in_plan(planner_result.content)
+        from core.symbols import CHECK
+        self.console.print(f"  [green]{CHECK}[/green] planner complete ({plan_steps} steps)")
         steps_completed.append("planner")
+
+        # Save checkpoint after planner
+        self.checkpoint_mgr.save(PlanningCheckpoint(
+            request=request,
+            request_hash=request_hash,
+            phase="planner",
+            complexity=adaptive.complexity,
+            scout_result=scout_content,
+            architect_result=architect_result.content,
+            planner_result=planner_result.content
+        ))
 
         # Validator with depth-aware context
         self.console.print("\n[bold]Phase 4:[/bold] Validating plan...")
@@ -563,12 +689,41 @@ Focus on:
         valid, error = self._validate_agent_response("Validator", validator_result)
         if not valid:
             return WorkflowResult(success=False, error=error)
+
+        # VALIDATION GATE: Check if plan actually passed validation
+        validation_data = self._parse_json_from_response(validator_result.content)
+        validation_status = validation_data.get("status", "unknown")
+        validation_score = validation_data.get("score", 0)
+
+        if validation_status != "approved" or validation_score < 70:
+            blocking_issues = validation_data.get("blocking_issues", [])
+            issue_summary = "; ".join(
+                issue.get("issue", "unknown")[:60]
+                for issue in blocking_issues[:3]
+            ) if blocking_issues else "Plan did not meet quality threshold"
+
+            from core.symbols import CROSS
+            self.console.print(f"\n[red]{CROSS} Plan validation failed[/red]")
+            self.console.print(f"  Status: {validation_status}, Score: {validation_score}/100")
+            if blocking_issues:
+                self.console.print("  Issues:")
+                for issue in blocking_issues[:5]:
+                    step = issue.get("step", "?")
+                    issue_text = issue.get("issue", "Unknown issue")
+                    self.console.print(f"    - Step {step}: {issue_text[:70]}")
+
+            return WorkflowResult(
+                success=False,
+                error=f"Plan validation failed (score {validation_score}): {issue_summary}",
+                data={"validation": validation_data}
+            )
+
         steps_completed.append("validator")
 
         # Compile as single plan.md file
         plan_files = self._compile_single_plan(
             request=request,
-            scout=scout_result.content,
+            scout=scout_content,
             architect=architect_result.content,
             planner=planner_result.content,
             validator=validator_result.content,
@@ -579,13 +734,8 @@ Focus on:
         dirname = self._generate_plan_dirname(request)
         output_path = self._save_plan_folder(dirname, plan_files)
 
-        # Generate and save metadata for cross-plan tracking
-        self._generate_plan_metadata(
-            request=request,
-            plan_dir=output_path,
-            complexity=adaptive.complexity,
-            adaptive=adaptive
-        )
+        # Clear checkpoint on success
+        self.checkpoint_mgr.clear(request)
 
         return WorkflowResult(
             success=True,
@@ -594,7 +744,8 @@ Focus on:
             data={
                 "complexity": adaptive.complexity,
                 "output_format": adaptive.output_format,
-                "agent_depth": adaptive.agent_depth
+                "agent_depth": adaptive.agent_depth,
+                "validation_score": validation_score
             }
         )
 
@@ -884,6 +1035,29 @@ Focus on:
         valid, error = self._validate_agent_response("Validator", validator_result)
         if not valid:
             return WorkflowResult(success=False, error=error)
+
+        # VALIDATION GATE: Check if master plan actually passed validation
+        validation_data = self._parse_json_from_response(validator_result.content)
+        validation_status = validation_data.get("status", "unknown")
+        validation_score = validation_data.get("score", 0)
+
+        if validation_status != "approved" or validation_score < 70:
+            blocking_issues = validation_data.get("blocking_issues", [])
+            issue_summary = "; ".join(
+                issue.get("issue", "unknown")[:60]
+                for issue in blocking_issues[:3]
+            ) if blocking_issues else "Master plan did not meet quality threshold"
+
+            from core.symbols import CROSS
+            self.console.print(f"\n[red]{CROSS} Master plan validation failed[/red]")
+            self.console.print(f"  Status: {validation_status}, Score: {validation_score}/100")
+
+            return WorkflowResult(
+                success=False,
+                error=f"Master plan validation failed (score {validation_score}): {issue_summary}",
+                data={"validation": validation_data}
+            )
+
         steps_completed.append("validator")
 
         # Save master plan as folder with multiple files
@@ -900,14 +1074,6 @@ Focus on:
         dirname = self._generate_plan_dirname(request, prefix="master-")
         output_path = self._save_plan_folder(dirname, plan_files)
 
-        # Generate and save metadata for cross-plan tracking
-        self._generate_plan_metadata(
-            request=request,
-            plan_dir=output_path,
-            complexity=analysis.get("complexity", "complex"),
-            analysis=analysis
-        )
-
         return WorkflowResult(
             success=True,
             output_file=output_path,
@@ -919,236 +1085,13 @@ Focus on:
             }
         )
 
-    def _run_pre_planning_scan(self, request: str) -> tuple[ScanResult, Optional[dict]]:
-        """
-        Run pre-planning scan to check for duplicates and dependencies.
-
-        Returns:
-            Tuple of (ScanResult, AI analysis dict or None)
-        """
-        from core.symbols import CHECK, WARNING, CROSS
-
-        self.console.print("[bold]Pre-Planning Scan:[/bold] Checking for duplicates...")
-
-        # Quick keyword-based scan
-        scan_result = self.plan_registry.pre_planning_scan(request)
-
-        ai_analysis = None
-
-        if scan_result.duplicates and self._config.deduplication.use_ai_analysis:
-            # Run AI-powered deep analysis
-            self.console.print("  Found potential matches, running deep analysis...")
-
-            # Build context for deduplicator
-            similar_plans_context = []
-            for dup in scan_result.duplicates[:5]:  # Limit to top 5
-                plan_data = self.plan_registry.get_plan(dup["plan_id"])
-                if plan_data:
-                    similar_plans_context.append({
-                        "plan_id": dup["plan_id"],
-                        "request": plan_data.get("request", ""),
-                        "status": plan_data.get("status", ""),
-                        "keywords": plan_data.get("keywords", [])
-                    })
-
-            # Run deduplicator agent if available
-            if "deduplicator" in self.agents:
-                dedup_result = self.run_agent(
-                    "deduplicator",
-                    message=f"Analyze this new request for similarity:\n\n{request}",
-                    context=f"## Existing Plans\n\n```json\n{json.dumps(similar_plans_context, indent=2)}\n```",
-                    show_progress=False
-                )
-
-                if dedup_result.success:
-                    ai_analysis = self._parse_json_from_response(dedup_result.content)
-
-        # Report findings
-        if scan_result.recommendation == "block":
-            self.console.print(f"  [red]{CROSS}[/red] {scan_result.message}")
-        elif scan_result.recommendation == "warn":
-            self.console.print(f"  [yellow]{WARNING}[/yellow] {scan_result.message}")
-        else:
-            self.console.print(f"  [green]{CHECK}[/green] {scan_result.message}")
-
-        return scan_result, ai_analysis
-
-    def _display_conflict_details(
-        self,
-        scan_result: ScanResult,
-        ai_analysis: Optional[dict]
-    ) -> None:
-        """Display detailed conflict information to user."""
-        from rich.table import Table
-        from rich.panel import Panel
-
-        if scan_result.duplicates:
-            table = Table(title="Similar Plans Detected")
-            table.add_column("Plan ID", style="cyan")
-            table.add_column("Similarity", style="yellow")
-            table.add_column("Status", style="green")
-            table.add_column("Request", style="dim")
-
-            for dup in scan_result.duplicates:
-                request_text = dup.get("request", "")
-                if len(request_text) > 40:
-                    request_text = request_text[:40] + "..."
-                table.add_row(
-                    dup["plan_id"],
-                    f"{dup['similarity']:.0%}",
-                    dup.get("status", "unknown"),
-                    request_text
-                )
-
-            self.console.print(table)
-
-        if ai_analysis and ai_analysis.get("suggested_action"):
-            self.console.print(Panel(
-                ai_analysis["suggested_action"],
-                title="Suggestion",
-                border_style="yellow"
-            ))
-
-        if scan_result.dependencies:
-            self.console.print("\n[bold]Potential Dependencies:[/bold]")
-            for dep in scan_result.dependencies:
-                self.console.print(f"  - Plan {dep['plan_id']}: {dep['reason']}")
-
-    def _generate_plan_metadata(
-        self,
-        request: str,
-        plan_dir: Path,
-        complexity: str,
-        analysis: Optional[dict] = None,
-        adaptive: Optional[AdaptiveConfig] = None
-    ) -> PlanMetadata:
-        """
-        Generate metadata.json for a newly created plan.
-
-        Args:
-            request: Original user request
-            plan_dir: Path to the plan directory
-            complexity: Complexity level (simple, medium, complex, massive)
-            analysis: Optional analysis data from analyzer agent
-            adaptive: Optional AdaptiveConfig with output_format and agent_depth
-        """
-        # Extract plan ID from directory name
-        match = re.match(r'^(\d+)[_-](.+)$', plan_dir.name)
-        plan_id = match.group(1).lstrip('0') if match else "0"
-        plan_name = match.group(2) if match else plan_dir.name
-
-        # Extract keywords
-        keywords = self.plan_registry.extract_keywords(request)
-
-        # Infer features from analysis
-        features_provided = []
-        if analysis:
-            sub_features = analysis.get("sub_features", [])
-            for sf in sub_features:
-                if isinstance(sf, str):
-                    features_provided.append(sf.lower().replace(" ", "-"))
-                elif isinstance(sf, dict):
-                    name = sf.get("name", "")
-                    if name:
-                        features_provided.append(name.lower().replace(" ", "-"))
-
-        # If no features extracted, derive from keywords
-        if not features_provided:
-            features_provided = [f"{kw}-feature" for kw in keywords[:3]]
-
-        # Infer affected files
-        files_affected = self._infer_affected_files(request, keywords)
-
-        metadata = PlanMetadata(
-            plan_id=plan_id,
-            plan_name=plan_name,
-            request=request,
-            request_hash=self.plan_registry.compute_request_hash(request),
-            keywords=keywords,
-            features_provided=features_provided,
-            features_required=[],
-            files_affected=files_affected,
-            status="pending",
-            complexity=complexity,
-            created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
-        )
-
-        # Save metadata.json with adaptive info if available
-        metadata_dict = metadata.to_dict()
-        if adaptive:
-            metadata_dict["output_format"] = adaptive.output_format
-            metadata_dict["agent_depth"] = adaptive.agent_depth
-            metadata_dict["factors"] = adaptive.factors
-
-        metadata_path = plan_dir / "metadata.json"
-        metadata_path.write_text(
-            json.dumps(metadata_dict, indent=2),
-            encoding="utf-8"
-        )
-
-        # Trigger registry update
-        self.plan_registry.scan_existing_plans()
-
-        return metadata
-
-    def _infer_affected_files(self, request: str, keywords: list[str]) -> list[str]:
-        """Infer likely affected file patterns from request."""
-        patterns = []
-        request_lower = request.lower()
-
-        # Common patterns
-        pattern_map = {
-            'test': ['tests/*'],
-            'e2e': ['tests/e2e/*'],
-            'playwright': ['tests/e2e/*', 'playwright.config.*'],
-            'api': ['api/*', 'routes/*'],
-            'auth': ['auth/*', 'middleware/*'],
-            'config': ['config/*', '*.config.*'],
-            'ui': ['src/components/*'],
-            'component': ['src/components/*'],
-            'database': ['models/*', 'migrations/*'],
-        }
-
-        for keyword in keywords:
-            if keyword in pattern_map:
-                patterns.extend(pattern_map[keyword])
-
-        return list(dict.fromkeys(patterns)) or ['*']
-
-    def execute(self, request: str, force: bool = False) -> WorkflowResult:
+    def execute(self, request: str) -> WorkflowResult:
         """
         Execute the smart planning workflow.
 
         Args:
             request: The user's feature request
-            force: If True, skip duplicate detection (default False)
         """
-        # Phase 0: Pre-Planning Scan (if deduplication is enabled)
-        if not force and self._config.deduplication.enabled:
-            scan_result, ai_analysis = self._run_pre_planning_scan(request)
-
-            if scan_result.recommendation == "block":
-                self._display_conflict_details(scan_result, ai_analysis)
-                return WorkflowResult(
-                    success=False,
-                    error=f"Plan creation blocked: {scan_result.message}",
-                    data={
-                        "scan_result": {
-                            "has_conflicts": scan_result.has_conflicts,
-                            "duplicates": scan_result.duplicates,
-                            "dependencies": scan_result.dependencies,
-                            "recommendation": scan_result.recommendation,
-                            "message": scan_result.message
-                        },
-                        "ai_analysis": ai_analysis,
-                        "blocked": True
-                    }
-                )
-            elif scan_result.recommendation == "warn":
-                self._display_conflict_details(scan_result, ai_analysis)
-                self.console.print("\n[yellow]Proceeding despite warnings...[/yellow]\n")
-
         codebase_context = self._get_codebase_context()
 
         # Phase 1: Analyze complexity
@@ -1190,59 +1133,61 @@ Focus on:
         adaptive: AdaptiveConfig
     ) -> dict[str, str]:
         """
-        Compile simple/medium plan as a single file with all phases.
+        Compile plan as a single minimal file.
 
-        Structure:
-        - plan.md (complete plan: context → architecture → steps → validation)
-        - metadata.json (generated separately)
+        The planner output is already in the new format (GOAL/CONTEXT/STEPS/VERIFY).
+        We just need to add the header and clean it up.
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        # Extract GOAL from planner output
+        goal_match = re.search(r'GOAL:\s*(.+?)(?=\n\n|\nCONTEXT:)', planner, re.DOTALL)
+        goal = goal_match.group(1).strip() if goal_match else request[:100]
 
-        content = f"""# Plan: {request}
+        # Extract CONTEXT bullets from planner (or fall back to scout summary)
+        context_match = re.search(r'CONTEXT:\s*((?:- .+\n?)+)', planner)
+        if context_match:
+            context_section = context_match.group(1).strip()
+        else:
+            # Create context from scout output (first 5 meaningful lines)
+            scout_lines = [l.strip() for l in scout.split('\n') if l.strip() and not l.startswith('#')]
+            context_section = '\n'.join(f"- {l[:80]}" for l in scout_lines[:5])
 
-> Generated: {timestamp}
-> Complexity: {adaptive.complexity}
-> Depth: {adaptive.agent_depth}
+        # Extract STEPS section from planner - get everything between STEPS: and VERIFY:
+        steps_match = re.search(r'STEPS:\s*(.*?)(?=\n\s*VERIFY:|\Z)', planner, re.DOTALL | re.IGNORECASE)
+        if steps_match:
+            steps_section = steps_match.group(1).strip()
+        else:
+            # Fallback: use planner content as-is (for backward compatibility)
+            steps_section = planner
+
+        # Extract VERIFY section from planner
+        verify_match = re.search(r'VERIFY:\s*((?:- .+\n?)+)', planner)
+        if verify_match:
+            verify_section = verify_match.group(1).strip()
+        else:
+            # Create verify from validator output
+            verify_section = "- Run tests to verify implementation"
+
+        # Build the minimal plan
+        content = f"""# Plan: {request[:100]}
+
+Request: {request}
+Complexity: {adaptive.complexity}
+
+## Goal
+
+{goal}
 
 ## Context
 
-{scout}
+{context_section}
 
----
+## Steps
 
-## Architecture
+{steps_section}
 
-{architect}
-"""
+## Verify
 
-        if expert_insights:
-            content += "\n---\n\n## Expert Insights\n\n"
-            for insight in expert_insights:
-                content += f"### {insight.expert_name} ({insight.expert_type})\n\n"
-                content += f"{insight.insights}\n\n"
-                if insight.recommendations:
-                    content += "**Recommendations:**\n"
-                    for rec in insight.recommendations:
-                        content += f"- {rec}\n"
-                    content += "\n"
-                if insight.concerns:
-                    content += "**Concerns:**\n"
-                    for concern in insight.concerns:
-                        content += f"- {concern}\n"
-                    content += "\n"
-
-        content += f"""
----
-
-## Implementation Steps
-
-{planner}
-
----
-
-## Validation
-
-{validator}
+{verify_section}
 """
 
         return {"plan.md": content}
@@ -1258,131 +1203,62 @@ Focus on:
         expert_insights: Optional[list[ExpertInsight]] = None
     ) -> dict[str, str]:
         """
-        Compile master plan as multiple files.
+        Compile master plan as a SINGLE minimal file.
 
-        Returns:
-            Dict mapping filename to content for the plan folder.
-            Sub-features get their own numbered files.
+        The synthesis output should already be in GOAL/CONTEXT/STEPS/VERIFY format.
+        We produce one plan.md file, not multiple files.
         """
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
         complexity = analysis.get("complexity", "complex")
-        expert_count = len(expert_insights) if expert_insights else 0
 
-        files = {}
+        # Extract GOAL from synthesis output
+        goal_match = re.search(r'GOAL:\s*(.+?)(?=\n\n|\nCONTEXT:)', synthesis, re.DOTALL)
+        goal = goal_match.group(1).strip() if goal_match else request[:100]
 
-        # Build sub-features summary for overview
-        sub_features_summary = "\n".join([
-            f"- **{sp.name}** ({sp.id}) - `{i+2:02d}_sub-{self._slugify(sp.name)}.md`"
-            for i, sp in enumerate(sub_plans)
-        ])
+        # Extract CONTEXT from synthesis
+        context_match = re.search(r'CONTEXT:\s*((?:- .+\n?)+)', synthesis)
+        if context_match:
+            context_section = context_match.group(1).strip()
+        else:
+            # Build context from sub-features
+            context_lines = [f"- {sp.name}: {sp.id}" for sp in sub_plans[:5]]
+            context_section = '\n'.join(context_lines)
 
-        # Calculate the master implementation file number
-        master_impl_num = len(sub_plans) + 2
-        validation_num = master_impl_num + 1
+        # Extract STEPS from synthesis - get everything between STEPS: and VERIFY:
+        steps_match = re.search(r'STEPS:\s*(.*?)(?=\n\s*VERIFY:|\Z)', synthesis, re.DOTALL | re.IGNORECASE)
+        if steps_match:
+            steps_section = steps_match.group(1).strip()
+        else:
+            steps_section = synthesis
 
-        # 00_overview.md - Summary and metadata
-        files["00_overview.md"] = f"""# Master Plan: {request}
+        # Extract VERIFY from synthesis
+        verify_match = re.search(r'VERIFY:\s*((?:- .+\n?)+)', synthesis)
+        if verify_match:
+            verify_section = verify_match.group(1).strip()
+        else:
+            verify_section = "- Run full test suite\n- Verify all sub-features integrate correctly"
 
-> Generated on {timestamp}
-> Complexity: {complexity.upper()} (decomposed planning)
-> Sub-features: {len(sub_plans)}
-> Domain experts consulted: {expert_count}
+        content = f"""# Plan: {request[:100]}
 
-## Overview
+Request: {request}
+Complexity: {complexity}
 
-**Request:** {request}
+## Goal
 
-### Analysis
-- Complexity: {complexity}
-- Strategy: {analysis.get('strategy', 'decompose_sequential')}
-- Estimated steps: {analysis.get('estimated_steps', 'N/A')}
-
-## Plan Structure
-
-- `01_architecture.md` - High-level architecture{' and expert insights' if expert_insights else ''}
-{sub_features_summary}
-- `{master_impl_num:02d}_master-implementation.md` - Synthesized master implementation plan
-- `{validation_num:02d}_validation.md` - Validation checklist
-
-## Execution Notes
-
-1. Follow the phases in order
-2. Parallelize where indicated
-3. Run validation commands after each phase
-4. Integration testing after all features complete
-"""
-
-        # 01_architecture.md - Architecture + expert insights
-        architect_content = f"""# Architecture Overview
-
-> Part of master plan: {request}
-
-This document contains the high-level architecture design for the decomposed feature implementation.
-"""
-        if expert_insights:
-            architect_content += "\n---\n\n## Domain Expert Insights\n\n"
-            for insight in expert_insights:
-                architect_content += f"### {insight.expert_name} ({insight.expert_type})\n\n"
-                architect_content += f"{insight.insights}\n\n"
-                if insight.recommendations:
-                    architect_content += "**Recommendations:**\n"
-                    for rec in insight.recommendations:
-                        architect_content += f"- {rec}\n"
-                    architect_content += "\n"
-                if insight.concerns:
-                    architect_content += "**Concerns:**\n"
-                    for concern in insight.concerns:
-                        architect_content += f"- {concern}\n"
-                    architect_content += "\n"
-        files["01_architecture.md"] = architect_content
-
-        # Sub-feature files (02_sub-*, 03_sub-*, etc.)
-        for i, sp in enumerate(sub_plans):
-            file_num = i + 2
-            slug = self._slugify(sp.name)
-            filename = f"{file_num:02d}_sub-{slug}.md"
-
-            files[filename] = f"""# Sub-Feature: {sp.name}
-
-> Part of master plan: {request}
-> Sub-feature ID: {sp.id}
+{goal}
 
 ## Context
 
-{sp.scout_result}
+{context_section}
 
----
+## Steps
 
-## Architecture
+{steps_section}
 
-{sp.architect_result}
+## Verify
 
----
-
-## Implementation Steps
-
-{sp.planner_result}
+{verify_section}
 """
-
-        # Master implementation file
-        files[f"{master_impl_num:02d}_master-implementation.md"] = f"""# Master Implementation Plan
-
-> Part of master plan: {request}
-
-This document synthesizes all sub-feature plans into a cohesive implementation strategy.
-
-{synthesis}
-"""
-
-        # Validation file
-        files[f"{validation_num:02d}_validation.md"] = f"""# Validation
-
-> Part of master plan: {request}
-
-{validation}
-"""
-
-        return files
+        return {"plan.md": content}
 
     def _slugify(self, text: str) -> str:
         """Convert text to kebab-case slug for filenames."""

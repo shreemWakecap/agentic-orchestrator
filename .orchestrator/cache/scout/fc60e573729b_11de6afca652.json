@@ -1,0 +1,5 @@
+{
+  "cached_at": "2026-01-15T15:01:20.296926",
+  "request": "Create a parallel build test module structure in .orchestrator/tests/parallel_test/. Create: (1) models/user.py with User class containing id, name, email fields and validation. (2) models/product.py ",
+  "content": "PROJECT_TYPE: TypeScript/Node.js with Express (monorepo structure)\nSTRUCTURE: src/server/, src/agents/, src/workflow/, .orchestrator/\nPATTERNS: Agent-based architecture, specs in YAML, cache-based state management\nRELEVANT_FILES: None directly related - creating new test module from scratch\nNOTES: .orchestrator/ contains specs/cache/config; test structure should be self-contained with simple Python-style classes"
+}

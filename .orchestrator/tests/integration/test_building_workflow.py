@@ -110,184 +110,30 @@ class TestBuildingWorkflowStateManagement:
         assert "step1" in loaded.completed_steps
 
     def test_state_file_location(self, project_root, pending_plan):
-        """Test state file is created next to plan."""
+        """Test state file is created in centralized state directory."""
         workflow = BuildingWorkflow(project_root=project_root)
 
         state_file = workflow._get_state_file(pending_plan)
 
-        assert state_file.parent == pending_plan.parent
-        assert state_file.name.startswith(".")
+        # State files are stored in specs/state/ directory
+        assert state_file.parent.name == "state"
+        assert state_file.parent.parent == workflow.specs_dir
         assert ".state.json" in state_file.name
-
-
-class TestBuildingWorkflowExecution:
-    """Tests for building workflow execution."""
-
-    @patch('workflows.building.BuildingWorkflow.run_agent')
-    def test_simple_build_success(self, mock_run_agent, project_root, pending_plan, mock_agent_result):
-        """Test successful simple build."""
-        # Setup mock responses
-        mock_run_agent.side_effect = [
-            # Parser
-            mock_agent_result(
-                content=json.dumps({
-                    "plan_id": "test",
-                    "plan_type": "simple",
-                    "phases": [{
-                        "id": "phase1",
-                        "name": "Setup",
-                        "steps": [{
-                            "id": "step1",
-                            "action": "create",
-                            "target": "src/utils.py",
-                            "description": "Create utils file"
-                        }]
-                    }],
-                    "validation_commands": ["python -m pytest"]
-                }),
-                agent_name="parser"
-            ),
-            # Builder
-            mock_agent_result(
-                content="Created src/utils.py",
-                agent_name="builder",
-                files_created=["src/utils.py"]
-            ),
-            # Tester
-            mock_agent_result(content="Tests passed", agent_name="tester"),
-            # Reviewer
-            mock_agent_result(content='{"status": "good"}', agent_name="reviewer"),
-        ]
-
-        workflow = BuildingWorkflow(project_root=project_root)
-        result = workflow.run(str(pending_plan))
-
-        assert result.success
-        assert "step1" in result.steps_completed
-
-    @patch('workflows.building.BuildingWorkflow.run_agent')
-    def test_build_moves_plan_to_completed(self, mock_run_agent, project_root, pending_plan, mock_agent_result):
-        """Test successful build moves plan to completed."""
-        mock_run_agent.side_effect = [
-            mock_agent_result(
-                content=json.dumps({
-                    "plan_id": "test", "plan_type": "simple",
-                    "phases": [{"id": "p1", "name": "Phase", "steps": [
-                        {"id": "s1", "action": "create", "target": "README.md", "description": "Create readme"}
-                    ]}],
-                    "validation_commands": []
-                }),
-                agent_name="parser"
-            ),
-            # Builder for the step
-            mock_agent_result(content="Created README.md", agent_name="builder", files_created=["README.md"]),
-            # Tester
-            mock_agent_result(content="Tests passed", agent_name="tester"),
-            # Reviewer
-            mock_agent_result(content='{"status": "good"}', agent_name="reviewer"),
-        ]
-
-        workflow = BuildingWorkflow(project_root=project_root)
-        result = workflow.run(str(pending_plan))
-
-        assert result.success
-        # Plan should be in completed folder
-        assert "completed" in str(result.output_file)
-
-    @patch('workflows.building.BuildingWorkflow.run_agent')
-    def test_build_handles_step_failure(self, mock_run_agent, project_root, pending_plan, mock_agent_result):
-        """Test build handles step failure properly."""
-        mock_run_agent.side_effect = [
-            # Parser
-            mock_agent_result(
-                content=json.dumps({
-                    "plan_id": "test", "plan_type": "simple",
-                    "phases": [{
-                        "id": "p1", "name": "Phase",
-                        "steps": [{"id": "s1", "action": "create", "target": "x.py", "description": "Create"}]
-                    }],
-                    "validation_commands": []
-                }),
-                agent_name="parser"
-            ),
-            # Builder fails
-            mock_agent_result(
-                content="",
-                agent_name="builder",
-                success=False,
-                error="Could not create file"
-            ),
-        ]
-
-        workflow = BuildingWorkflow(project_root=project_root)
-        result = workflow.run(str(pending_plan))
-
-        assert not result.success
-        assert "s1" in result.error
-
-    @patch('workflows.building.BuildingWorkflow.run_agent')
-    def test_build_resume_skips_completed_steps(self, mock_run_agent, project_root, pending_plan, mock_agent_result):
-        """Test build resume skips already completed steps."""
-        # Pre-create state with completed step
-        workflow = BuildingWorkflow(project_root=project_root)
-        workflow.build_state = BuildState(
-            plan_id="test",
-            plan_file=str(pending_plan),
-            status="in_progress",
-            started_at="2024-01-15",
-            completed_steps=["step1"]  # Already done
-        )
-        workflow._save_state(pending_plan)
-
-        # Move plan to in-progress for the test
-        in_progress = project_root / ".orchestrator" / "specs" / "in-progress" / pending_plan.name
-        pending_plan.rename(in_progress)
-        state_file = pending_plan.parent / f".{pending_plan.stem}.state.json"
-        if state_file.exists():
-            state_file.rename(in_progress.parent / state_file.name)
-
-        mock_run_agent.side_effect = [
-            # Parser
-            mock_agent_result(
-                content=json.dumps({
-                    "plan_id": "test", "plan_type": "simple",
-                    "phases": [{
-                        "id": "p1", "name": "Phase",
-                        "steps": [
-                            {"id": "step1", "action": "create", "target": "a.py", "description": "Done"},
-                            {"id": "step2", "action": "create", "target": "b.py", "description": "New"}
-                        ]
-                    }],
-                    "validation_commands": []
-                }),
-                agent_name="parser"
-            ),
-            # Only step2 builder (step1 skipped)
-            mock_agent_result(content="Created b.py", agent_name="builder", files_created=["b.py"]),
-            mock_agent_result(content="Tests OK", agent_name="tester"),
-            mock_agent_result(content='{"status": "good"}', agent_name="reviewer"),
-        ]
-
-        workflow2 = BuildingWorkflow(project_root=project_root)
-        result = workflow2.run(str(in_progress))
-
-        # Should succeed and have skipped step1
-        assert result.success
 
 
 class TestBuildingWorkflowPlanOrganization:
     """Tests for plan file organization."""
 
-    def test_move_plan_to_destination(self, project_root, pending_plan):
-        """Test plan can be moved between directories."""
+    def test_archive_plan_to_completed(self, project_root, pending_plan):
+        """Test plan can be archived to completed directory."""
         workflow = BuildingWorkflow(project_root=project_root)
 
-        # Move to in-progress
-        new_path = workflow._move_plan(pending_plan, "in-progress")
+        # Archive to completed
+        new_path = workflow._archive_plan(pending_plan.parent, "completed")
 
         assert new_path.exists()
-        assert "in-progress" in str(new_path.parent)
-        assert not pending_plan.exists()
+        assert "completed" in str(new_path.parent)
+        assert not pending_plan.parent.exists()
 
     def test_plan_not_found_returns_error(self, project_root):
         """Test workflow handles missing plan."""

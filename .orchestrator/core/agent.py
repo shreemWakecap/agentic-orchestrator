@@ -53,17 +53,18 @@ TRANSIENT_ERRORS = (
 # Expected output markers for each agent type - used to validate responses
 # If an agent's output doesn't contain these markers, it's likely a placeholder
 AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
-    # JSON-output agents (structured data)
-    "scout": ['"project_type"', '"tech_stack"', '"relevant_files"'],
-    "architect": ['"approach"', '"components"', '"data_flow"'],
-    "validator": ["## Validation", "## Checks", "## Summary"],
-    "parser": ['"phases"', '"steps"', '"plan_id"'],
+    # New simplified text formats
+    "scout": ["PROJECT_TYPE:", "STRUCTURE:"],
+    "architect": ["APPROACH:", "FILES_TO_"],
+    "planner": ["GOAL:", "STEPS:", "DO:"],
+    "synthesizer": ["GOAL:", "STEPS:"],
+    # JSON-output agents
+    "validator": ['"status"', '"score"'],
+    "analyzer": ['"complexity"', '"strategy"'],
+    "decomposer": ['"sub_features"', '"execution_order"'],
+    "parser": ['"phases"', '"steps"'],
     "syncer": ['"commit_message"', '"pr_description"'],
     # Markdown-output agents
-    "planner": ["## Goal", "## Steps", "## Verification"],
-    "synthesizer": ["## Master Plan", "## Implementation"],
-    "decomposer": ["## Sub-Features", "###"],
-    "analyzer": ["## Complexity", "##"],
     "fixer": ["## Fix", "##"],
     "reviewer": ["## Goals", "## Summary"],
     # Agentic agents (use tools, not text output)

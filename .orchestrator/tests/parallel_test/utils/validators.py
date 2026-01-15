@@ -28,7 +28,7 @@ def validate_price(price) -> bool:
         price: The price value to validate (int, float, or string).
 
     Returns:
-        True if the price is valid (non-negative number), False otherwise.
+        True if the price is valid (positive number), False otherwise.
     """
     if price is None:
         return False

@@ -37,3 +37,4 @@ uv.lock
 
 # Future requirements (local planning file)
 .future_requirements.md
+node_modules

@@ -1,0 +1,32 @@
+{
+  "plan_id": "005_master-extract-inline-javascript-from-orchestratorservertemplateshtml",
+  "plan_file": "D:\\agentic-orchestrator\\.orchestrator\\specs\\completed\\005_master-extract-inline-javascript-from-orchestratorservertemplateshtml",
+  "status": "completed",
+  "started_at": "2026-01-15T17:02:44.027704",
+  "updated_at": "2026-01-15T17:06:33.287777",
+  "current_phase": 0,
+  "current_step": "",
+  "total_steps": 1,
+  "completed_steps": [
+    "step-1"
+  ],
+  "failed_steps": [],
+  "skipped_steps": [],
+  "step_states": {
+    "step-1": {
+      "step_id": "step-1",
+      "status": "completed",
+      "started_at": "2026-01-15T17:02:56.659982",
+      "completed_at": "2026-01-15T17:03:13.951286",
+      "retry_count": 0,
+      "error": null,
+      "files_affected": [
+        ".orchestrator/package.json"
+      ],
+      "summary": "## Summary\n\n**File Created:** `.orchestrator/package.json`\n\n**Changes Made:**\n- Created a new npm package configuration file with:\n  - Package name: `orchestrator-frontend`\n  - Version: `1.0.0`\n  - Pr"
+    }
+  },
+  "files_created": [],
+  "files_modified": [],
+  "last_error": null
+}

@@ -85,21 +85,33 @@ Additional text."""
     @patch('workflows.planning.PlanningWorkflow.run_agent')
     def test_simple_planning_success(self, mock_run_agent, project_root, mock_agent_result):
         """Test successful simple planning workflow."""
-        # Setup mock responses
+        # Setup mock responses with proper AGENT_OUTPUT_MARKERS
         mock_run_agent.side_effect = [
             # Analyzer
             mock_agent_result(
                 content='```json\n{"complexity": "simple", "needs_decomposition": false}\n```',
                 agent_name="analyzer"
             ),
-            # Scout
-            mock_agent_result(content="Found: src/, tests/", agent_name="scout"),
-            # Architect
-            mock_agent_result(content="## Architecture\nUse modular design", agent_name="architect"),
-            # Planner
-            mock_agent_result(content="## Steps\n1. Create file\n2. Add tests", agent_name="planner"),
-            # Validator
-            mock_agent_result(content="Plan is valid", agent_name="validator"),
+            # Scout - needs PROJECT_TYPE: or STRUCTURE:
+            mock_agent_result(
+                content="PROJECT_TYPE: Python\nSTRUCTURE: src/, tests/, config/\nPATTERNS: Standard layout\nRELEVANT_FILES: src/main.py",
+                agent_name="scout"
+            ),
+            # Architect - needs APPROACH: or FILES_TO_
+            mock_agent_result(
+                content="APPROACH: Modular design with separation of concerns\nFILES_TO_CREATE: src/logging.py\nFILES_TO_MODIFY: src/main.py",
+                agent_name="architect"
+            ),
+            # Planner - needs GOAL:, STEPS:, or DO:
+            mock_agent_result(
+                content="GOAL: Add logging feature\nSTEPS:\n1. Create logging module\n2. Add tests\nDO: Implement step by step",
+                agent_name="planner"
+            ),
+            # Validator - needs JSON with status and score >= 70
+            mock_agent_result(
+                content='```json\n{"status": "approved", "score": 85, "summary": "Plan is valid and complete. All steps are well-defined and achievable."}\n```',
+                agent_name="validator"
+            ),
         ]
 
         workflow = PlanningWorkflow(project_root=project_root)
@@ -121,11 +133,23 @@ Additional text."""
                 success=False,
                 error="Analyzer timeout"
             ),
-            # Simple planning agents
-            mock_agent_result(content="Codebase context", agent_name="scout"),
-            mock_agent_result(content="Architecture", agent_name="architect"),
-            mock_agent_result(content="Plan steps", agent_name="planner"),
-            mock_agent_result(content="Valid", agent_name="validator"),
+            # Simple planning agents with proper markers
+            mock_agent_result(
+                content="PROJECT_TYPE: Python\nSTRUCTURE: src/, tests/\nPATTERNS: Standard\nRELEVANT_FILES: main.py",
+                agent_name="scout"
+            ),
+            mock_agent_result(
+                content="APPROACH: Simple modular design\nFILES_TO_CREATE: feature.py\nFILES_TO_MODIFY: None",
+                agent_name="architect"
+            ),
+            mock_agent_result(
+                content="GOAL: Add feature\nSTEPS:\n1. Create feature file\n2. Write tests\nDO: Implement",
+                agent_name="planner"
+            ),
+            mock_agent_result(
+                content='```json\n{"status": "approved", "score": 85, "summary": "Plan is valid and complete."}\n```',
+                agent_name="validator"
+            ),
         ]
 
         workflow = PlanningWorkflow(project_root=project_root)
@@ -173,25 +197,46 @@ class TestPlanningWorkflowComplex:
                 content='```json\n{"complexity": "complex", "needs_decomposition": true, "strategy": "decompose_sequential"}\n```',
                 agent_name="analyzer"
             ),
-            # Global scout (Phase 2a)
-            mock_agent_result(content="Global codebase context", agent_name="scout"),
-            # Preliminary architect (Phase 2b - for expert consultation)
-            mock_agent_result(content="High-level architecture overview", agent_name="architect"),
-            # Decomposer (Phase 2c)
+            # Global scout (Phase 2a) - needs PROJECT_TYPE: or STRUCTURE:
             mock_agent_result(
-                content='```json\n{"sub_features": [{"id": "sf1", "name": "Auth", "description": "User auth", "context_summary": ""}]}\n```',
+                content="PROJECT_TYPE: TypeScript\nSTRUCTURE: src/, lib/, auth/\nPATTERNS: Modular auth\nRELEVANT_FILES: src/auth/index.ts",
+                agent_name="scout"
+            ),
+            # Preliminary architect (Phase 2b) - needs APPROACH: or FILES_TO_
+            mock_agent_result(
+                content="APPROACH: Multi-provider auth system\nFILES_TO_CREATE: src/auth/oauth.ts, src/auth/saml.ts\nFILES_TO_MODIFY: src/config.ts",
+                agent_name="architect"
+            ),
+            # Decomposer (Phase 2c) - needs 50+ chars
+            mock_agent_result(
+                content='DECOMPOSITION ANALYSIS:\n```json\n{"sub_features": [{"id": "sf1", "name": "Auth", "description": "User authentication module with OAuth2 support", "context_summary": "Authentication system integration"}]}\n```',
                 agent_name="decomposer"
             ),
-            # Sub-feature scout (Phase 3 - targeted exploration)
-            mock_agent_result(content="Auth specific context", agent_name="scout"),
-            # Sub-feature architect
-            mock_agent_result(content="Auth architecture", agent_name="architect"),
-            # Sub-feature planner
-            mock_agent_result(content="Auth steps", agent_name="planner"),
-            # Synthesizer (Phase 4)
-            mock_agent_result(content="Master plan", agent_name="synthesizer"),
-            # Validator (Phase 5)
-            mock_agent_result(content="Valid", agent_name="validator"),
+            # Sub-feature scout (Phase 3) - needs PROJECT_TYPE: or STRUCTURE:
+            mock_agent_result(
+                content="PROJECT_TYPE: TypeScript\nSTRUCTURE: auth/\nPATTERNS: OAuth flow\nRELEVANT_FILES: auth/oauth.ts",
+                agent_name="scout"
+            ),
+            # Sub-feature architect - needs APPROACH: or FILES_TO_
+            mock_agent_result(
+                content="APPROACH: OAuth2 with PKCE flow\nFILES_TO_CREATE: auth/providers/oauth.ts\nFILES_TO_MODIFY: auth/index.ts",
+                agent_name="architect"
+            ),
+            # Sub-feature planner - needs GOAL:, STEPS:, or DO:
+            mock_agent_result(
+                content="GOAL: Implement OAuth authentication\nSTEPS:\n1. Create OAuth provider\n2. Add callback handler\nDO: Implement incrementally",
+                agent_name="planner"
+            ),
+            # Synthesizer (Phase 4) - needs GOAL: or STEPS:
+            mock_agent_result(
+                content="GOAL: Complete auth system implementation\nSTEPS:\n1. OAuth provider\n2. SAML integration\n3. 2FA setup",
+                agent_name="synthesizer"
+            ),
+            # Validator (Phase 5) - needs JSON with status and score >= 70
+            mock_agent_result(
+                content='```json\n{"status": "approved", "score": 90, "summary": "Comprehensive plan validated successfully. All sub-features are properly integrated."}\n```',
+                agent_name="validator"
+            ),
         ]
 
         workflow = PlanningWorkflow(project_root=project_root)
@@ -212,20 +257,38 @@ class TestPlanningWorkflowComplex:
                 content='{"complexity": "complex", "needs_decomposition": true}',
                 agent_name="analyzer"
             ),
-            # Global scout (Phase 2a)
-            mock_agent_result(content="Context", agent_name="scout"),
-            # Preliminary architect (Phase 2b)
-            mock_agent_result(content="Prelim architecture", agent_name="architect"),
-            # Decomposer - returns no sub_features (Phase 2c)
+            # Global scout (Phase 2a) - needs PROJECT_TYPE: or STRUCTURE:
             mock_agent_result(
-                content='{"sub_features": []}',
+                content="PROJECT_TYPE: Python\nSTRUCTURE: src/, tests/\nPATTERNS: Standard\nRELEVANT_FILES: main.py",
+                agent_name="scout"
+            ),
+            # Preliminary architect (Phase 2b) - needs APPROACH: or FILES_TO_
+            mock_agent_result(
+                content="APPROACH: Simple modular design\nFILES_TO_CREATE: feature.py\nFILES_TO_MODIFY: main.py",
+                agent_name="architect"
+            ),
+            # Decomposer - returns no sub_features (Phase 2c) - needs 50+ chars
+            mock_agent_result(
+                content='DECOMPOSITION ANALYSIS: Feature is simple enough for direct implementation.\n```json\n{"sub_features": []}\n```',
                 agent_name="decomposer"
             ),
             # Falls back to simple planning: scout → architect → planner → validator
-            mock_agent_result(content="Scout", agent_name="scout"),
-            mock_agent_result(content="Arch", agent_name="architect"),
-            mock_agent_result(content="Plan", agent_name="planner"),
-            mock_agent_result(content="Valid", agent_name="validator"),
+            mock_agent_result(
+                content="PROJECT_TYPE: Python\nSTRUCTURE: src/\nPATTERNS: Standard\nRELEVANT_FILES: main.py",
+                agent_name="scout"
+            ),
+            mock_agent_result(
+                content="APPROACH: Direct implementation\nFILES_TO_CREATE: feature.py\nFILES_TO_MODIFY: None",
+                agent_name="architect"
+            ),
+            mock_agent_result(
+                content="GOAL: Add feature\nSTEPS:\n1. Create module\n2. Add tests\nDO: Implement",
+                agent_name="planner"
+            ),
+            mock_agent_result(
+                content='```json\n{"status": "approved", "score": 85, "summary": "Plan is valid and complete."}\n```',
+                agent_name="validator"
+            ),
         ]
 
         workflow = PlanningWorkflow(project_root=project_root)
@@ -255,10 +318,22 @@ class TestPlanningWorkflowOutput:
         """Test plan file is created in pending directory."""
         mock_run_agent.side_effect = [
             mock_agent_result(content='{"complexity": "simple"}', agent_name="analyzer"),
-            mock_agent_result(content="Scout", agent_name="scout"),
-            mock_agent_result(content="Arch", agent_name="architect"),
-            mock_agent_result(content="Plan", agent_name="planner"),
-            mock_agent_result(content="Valid", agent_name="validator"),
+            mock_agent_result(
+                content="PROJECT_TYPE: Python\nSTRUCTURE: src/\nPATTERNS: Standard\nRELEVANT_FILES: main.py",
+                agent_name="scout"
+            ),
+            mock_agent_result(
+                content="APPROACH: Add logging module\nFILES_TO_CREATE: src/logging.py\nFILES_TO_MODIFY: None",
+                agent_name="architect"
+            ),
+            mock_agent_result(
+                content="GOAL: Add logging\nSTEPS:\n1. Create logger\n2. Configure output\nDO: Implement",
+                agent_name="planner"
+            ),
+            mock_agent_result(
+                content='```json\n{"status": "approved", "score": 85, "summary": "Plan is valid and complete."}\n```',
+                agent_name="validator"
+            ),
         ]
 
         workflow = PlanningWorkflow(project_root=project_root)
@@ -272,17 +347,33 @@ class TestPlanningWorkflowOutput:
         """Test generated plan has required sections."""
         mock_run_agent.side_effect = [
             mock_agent_result(content='{"complexity": "simple"}', agent_name="analyzer"),
-            mock_agent_result(content="# Context\nFound src/", agent_name="scout"),
-            mock_agent_result(content="# Architecture\nModular", agent_name="architect"),
-            mock_agent_result(content="# Plan\n1. Step one", agent_name="planner"),
-            mock_agent_result(content="Validated", agent_name="validator"),
+            mock_agent_result(
+                content="PROJECT_TYPE: Python\nSTRUCTURE: src/, tests/\nPATTERNS: Standard layout\nRELEVANT_FILES: src/main.py",
+                agent_name="scout"
+            ),
+            mock_agent_result(
+                content="APPROACH: Modular architecture\nFILES_TO_CREATE: src/feature.py\nFILES_TO_MODIFY: src/main.py",
+                agent_name="architect"
+            ),
+            mock_agent_result(
+                content="GOAL: Add feature\nSTEPS:\n1. Step one\n2. Step two\nDO: Implement incrementally",
+                agent_name="planner"
+            ),
+            mock_agent_result(
+                content='```json\n{"status": "approved", "score": 85, "summary": "Plan validated successfully."}\n```',
+                agent_name="validator"
+            ),
         ]
 
         workflow = PlanningWorkflow(project_root=project_root)
         result = workflow.run("Add feature")
 
-        plan_content = result.output_file.read_text()
+        # output_file is now a folder, plan is inside as plan.md
+        plan_file = result.output_file / "plan.md"
+        plan_content = plan_file.read_text()
 
-        assert "## Overview" in plan_content or "# Plan" in plan_content
-        assert "Architecture" in plan_content
-        assert "Plan" in plan_content or "Implementation" in plan_content
+        # New plan format has Goal, Context, Steps, Verify sections
+        assert "# Plan" in plan_content
+        assert "## Goal" in plan_content
+        assert "## Context" in plan_content
+        assert "## Steps" in plan_content

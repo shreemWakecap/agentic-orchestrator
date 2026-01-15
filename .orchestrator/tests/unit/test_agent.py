@@ -151,24 +151,40 @@ class TestAgentLoading:
 class TestAgentPromptBuilding:
     """Tests for Agent prompt building."""
 
-    def test_build_prompt_basic(self, project_root):
-        """Test basic prompt building."""
+    def test_build_enhanced_system_prompt(self, project_root):
+        """Test enhanced system prompt building."""
         agent = Agent.load("scout", project_root)
-        prompt = agent._build_prompt("Explore the codebase")
+        prompt = agent._build_enhanced_system_prompt()
 
-        assert "<system>" in prompt
-        assert "</system>" in prompt
-        assert "Explore the codebase" in prompt
+        # Should contain the base system prompt plus enforcement
+        assert "CRITICAL INSTRUCTIONS" in prompt
+        assert "REQUIREMENTS:" in prompt
 
-    def test_build_prompt_with_context(self, project_root):
-        """Test prompt building with context."""
+    def test_build_enhanced_system_prompt_retry(self, project_root):
+        """Test enhanced system prompt with retry flag."""
         agent = Agent.load("scout", project_root)
-        prompt = agent._build_prompt("Do something", context="Previous context here")
+        prompt = agent._build_enhanced_system_prompt(is_retry=True)
 
-        assert "## Context" in prompt
-        assert "Previous context here" in prompt
-        assert "## Task" in prompt
-        assert "Do something" in prompt
+        assert "RETRY" in prompt
+        assert "previous response was rejected" in prompt
+
+    def test_build_user_message_basic(self, project_root):
+        """Test basic user message building."""
+        agent = Agent.load("scout", project_root)
+        message = agent._build_user_message("Explore the codebase")
+
+        assert "## Task" in message
+        assert "Explore the codebase" in message
+
+    def test_build_user_message_with_context(self, project_root):
+        """Test user message building with context."""
+        agent = Agent.load("scout", project_root)
+        message = agent._build_user_message("Do something", context="Previous context here")
+
+        assert "## Context" in message
+        assert "Previous context here" in message
+        assert "## Task" in message
+        assert "Do something" in message
 
 
 class TestAgentExecution:
@@ -307,6 +323,13 @@ class TestAgentRetries:
         """Test agent retries on transient errors."""
         call_count = 0
 
+        # Response needs to be >50 chars and contain expected markers to pass validation
+        valid_response = """PROJECT_TYPE: Python
+STRUCTURE: src/, tests/, config/
+PATTERNS: Standard Python project structure
+RELEVANT_FILES: src/main.py, tests/test_main.py
+NOTES: This is a valid scout response that passes validation checks."""
+
         def mock_run(*args, **kwargs):
             nonlocal call_count
             call_count += 1
@@ -319,7 +342,7 @@ class TestAgentRetries:
             else:
                 result = MagicMock()
                 result.returncode = 0
-                result.stdout = "Success after retries"
+                result.stdout = valid_response
                 result.stderr = ""
                 return result
 

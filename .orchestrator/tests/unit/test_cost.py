@@ -159,12 +159,9 @@ Final step
     def test_estimate_reviewing(self, estimator, tmp_path):
         plan_file = tmp_path / "test_plan.md"
         plan_file.write_text("Test plan")
-        estimate = estimator.estimate_reviewing(plan_file, tech_count=3)
+        estimate = estimator.estimate_reviewing(plan_file)
         assert estimate.workflow == "reviewing"
-        assert "stack_detector" in estimate.agents
-        # Should have 3 expert agents
-        expert_agents = [a for a in estimate.agents if a.startswith("expert_")]
-        assert len(expert_agents) == 3
+        assert "reviewer" in estimate.agents
 
     def test_record_and_load_history(self, tmp_path):
         history_file = tmp_path / "cost_history.json"

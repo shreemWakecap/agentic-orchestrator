@@ -127,56 +127,72 @@ def test_plan_data(tmp_path: Path) -> Generator[dict, None, None]:
 
     plan_content = """# Test Feature Plan
 
-## Overview
-A simple test feature for E2E testing.
+Request: Create a test feature for E2E testing
+Complexity: simple
 
-## Phase 1: Setup
-### Step 1.1: Create test file
-- Create `src/test.py` with test function
+## Goal
 
-## Phase 2: Testing
-### Step 2.1: Add tests
-- Create tests for the test function
+Create a simple test feature for E2E testing.
 
-## Validation
+## Context
+
+- E2E test fixture
+- Simple complexity
+
+## Steps
+
+1. Create test file
+   DO: Create `src/test.py` with test function
+   IN: none
+   OUT: src/test.py
+   DONE: File exists with test function
+   NEEDS: none
+
+2. Add tests
+   DO: Create tests for the test function
+   IN: src/test.py
+   OUT: tests/test_feature.py
+   DONE: pytest passes
+   NEEDS: 1
+
+## Verify
+
 - Run: pytest tests/
 """
     (pending_plan_dir / "plan.md").write_text(plan_content, encoding="utf-8")
-
-    metadata = {
-        "name": "Test Feature",
-        "request": "Create a test feature for E2E testing",
-        "complexity": "simple",
-        "created_at": "2024-01-15T10:00:00"
-    }
-    import json
-    (pending_plan_dir / "metadata.json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
     # Create a sample completed plan
     completed_plan_dir = specs_dir / "completed" / "002_completed-feature"
     completed_plan_dir.mkdir(parents=True, exist_ok=True)
 
-    completed_plan_content = """# Completed Feature Plan
+    completed_plan_content = """# Plan: Completed Feature
 
-## Overview
-A completed feature for E2E testing.
+Request: A feature that has been completed
+Complexity: medium
 
-## Phase 1: Implementation
-### Step 1.1: Implementation complete
-- All code has been implemented
+## Goal
 
-## Validation
+Complete a feature for E2E testing.
+
+## Context
+
+- E2E test fixture
+- Completed status
+
+## Steps
+
+1. Implementation complete
+   DO: All code has been implemented
+   IN: none
+   OUT: src/completed.py
+   DONE: All tests pass
+   NEEDS: none
+
+## Verify
+
 - All tests pass
 """
     (completed_plan_dir / "plan.md").write_text(completed_plan_content, encoding="utf-8")
-
-    completed_metadata = {
-        "name": "Completed Feature",
-        "request": "A feature that has been completed",
-        "complexity": "medium",
-        "created_at": "2024-01-14T10:00:00"
-    }
-    (completed_plan_dir / "metadata.json").write_text(json.dumps(completed_metadata, indent=2), encoding="utf-8")
 
     yield {
         "specs_dir": specs_dir,

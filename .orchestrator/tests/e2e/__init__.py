@@ -1,2 +1,1 @@
-# E2E Tests Package
-# End-to-end tests using Playwright for browser automation
+# E2E tests for the orchestrator web interface

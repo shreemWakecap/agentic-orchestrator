@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "plan_id": "8",
+  "plan_name": "config-file-reader-utility",
+  "request": "Add a config file reader utility",
+  "request_hash": "74aff940039a406d",
+  "keywords": [
+    "config",
+    "file",
+    "reader",
+    "utility"
+  ],
+  "features_provided": [
+    "config-feature",
+    "file-feature",
+    "reader-feature"
+  ],
+  "features_required": [],
+  "files_affected": [
+    "config/*",
+    "*.config.*"
+  ],
+  "modules_touched": [],
+  "depends_on": [],
+  "blocked_by": [],
+  "status": "pending",
+  "complexity": "simple",
+  "created_at": "2026-01-15T10:29:42.577626",
+  "updated_at": "2026-01-15T10:29:42.577626",
+  "similarity_scores": {},
+  "output_format": "minimal",
+  "agent_depth": "brief",
+  "factors": {
+    "estimated_steps": 3,
+    "files_affected": 2,
+    "cross_module": false,
+    "dependencies_external": 1,
+    "risk_level": "low"
+  }
+}

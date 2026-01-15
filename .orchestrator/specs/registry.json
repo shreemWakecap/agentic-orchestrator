@@ -1,90 +1,7 @@
 {
   "schema_version": "1.0",
-  "last_scan": "2026-01-15T00:59:56.532496",
+  "last_scan": "2026-01-15T10:29:42.586607",
   "plans": {
-    "1": {
-      "path": "completed/001_test-module-3-independent-model",
-      "status": "completed",
-      "request": "Create a test module with 3 independent model files (user.py, product.py, order.py) in tests/parallel_test/models/, a registry.py that imports all models, and 2 utility files (validators.py, formatters.py) in tests/parallel_test/utils/. Each file should have a simple class or function. This tests parallel build capability.",
-      "request_hash": "622198ff625fe64a",
-      "keywords": [
-        "test",
-        "module",
-        "independent",
-        "model",
-        "files",
-        "userpy",
-        "productpy",
-        "orderpy",
-        "testsparallel_testmodels",
-        "registrypy",
-        "imports",
-        "all",
-        "models",
-        "utility",
-        "files",
-        "validatorspy",
-        "formatterspy",
-        "testsparallel_testutils",
-        "each",
-        "file",
-        "simple",
-        "class",
-        "function",
-        "tests",
-        "parallel",
-        "capability"
-      ],
-      "features_provided": [
-        "test-feature",
-        "module-feature",
-        "independent-feature"
-      ],
-      "files_affected": [
-        "tests/*"
-      ],
-      "depends_on": []
-    },
-    "2": {
-      "path": "pending/002_playwright-e2e-tests-critical-user",
-      "status": "pending",
-      "request": "Add Playwright E2E tests for critical user flows in the orchestrator web UI. Cover: (1) viewing plan list, (2) viewing plan details, (3) starting a build. Create tests/e2e/ directory, add playwright.config.ts, and implement tests using @playwright/test.",
-      "request_hash": "32b6ff2d7c2fcb51",
-      "keywords": [
-        "playwright",
-        "e2e",
-        "tests",
-        "critical",
-        "user",
-        "flows",
-        "orchestrator",
-        "web",
-        "cover",
-        "viewing",
-        "plan",
-        "list",
-        "viewing",
-        "plan",
-        "details",
-        "starting",
-        "testse2e",
-        "directory",
-        "playwrightconfigts",
-        "tests",
-        "using",
-        "playwrighttest"
-      ],
-      "features_provided": [
-        "playwright-feature",
-        "e2e-feature",
-        "tests-feature"
-      ],
-      "files_affected": [
-        "tests/e2e/*",
-        "playwright.config.*"
-      ],
-      "depends_on": []
-    },
     "3": {
       "path": "pending/003_extract-inline-javascript-from-servertemplateshtml",
       "status": "pending",
@@ -254,29 +171,131 @@
         "playwright.config.*"
       ],
       "depends_on": []
+    },
+    "7": {
+      "path": "pending/007_simple-logging-utility",
+      "status": "pending",
+      "request": "Add a simple logging utility",
+      "request_hash": "8e34d589e28190f4",
+      "keywords": [
+        "simple",
+        "logging",
+        "utility"
+      ],
+      "features_provided": [
+        "simple-feature",
+        "logging-feature",
+        "utility-feature"
+      ],
+      "files_affected": [
+        "*"
+      ],
+      "depends_on": []
+    },
+    "8": {
+      "path": "pending/008_config-file-reader-utility",
+      "status": "pending",
+      "request": "Add a config file reader utility",
+      "request_hash": "74aff940039a406d",
+      "keywords": [
+        "config",
+        "file",
+        "reader",
+        "utility"
+      ],
+      "features_provided": [
+        "config-feature",
+        "file-feature",
+        "reader-feature"
+      ],
+      "files_affected": [
+        "config/*",
+        "*.config.*"
+      ],
+      "depends_on": []
+    },
+    "1": {
+      "path": "completed/001_test-that-validates-form-elements",
+      "status": "completed",
+      "request": "Create a test that validates form elements render with expected CSS classes. Test should check that Bootstrap classes (form-control, btn-primary, etc.) are correctly applied to input fields and buttons in the HTML templates. Add to tests/unit/.",
+      "request_hash": "6d58b577dafe47aa",
+      "keywords": [
+        "test",
+        "validates",
+        "form",
+        "elements",
+        "render",
+        "expected",
+        "css",
+        "classes",
+        "test",
+        "check",
+        "bootstrap",
+        "classes",
+        "formcontrol",
+        "btnprimary",
+        "etc",
+        "correctly",
+        "applied",
+        "input",
+        "fields",
+        "buttons",
+        "html",
+        "templates",
+        "testsunit"
+      ],
+      "features_provided": [
+        "test-feature",
+        "validates-feature",
+        "form-feature"
+      ],
+      "files_affected": [
+        "tests/*"
+      ],
+      "depends_on": []
+    },
+    "2": {
+      "path": "completed/002_playwright-e2e-tests-critical-user",
+      "status": "completed",
+      "request": "Add Playwright E2E tests for critical user flows in the orchestrator web UI. Cover: (1) viewing plan list, (2) viewing plan details, (3) starting a build. Create tests/e2e/ directory, add playwright.config.ts, and implement tests using @playwright/test.",
+      "request_hash": "32b6ff2d7c2fcb51",
+      "keywords": [
+        "playwright",
+        "e2e",
+        "tests",
+        "critical",
+        "user",
+        "flows",
+        "orchestrator",
+        "web",
+        "cover",
+        "viewing",
+        "plan",
+        "list",
+        "viewing",
+        "plan",
+        "details",
+        "starting",
+        "testse2e",
+        "directory",
+        "playwrightconfigts",
+        "tests",
+        "using",
+        "playwrighttest"
+      ],
+      "features_provided": [
+        "playwright-feature",
+        "e2e-feature",
+        "tests-feature"
+      ],
+      "files_affected": [
+        "tests/e2e/*",
+        "playwright.config.*"
+      ],
+      "depends_on": []
     }
   },
   "features_index": {
-    "test-feature": [
-      "1",
-      "6"
-    ],
-    "validates-feature": [
-      "1"
-    ],
-    "form-feature": [
-      "1"
-    ],
-    "playwright-feature": [
-      "2"
-    ],
-    "e2e-feature": [
-      "2",
-      "6"
-    ],
-    "tests-feature": [
-      "2"
-    ],
     "extract-feature": [
       "3"
     ],
@@ -307,6 +326,32 @@
     "comprehensive-feature": [
       "6"
     ],
+    "e2e-feature": [
+      "6",
+      "2"
+    ],
+    "test-feature": [
+      "6",
+      "1"
+    ],
+    "simple-feature": [
+      "7"
+    ],
+    "logging-feature": [
+      "7"
+    ],
+    "utility-feature": [
+      "7"
+    ],
+    "config-feature": [
+      "8"
+    ],
+    "file-feature": [
+      "8"
+    ],
+    "reader-feature": [
+      "8"
+    ],
     "health-feature": [
       "1"
     ],
@@ -327,32 +372,47 @@
     ],
     "independent-feature": [
       "1"
+    ],
+    "validates-feature": [
+      "1"
+    ],
+    "form-feature": [
+      "1"
+    ],
+    "playwright-feature": [
+      "2"
+    ],
+    "tests-feature": [
+      "2"
     ]
   },
   "files_index": {
-    "tests/*": [
-      "1",
-      "6"
-    ],
-    "tests/e2e/*": [
-      "2",
-      "4",
-      "6"
-    ],
-    "playwright.config.*": [
-      "2",
-      "4",
-      "6"
-    ],
     "*": [
       "3",
-      "5"
+      "5",
+      "7"
+    ],
+    "tests/e2e/*": [
+      "4",
+      "6",
+      "2"
+    ],
+    "playwright.config.*": [
+      "4",
+      "6",
+      "2"
     ],
     "config/*": [
-      "4"
+      "4",
+      "8"
     ],
     "*.config.*": [
-      "4"
+      "4",
+      "8"
+    ],
+    "tests/*": [
+      "6",
+      "1"
     ],
     "api/*": [
       "1"
@@ -362,10 +422,10 @@
     ]
   },
   "stats": {
-    "total_plans": 9,
+    "total_plans": 11,
     "pending": 6,
     "in_progress": 0,
-    "completed": 3,
+    "completed": 5,
     "failed": 0
   }
 }

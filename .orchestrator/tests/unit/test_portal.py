@@ -98,6 +98,32 @@ class TestHealthEndpoint:
         assert isinstance(data["uptime_seconds"], (int, float))
         assert data["uptime_seconds"] >= 0
 
+    def test_root_health_endpoint_returns_200(self, client):
+        """Test that /health endpoint (without /api prefix) returns 200."""
+        response = client.get("/health")
+        assert response.status_code == 200
+
+    def test_root_health_returns_status_ok(self, client):
+        """Test that /health endpoint returns 'ok' status."""
+        response = client.get("/health")
+        data = response.json()
+        assert data["status"] == "ok"
+
+    def test_root_health_returns_version(self, client):
+        """Test that /health endpoint returns version string."""
+        response = client.get("/health")
+        data = response.json()
+        assert "version" in data
+        assert data["version"] == "1.0.0"
+
+    def test_root_health_returns_uptime_seconds(self, client):
+        """Test that /health endpoint returns uptime in seconds."""
+        response = client.get("/health")
+        data = response.json()
+        assert "uptime_seconds" in data
+        assert isinstance(data["uptime_seconds"], (int, float))
+        assert data["uptime_seconds"] >= 0
+
 
 class TestAPIModels:
     """Test Pydantic models for API requests."""

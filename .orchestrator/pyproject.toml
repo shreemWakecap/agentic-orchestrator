@@ -48,6 +48,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+cache_dir = "tests/.pytest_cache"
 timeout = 300
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",

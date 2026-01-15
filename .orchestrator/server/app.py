@@ -183,6 +183,17 @@ async def health_check():
     }
 
 
+@app.get("/health")
+async def health():
+    """Simple health check endpoint at root level."""
+    uptime_seconds = (datetime.now() - START_TIME).total_seconds()
+    return {
+        "status": "ok",
+        "version": app.version,
+        "uptime_seconds": round(uptime_seconds, 2)
+    }
+
+
 @app.get("/api/plans")
 async def api_list_plans():
     """List all plans."""

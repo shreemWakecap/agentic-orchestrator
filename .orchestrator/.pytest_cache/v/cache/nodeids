@@ -191,6 +191,8 @@
   "tests/unit/test_form_css.py::TestFormCSSClasses::test_input_has_focus_ring_classes",
   "tests/unit/test_form_css.py::TestFormCSSClasses::test_input_has_padding_classes",
   "tests/unit/test_form_css.py::TestFormCSSClasses::test_input_has_responsive_text_size",
+  "tests/unit/test_form_visibility.py::TestFormInputVisibility::test_dashboard_contains_form_elements",
+  "tests/unit/test_form_visibility.py::TestFormInputVisibility::test_dashboard_returns_200",
   "tests/unit/test_portal.py::TestAPIModels::test_budget_update_request_model",
   "tests/unit/test_portal.py::TestAPIModels::test_build_request_model",
   "tests/unit/test_portal.py::TestAPIModels::test_fix_request_model",

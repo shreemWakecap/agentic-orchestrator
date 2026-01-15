@@ -58,6 +58,37 @@ class ParsedPlan:
 
 
 @dataclass
+class GoalContext:
+    """
+    Tracks the GOAL and verification status for goal-oriented building.
+
+    The builder should work until the GOAL is achieved, not just until
+    the plan steps are executed.
+    """
+    goal: str  # What success looks like (from plan's GOAL section)
+    original_request: str  # The full user request
+    verify_commands: list[str]  # Commands to verify success
+    context_notes: list[str] = field(default_factory=list)  # Key context
+    goal_achieved: bool = False
+    verification_attempts: int = 0
+    max_verification_attempts: int = 3
+    missing_items: list[str] = field(default_factory=list)  # What's still needed
+    completion_percentage: int = 0  # Estimated % complete
+
+    def to_dict(self) -> dict:
+        return {
+            "goal": self.goal,
+            "original_request": self.original_request,
+            "verify_commands": self.verify_commands,
+            "context_notes": self.context_notes,
+            "goal_achieved": self.goal_achieved,
+            "verification_attempts": self.verification_attempts,
+            "missing_items": self.missing_items,
+            "completion_percentage": self.completion_percentage,
+        }
+
+
+@dataclass
 class StepResult:
     """Result of executing a single step."""
     step_id: str
@@ -237,12 +268,318 @@ class BuildingWorkflow(Workflow):
 
     def _load_agents(self):
         """Load all agents needed for building."""
-        agents = ["parser", "builder", "tester", "reviewer", "coordinator", "integrator"]
+        agents = ["parser", "builder", "tester", "reviewer", "coordinator", "integrator", "goal-verifier"]
         for agent_name in agents:
             try:
                 self.register_agent(Agent.load(agent_name, self.project_root))
             except FileNotFoundError:
-                self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
+                if agent_name != "goal-verifier":  # goal-verifier is optional
+                    self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
+
+    def _extract_goal_context(self, plan_content: str) -> GoalContext:
+        """
+        Extract goal, request, and verification commands from plan content.
+
+        Returns a GoalContext object that tracks what we're trying to achieve.
+        """
+        # Extract GOAL section
+        goal_match = re.search(r'(?:^|\n)##?\s*Goal\s*\n+(.*?)(?=\n##|\n\*\*|$)', plan_content, re.DOTALL | re.IGNORECASE)
+        goal = goal_match.group(1).strip() if goal_match else ""
+
+        # Extract original request
+        request_match = re.search(r'Request:\s*(.+?)(?:\n|Complexity:)', plan_content, re.DOTALL)
+        original_request = request_match.group(1).strip() if request_match else ""
+
+        # Extract VERIFY commands
+        verify_match = re.search(r'(?:^|\n)##?\s*Verify\s*\n+(.*?)(?=\n##|$)', plan_content, re.DOTALL | re.IGNORECASE)
+        verify_section = verify_match.group(1).strip() if verify_match else ""
+        verify_commands = [
+            line.strip().lstrip('- ').lstrip('* ')
+            for line in verify_section.split('\n')
+            if line.strip() and line.strip().startswith(('-', '*'))
+        ]
+
+        # Extract CONTEXT notes
+        context_match = re.search(r'(?:^|\n)##?\s*Context\s*\n+(.*?)(?=\n##|$)', plan_content, re.DOTALL | re.IGNORECASE)
+        context_section = context_match.group(1).strip() if context_match else ""
+        context_notes = [
+            line.strip().lstrip('- ').lstrip('* ')
+            for line in context_section.split('\n')
+            if line.strip() and line.strip().startswith(('-', '*'))
+        ]
+
+        return GoalContext(
+            goal=goal,
+            original_request=original_request,
+            verify_commands=verify_commands,
+            context_notes=context_notes
+        )
+
+    def _verify_goal_achieved(self, goal_context: GoalContext) -> tuple[bool, list[str]]:
+        """
+        Verify if the GOAL has been achieved by analyzing the implementation.
+
+        Uses the goal-verifier agent to check:
+        1. Are all files from the request created?
+        2. Do they contain the expected functionality?
+        3. Do verification commands pass?
+
+        Returns:
+            Tuple of (goal_achieved, list_of_missing_items)
+        """
+        from core.symbols import CHECK, CROSS, WARNING
+
+        self.console.print("\n[bold]Goal Verification:[/bold] Checking if goal is achieved...")
+
+        # Build verification context
+        verification_prompt = f"""Analyze if the following GOAL has been fully achieved:
+
+## GOAL
+{goal_context.goal}
+
+## ORIGINAL REQUEST
+{goal_context.original_request}
+
+## VERIFICATION CRITERIA
+{chr(10).join(f'- {cmd}' for cmd in goal_context.verify_commands)}
+
+## FILES CREATED/MODIFIED
+Created: {', '.join(self.build_state.files_created) if self.build_state.files_created else 'None'}
+Modified: {', '.join(self.build_state.files_modified) if self.build_state.files_modified else 'None'}
+
+## TASK
+1. Check if all numbered requirements from the request are implemented
+2. Verify the files exist and contain proper implementation (not empty/placeholder)
+3. Identify any MISSING items that still need to be done
+
+Respond in JSON:
+```json
+{{
+    "goal_achieved": true/false,
+    "completion_percentage": 0-100,
+    "missing_items": ["item 1 that's missing", "item 2 that's missing"],
+    "verification_notes": "Brief explanation"
+}}
+```
+"""
+
+        # Try to use goal-verifier agent, fall back to reviewer
+        agent_name = "goal-verifier" if "goal-verifier" in self.agents else "reviewer"
+
+        result = self.run_agent(
+            agent_name,
+            message=verification_prompt,
+            context=f"Build completed {len(self.build_state.completed_steps)} steps",
+            show_progress=False
+        )
+
+        if not result.success:
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Could not verify goal (agent failed)")
+            return False, ["Verification failed - unable to assess"]
+
+        # Parse result
+        parsed = self._parse_json_from_response(result.content)
+        goal_achieved = parsed.get("goal_achieved", False)
+        missing_items = parsed.get("missing_items", [])
+        completion_pct = parsed.get("completion_percentage", 0)
+        notes = parsed.get("verification_notes", "")
+
+        goal_context.completion_percentage = completion_pct
+        goal_context.missing_items = missing_items
+
+        if goal_achieved:
+            self.console.print(f"  [green]{CHECK}[/green] Goal achieved! ({completion_pct}% complete)")
+        else:
+            self.console.print(f"  [red]{CROSS}[/red] Goal NOT achieved ({completion_pct}% complete)")
+            if missing_items:
+                self.console.print(f"  Missing items:")
+                for item in missing_items[:5]:
+                    self.console.print(f"    - {item[:60]}")
+            if notes:
+                self.console.print(f"  Notes: {notes[:100]}")
+
+        return goal_achieved, missing_items
+
+    def _generate_completion_steps(self, goal_context: GoalContext) -> list[BuildStep]:
+        """
+        Generate additional steps to complete the goal based on what's missing.
+
+        Uses the planner agent to create steps for missing items.
+        """
+        if not goal_context.missing_items:
+            return []
+
+        from core.symbols import CHECK
+
+        self.console.print("\n[bold]Generating Completion Steps:[/bold]")
+
+        missing_summary = "\n".join(f"- {item}" for item in goal_context.missing_items)
+
+        # Use planner to generate steps for missing items
+        planner_prompt = f"""Generate implementation steps for these MISSING items:
+
+## ORIGINAL GOAL
+{goal_context.goal}
+
+## ORIGINAL REQUEST
+{goal_context.original_request}
+
+## WHAT'S MISSING (must be implemented)
+{missing_summary}
+
+## WHAT'S ALREADY DONE
+- Completed steps: {len(self.build_state.completed_steps)}
+- Files created: {', '.join(self.build_state.files_created[:10]) if self.build_state.files_created else 'None'}
+
+Create steps ONLY for the missing items. Use the standard format:
+STEPS:
+1. [Title]
+   DO: [instruction]
+   IN: [inputs]
+   OUT: [output file]
+   DONE: [verification]
+   NEEDS: [dependencies or "none"]
+"""
+
+        # Try to load planner agent
+        try:
+            planner = Agent.load("planner", self.project_root)
+            result = planner.run(planner_prompt)
+        except Exception as e:
+            self.console.print(f"  [yellow]Could not generate completion steps: {e}[/yellow]")
+            return []
+
+        if not result.success:
+            return []
+
+        # Parse the generated steps
+        steps = self._parse_steps_from_content(result.content)
+        self.console.print(f"  [green]{CHECK}[/green] Generated {len(steps)} completion step(s)")
+
+        return steps
+
+    def _parse_steps_from_content(self, content: str) -> list[BuildStep]:
+        """Parse step definitions from planner output."""
+        steps = []
+
+        # Find STEPS section
+        steps_match = re.search(r'STEPS?:\s*(.*?)(?:VERIFY:|$)', content, re.DOTALL | re.IGNORECASE)
+        if not steps_match:
+            return steps
+
+        steps_content = steps_match.group(1)
+
+        # Parse individual steps
+        step_pattern = r'(\d+)\.\s*(.+?)(?=\n\d+\.|$)'
+        step_matches = re.findall(step_pattern, steps_content, re.DOTALL)
+
+        for i, (num, step_content) in enumerate(step_matches):
+            # Extract fields
+            do_match = re.search(r'DO:\s*(.+?)(?=\n\s*[A-Z]+:|$)', step_content, re.DOTALL)
+            out_match = re.search(r'OUT:\s*(.+?)(?=\n|$)', step_content)
+
+            description = do_match.group(1).strip() if do_match else step_content.split('\n')[0].strip()
+            target = out_match.group(1).strip() if out_match else ""
+
+            # Infer action from description
+            action = "create"
+            desc_lower = description.lower()
+            if any(w in desc_lower for w in ["modify", "update", "change", "edit", "refactor"]):
+                action = "modify"
+            elif any(w in desc_lower for w in ["delete", "remove"]):
+                action = "delete"
+            elif any(w in desc_lower for w in ["run", "execute", "install"]):
+                action = "run"
+
+            steps.append(BuildStep(
+                id=f"completion-step-{i+1}",
+                action=action,
+                target=target,
+                description=description,
+                complexity="medium"
+            ))
+
+        return steps
+
+    def _run_goal_verification_loop(
+        self,
+        plan: "ParsedPlan",
+        goal_context: GoalContext,
+        plan_path: Path
+    ) -> bool:
+        """
+        Run the goal verification and self-healing loop.
+
+        After all planned steps are executed:
+        1. Verify if the goal is achieved
+        2. If not, analyze gaps and generate completion steps
+        3. Execute completion steps
+        4. Repeat until goal achieved or max attempts reached
+
+        Returns:
+            True if goal was achieved, False otherwise
+        """
+        from core.symbols import CHECK, CROSS, WARNING, ARROW_RIGHT
+
+        max_attempts = goal_context.max_verification_attempts
+
+        for attempt in range(1, max_attempts + 1):
+            goal_context.verification_attempts = attempt
+
+            self.console.print(f"\n{'='*50}")
+            self.console.print(f"[bold]Goal Verification Loop - Attempt {attempt}/{max_attempts}[/bold]")
+
+            # Step 1: Verify goal
+            goal_achieved, missing_items = self._verify_goal_achieved(goal_context)
+
+            if goal_achieved:
+                goal_context.goal_achieved = True
+                return True
+
+            # Step 2: If this is the last attempt, don't try to generate more steps
+            if attempt >= max_attempts:
+                self.console.print(f"\n[yellow]{WARNING} Max verification attempts reached[/yellow]")
+                self.console.print(f"  Goal not fully achieved. Missing items:")
+                for item in missing_items[:5]:
+                    self.console.print(f"    - {item[:60]}")
+                return False
+
+            # Step 3: Generate completion steps
+            completion_steps = self._generate_completion_steps(goal_context)
+
+            if not completion_steps:
+                self.console.print(f"  [yellow]{WARNING}[/yellow] Could not generate completion steps")
+                continue
+
+            # Step 4: Execute completion steps
+            self.console.print(f"\n[bold]Executing {len(completion_steps)} Completion Steps:[/bold]")
+
+            phase_context = f"Completing missing items for: {goal_context.goal[:100]}"
+
+            for step in completion_steps:
+                # Check if already done
+                if step.id in self.build_state.completed_steps:
+                    continue
+
+                self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {step.description[:55]}...")
+
+                result = self._execute_step(step, phase_context)
+
+                if result.status == "completed":
+                    self.build_state.completed_steps.append(step.id)
+                    self.build_state.files_created.extend(
+                        [f for f in result.files_affected if result.action_taken == "created"]
+                    )
+                    self.build_state.files_modified.extend(
+                        [f for f in result.files_affected if result.action_taken == "modified"]
+                    )
+                    self.console.print(f"  [green]{CHECK}[/green] {result.summary[:50]}")
+                else:
+                    self.console.print(f"  [red]{CROSS}[/red] {result.error or 'Failed'}")
+
+                self._save_state(plan_path)
+
+        return goal_context.goal_achieved
 
     def _verify_file_creation(self, files_affected: list[str], action: str) -> tuple[bool, str]:
         """
@@ -569,11 +906,27 @@ class BuildingWorkflow(Workflow):
 
         return "\n\n".join(context_parts) if context_parts else ""
 
-    def _execute_step(self, step: BuildStep, phase_context: str) -> StepResult:
-        """Execute a single build step using agentic builder."""
+    def _execute_step(
+        self,
+        step: BuildStep,
+        phase_context: str,
+        goal_context: Optional[GoalContext] = None
+    ) -> StepResult:
+        """Execute a single build step using goal-aware agentic builder."""
         step_context = self._get_relevant_context(step)
 
-        full_context = f"""## Phase Context
+        # Build goal-aware context for the builder
+        goal_section = ""
+        if goal_context and (goal_context.goal or goal_context.original_request):
+            goal_section = f"""## GOAL
+{goal_context.goal}
+
+## ORIGINAL REQUEST
+{goal_context.original_request}
+
+"""
+
+        full_context = f"""{goal_section}## Phase Context
 {phase_context[:1500]}
 
 ## Step Context
@@ -588,13 +941,18 @@ class BuildingWorkflow(Workflow):
             "builder",
             message=f"""Execute this build step:
 
+## CURRENT STEP
 **Action:** {step.action}
 **Target:** {step.target}
 **Description:** {step.description}
 
-IMPORTANT: Actually create/modify the files as specified. Use the Write tool to create files, Edit tool to modify existing files.
+IMPORTANT:
+1. Actually create/modify the files as specified using Write/Edit tools
+2. Verify the files were created with real content (not placeholders)
+3. Consider how this step contributes to the GOAL
+4. Flag any concerns about goal completion
 
-After completing, summarize what you did.""",
+After completing, summarize what you did and how it helps achieve the goal.""",
             context=full_context,
             show_progress=False
         )
@@ -681,6 +1039,9 @@ After completing, summarize what you did.""",
 
         steps_completed = []
 
+        # Extract goal context ONCE at the start for goal-aware building
+        goal_context = self._extract_goal_context(plan.raw_content)
+
         for phase_idx, phase in enumerate(plan.phases):
             self.console.print(f"\n[bold]Phase {phase_idx + 1}/{len(plan.phases)}:[/bold] {phase.name}")
 
@@ -724,8 +1085,8 @@ After completing, summarize what you did.""",
                 progress_str = f"[{completed}/{total}]"
                 self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {progress_str} {step.description[:55]}...")
 
-                # Execute the step
-                result = self._execute_step(step, phase_context)
+                # Execute the step with goal context for goal-aware building
+                result = self._execute_step(step, phase_context, goal_context)
 
                 # Update step state based on result
                 step_state.completed_at = datetime.now().isoformat()
@@ -792,6 +1153,36 @@ After completing, summarize what you did.""",
             if failed_count > 0:
                 self.console.print(f"  [yellow]{WARNING}[/yellow] {failed_count} phase test(s) had issues")
 
+        # GOAL VERIFICATION LOOP: Check if the goal is actually achieved
+        # Extract goal context from plan
+        goal_context = self._extract_goal_context(plan.raw_content)
+
+        # Only run goal verification if we have a goal and original request
+        if goal_context.goal or goal_context.original_request:
+            goal_achieved = self._run_goal_verification_loop(plan, goal_context, plan_path)
+
+            if not goal_achieved:
+                # Goal not achieved - mark as paused for manual intervention
+                self.build_state.status = "paused"
+                self.build_state.last_error = f"Goal not fully achieved. Missing: {', '.join(goal_context.missing_items[:3])}"
+                self._save_state(plan_path)
+
+                self.console.print(f"\n[yellow]Build paused - goal not fully achieved[/yellow]")
+                self.console.print(f"  Completion: {goal_context.completion_percentage}%")
+                self.console.print(f"  Run build again to continue attempting")
+
+                return WorkflowResult(
+                    success=False,
+                    error="Goal not fully achieved after verification loop",
+                    steps_completed=steps_completed,
+                    data={
+                        "paused_at": "goal_verification",
+                        "can_resume": True,
+                        "goal_context": goal_context.to_dict(),
+                        "completed_steps": len(self.build_state.completed_steps),
+                    }
+                )
+
         # Final review
         self.console.print("\n[bold]Final Review...[/bold]")
         review_result = self._run_review(plan)
@@ -804,7 +1195,8 @@ After completing, summarize what you did.""",
                 "plan_type": "simple",
                 "files_created": self.build_state.files_created,
                 "files_modified": self.build_state.files_modified,
-                "review": review_result
+                "review": review_result,
+                "goal_achieved": True
             }
         )
 
@@ -818,6 +1210,9 @@ After completing, summarize what you did.""",
         from core.symbols import ARROW_RIGHT, CHECK, CROSS, WARNING
 
         steps_completed = []
+
+        # Extract goal context ONCE at the start for goal-aware building
+        goal_context = self._extract_goal_context(plan.raw_content)
 
         # Flatten all steps across phases while preserving phase context
         all_steps: list[tuple[BuildStep, str]] = []  # (step, phase_context)
@@ -860,18 +1255,18 @@ After completing, summarize what you did.""",
             self._save_state(plan_path)
 
             if wave_size == 1:
-                # Single step - run directly
+                # Single step - run directly with goal context
                 step = pending_steps[0]
                 phase_context = step_contexts.get(step.id, "")
                 self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {step.description[:55]}...")
-                result = self._execute_step(step, phase_context)
+                result = self._execute_step(step, phase_context, goal_context)
                 wave_results = [(step, result)]
             else:
-                # Multiple steps - run in parallel
+                # Multiple steps - run in parallel with goal context
                 self.console.print(f"  [cyan]Running {len(pending_steps)} steps in parallel...[/cyan]")
                 # All steps in same wave use first step's context (simplification)
                 phase_context = step_contexts.get(pending_steps[0].id, "")
-                wave_results = self._execute_wave_parallel(pending_steps, phase_context, plan_path)
+                wave_results = self._execute_wave_parallel(pending_steps, phase_context, plan_path, goal_context)
 
             # Process wave results
             wave_failed = False
@@ -933,6 +1328,31 @@ After completing, summarize what you did.""",
         if not test_result:
             self.console.print(f"  [yellow]{WARNING}[/yellow] Tests had issues (continuing)")
 
+        # GOAL VERIFICATION LOOP: Check if the goal is actually achieved
+        goal_context = self._extract_goal_context(plan.raw_content)
+
+        if goal_context.goal or goal_context.original_request:
+            goal_achieved = self._run_goal_verification_loop(plan, goal_context, plan_path)
+
+            if not goal_achieved:
+                self.build_state.status = "paused"
+                self.build_state.last_error = f"Goal not fully achieved. Missing: {', '.join(goal_context.missing_items[:3])}"
+                self._save_state(plan_path)
+
+                self.console.print(f"\n[yellow]Build paused - goal not fully achieved[/yellow]")
+                self.console.print(f"  Completion: {goal_context.completion_percentage}%")
+
+                return WorkflowResult(
+                    success=False,
+                    error="Goal not fully achieved after verification loop",
+                    steps_completed=steps_completed,
+                    data={
+                        "paused_at": "goal_verification",
+                        "can_resume": True,
+                        "goal_context": goal_context.to_dict(),
+                    }
+                )
+
         # Final review
         self.console.print("\n[bold]Final Review...[/bold]")
         review_result = self._run_review(plan)
@@ -946,7 +1366,8 @@ After completing, summarize what you did.""",
                 "parallel_waves": total_waves,
                 "files_created": self.build_state.files_created,
                 "files_modified": self.build_state.files_modified,
-                "review": review_result
+                "review": review_result,
+                "goal_achieved": True
             }
         )
 
@@ -1126,7 +1547,11 @@ After completing, summarize what you did.""",
         return waves
 
     def _execute_wave_parallel(
-        self, steps: list[BuildStep], phase_context: str, plan_path: Path
+        self,
+        steps: list[BuildStep],
+        phase_context: str,
+        plan_path: Path,
+        goal_context: Optional[GoalContext] = None
     ) -> list[tuple[BuildStep, StepResult]]:
         """
         Execute multiple steps in parallel using ThreadPoolExecutor.
@@ -1135,6 +1560,7 @@ After completing, summarize what you did.""",
             steps: Steps to execute in parallel
             phase_context: Context string for the current phase
             plan_path: Path to plan for state saving
+            goal_context: Optional goal context for goal-aware building
 
         Returns:
             List of (step, result) tuples in completion order
@@ -1145,9 +1571,9 @@ After completing, summarize what you did.""",
         results: list[tuple[BuildStep, StepResult]] = []
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Submit all steps
+            # Submit all steps with goal context
             futures = {
-                executor.submit(self._execute_step, step, phase_context): step
+                executor.submit(self._execute_step, step, phase_context, goal_context): step
                 for step in steps
             }
 
@@ -1645,6 +2071,18 @@ Provide a quality assessment.""",
                     "Please re-run the planning workflow to generate a complete plan with actionable steps."
                 )
             )
+
+        # WARNING: Check if plan seems suspiciously short (might be incomplete)
+        # Extract Request line from plan content to check for numbered requirements
+        request_match = re.search(r'Request:\s*(.+?)(?:\n|Complexity:)', plan_content, re.DOTALL)
+        if request_match:
+            original_request = request_match.group(1).strip()
+            # Count numbered items in original request
+            numbered_items = len(re.findall(r'\(\d+\)', original_request))
+            if numbered_items >= 3 and total_steps < numbered_items - 2:
+                from core.symbols import WARNING
+                self.console.print(f"\n  [yellow]{WARNING} Warning: Request specified {numbered_items} numbered items but plan only has {total_steps} step(s)[/yellow]")
+                self.console.print(f"  [yellow]The plan may be incomplete. Consider re-running the planning workflow.[/yellow]")
 
         # Decide: simple or complex build
         if plan.plan_type == "master" or total_steps > 15:

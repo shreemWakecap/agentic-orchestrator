@@ -56,16 +56,16 @@ AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
     # JSON-output agents (structured data)
     "scout": ['"project_type"', '"tech_stack"', '"relevant_files"'],
     "architect": ['"approach"', '"components"', '"data_flow"'],
-    "validator": ['"status"', '"score"', '"checks"'],
+    "validator": ["## Validation", "## Checks", "## Summary"],
     "parser": ['"phases"', '"steps"', '"plan_id"'],
     "syncer": ['"commit_message"', '"pr_description"'],
     # Markdown-output agents
-    "planner": ["## Implementation Steps", "### Phase", "**Action:**"],
+    "planner": ["## Goal", "## Steps", "## Verification"],
     "synthesizer": ["## Master Plan", "## Implementation"],
     "decomposer": ["## Sub-Features", "###"],
     "analyzer": ["## Complexity", "##"],
     "fixer": ["## Fix", "##"],
-    "reviewer": ["## Review", "##"],
+    "reviewer": ["## Goals", "## Summary"],
     # Agentic agents (use tools, not text output)
     "builder": [],
     "tester": [],

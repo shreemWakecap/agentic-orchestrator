@@ -1,0 +1,32 @@
+{
+  "plan_id": "001_parallel-build-test-module-structure",
+  "plan_file": "D:\\agentic-orchestrator\\.orchestrator\\specs\\pending\\001_parallel-build-test-module-structure",
+  "status": "paused",
+  "started_at": "2026-01-16T01:18:00.331390",
+  "updated_at": "2026-01-16T01:19:10.014410",
+  "current_phase": 0,
+  "current_step": "",
+  "total_steps": 10,
+  "completed_steps": [],
+  "failed_steps": [
+    "step-1"
+  ],
+  "skipped_steps": [],
+  "step_states": {
+    "step-1": {
+      "step_id": "step-1",
+      "status": "failed",
+      "started_at": "2026-01-16T01:18:15.916306",
+      "completed_at": "2026-01-16T01:19:10.014410",
+      "retry_count": 1,
+      "error": "File verification failed: Files not created: .orchestrator/tests/parallel_test/__init__.py, .orchestrator/tests/parallel_test/models/__init__.py, .orchestrator/tests/parallel_test/utils/__init__.py",
+      "files_affected": [
+        ".orchestrator/tests/parallel_test/__init__.py, .orchestrator/tests/parallel_test/models/__init__.py, .orchestrator/tests/parallel_test/utils/__init__.py"
+      ],
+      "summary": "Builder reported success but verification failed: Files not created: .orchestrator/tests/parallel_test/__init__.py, .orchestrator/tests/parallel_test/models/__init__.py, .orchestrator/tests/parallel_test/utils/__init__.py"
+    }
+  },
+  "files_created": [],
+  "files_modified": [],
+  "last_error": "Wave 1 had failures"
+}

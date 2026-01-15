@@ -20,7 +20,5 @@
   "tests/integration/test_building_workflow.py::TestBuildingWorkflowExecution::test_build_moves_plan_to_completed": true,
   "tests/integration/test_building_workflow.py::TestBuildingWorkflowExecution::test_build_handles_step_failure": true,
   "tests/integration/test_building_workflow.py::TestBuildingWorkflowExecution::test_build_resume_skips_completed_steps": true,
-  "tests/integration/test_building_workflow.py::TestBuildingWorkflowPlanOrganization::test_move_plan_to_destination": true,
-  "tests/unit/test_form_css.py::TestClient": true,
-  "tests/unit/test_form_css.py::TestFormCSSClasses": true
+  "tests/integration/test_building_workflow.py::TestBuildingWorkflowPlanOrganization::test_move_plan_to_destination": true
 }

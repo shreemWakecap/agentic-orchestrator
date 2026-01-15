@@ -976,7 +976,17 @@ After completing, summarize what you did and how it helps achieve the goal.""",
         if result.files_modified:
             files_affected.extend(result.files_modified)
         if not files_affected:
-            files_affected = [step.target] if step.target else []
+            # Handle comma-separated targets in OUT field (e.g., "file1.py, file2.py (modified)")
+            if step.target:
+                targets = []
+                for t in step.target.split(','):
+                    # Remove parenthetical notes like "(empty initially)" or "(modified)"
+                    clean_target = re.sub(r'\s*\([^)]*\)\s*$', '', t.strip())
+                    if clean_target:
+                        targets.append(clean_target)
+                files_affected = targets
+            else:
+                files_affected = []
 
         # Determine action taken
         action_taken = step.action

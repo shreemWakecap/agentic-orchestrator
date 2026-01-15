@@ -1,30 +1,29 @@
 """User model for parallel test module."""
 
-import re
+from dataclasses import dataclass
 
 
+@dataclass
 class User:
     """Represents a user with id, name, and email fields."""
 
-    def __init__(self, id: int, name: str, email: str):
-        """Initialize a User instance.
+    id: int
+    name: str
+    email: str
 
-        Args:
-            id: Unique user identifier.
-            name: User's name.
-            email: User's email address.
-        """
-        self.id = id
-        self.name = name
-        self.email = email
-
-    def validate(self) -> bool:
-        """Validate the user's email address.
+    def validate_email(self) -> bool:
+        """Validate email format by checking for @ symbol.
 
         Returns:
-            True if the email is valid, False otherwise.
+            bool: True if email contains @ symbol, False otherwise.
         """
-        if not self.email:
-            return False
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        return bool(re.match(email_pattern, self.email))
+        return "@" in self.email if self.email else False
+
+    def __post_init__(self) -> None:
+        """Validate email format after initialization.
+
+        Raises:
+            ValueError: If email format is invalid.
+        """
+        if not self.validate_email():
+            raise ValueError(f"Invalid email format: {self.email}")

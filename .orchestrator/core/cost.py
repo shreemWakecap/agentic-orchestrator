@@ -152,11 +152,10 @@ class CostEstimator:
         "tester": TokenEstimate(2000, 2000),
         "integrator": TokenEstimate(3000, 4000),
 
-        # Review agents
-        "stack_detector": TokenEstimate(1000, 500),
-        "compliance_checker": TokenEstimate(3000, 1500),
-        "standards_checker": TokenEstimate(2500, 2000),
-        "report_generator": TokenEstimate(3000, 2500),
+        # Review/Fix/Sync agents
+        "reviewer": TokenEstimate(3000, 2000),
+        "fixer": TokenEstimate(2500, 3000),
+        "syncer": TokenEstimate(2000, 1500),
 
         # Expert agents (average)
         "expert": TokenEstimate(3000, 2500),
@@ -262,22 +261,11 @@ class CostEstimator:
             confidence=0.6
         )
 
-    def estimate_reviewing(
-        self,
-        plan_path: Path,
-        tech_count: int = 2
-    ) -> CostEstimate:
+    def estimate_reviewing(self, plan_path: Path) -> CostEstimate:
         """Estimate cost for reviewing workflow."""
         agents = {
-            "stack_detector": self._scale_estimate("stack_detector", 1.0),
-            "compliance_checker": self._scale_estimate("compliance_checker", 1.0),
-            "standards_checker": self._scale_estimate("standards_checker", 1.0),
-            "report_generator": self._scale_estimate("report_generator", 1.0),
+            "reviewer": self._scale_estimate("reviewer", 1.0),
         }
-
-        # Add expert reviews (1 per tech)
-        for i in range(tech_count):
-            agents[f"expert_{i}"] = self._scale_estimate("expert", 1.0)
 
         total_input = sum(e.input_tokens for e in agents.values())
         total_output = sum(e.output_tokens for e in agents.values())

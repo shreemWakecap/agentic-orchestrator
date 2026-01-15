@@ -958,6 +958,66 @@ def cmd_sync_remote(args=None):
 
 
 # =============================================================================
+# Cache Command
+# =============================================================================
+
+def cmd_cache(args):
+    """Manage planning cache."""
+    from core.scout_cache import ScoutCache
+    from core.checkpoint import CheckpointManager
+
+    cache = ScoutCache(PROJECT_ROOT)
+    checkpoint_mgr = CheckpointManager(SPECS_DIR)
+
+    if not args or args[0] == "status":
+        print("=== Cache Status ===\n")
+        stats = cache.stats()
+        print(f"Scout Cache:")
+        print(f"  Entries: {stats['entries']}")
+        print(f"  Size: {stats['size_mb']:.2f} MB")
+        print(f"  TTL: {stats['ttl_hours']} hours")
+        print(f"  Location: {stats['cache_dir']}")
+
+        pending_checkpoints = checkpoint_mgr.list_pending()
+        print(f"\nCheckpoints:")
+        print(f"  Pending: {len(pending_checkpoints)}")
+        if pending_checkpoints:
+            for cp in pending_checkpoints[:5]:
+                print(f"    - {cp['request'][:40]}... ({cp['phase']})")
+
+    elif args[0] == "clear":
+        what = args[1] if len(args) > 1 else "all"
+        if what in ["all", "scout"]:
+            cache.clear()
+            print("Scout cache cleared")
+        if what in ["all", "checkpoints"]:
+            count = checkpoint_mgr.clear_all()
+            print(f"Cleared {count} checkpoints")
+
+    elif args[0] == "checkpoints":
+        pending = checkpoint_mgr.list_pending()
+        if not pending:
+            print("No pending checkpoints")
+            return 0
+        print("=== Pending Checkpoints ===\n")
+        for cp in pending:
+            print(f"  {cp['request_hash'][:8]}: {cp['request'][:50]}")
+            print(f"    Phase: {cp['phase']}, Attempts: {cp['attempt_count']}")
+            print(f"    Created: {cp['created_at'][:19]}")
+            print()
+
+    else:
+        print("Usage: cli.py cache [status|clear|checkpoints]")
+        print("  status      - Show cache statistics")
+        print("  clear       - Clear all caches")
+        print("  clear scout - Clear only scout cache")
+        print("  checkpoints - List pending checkpoints")
+        return 1
+
+    return 0
+
+
+# =============================================================================
 # Main
 # =============================================================================
 
@@ -975,6 +1035,7 @@ COMMANDS = {
     'test': (cmd_test, "Run test suite"),
     'portal': (cmd_portal, "Start management portal"),
     'sync-remote': (cmd_sync_remote, "Sync changes to remote via PR"),
+    'cache': (cmd_cache, "Manage planning cache"),
 }
 
 

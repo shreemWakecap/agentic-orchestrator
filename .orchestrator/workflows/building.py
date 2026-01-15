@@ -271,7 +271,7 @@ class BuildingWorkflow(Workflow):
             if action in ("create", "created"):
                 if not full_path.exists():
                     missing_files.append(file_path)
-                elif full_path.stat().st_size == 0:
+                elif full_path.is_file() and full_path.stat().st_size == 0:
                     empty_files.append(file_path)
             elif action in ("modify", "modified"):
                 if not full_path.exists():

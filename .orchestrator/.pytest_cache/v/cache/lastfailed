@@ -20,5 +20,9 @@
   "tests/integration/test_building_workflow.py::TestBuildingWorkflowExecution::test_build_moves_plan_to_completed": true,
   "tests/integration/test_building_workflow.py::TestBuildingWorkflowExecution::test_build_handles_step_failure": true,
   "tests/integration/test_building_workflow.py::TestBuildingWorkflowExecution::test_build_resume_skips_completed_steps": true,
-  "tests/integration/test_building_workflow.py::TestBuildingWorkflowPlanOrganization::test_move_plan_to_destination": true
+  "tests/integration/test_building_workflow.py::TestBuildingWorkflowPlanOrganization::test_move_plan_to_destination": true,
+  "tests/unit/test_portal.py::TestHelperFunctions::test_get_all_plans": true,
+  "tests/unit/test_portal.py::TestHelperFunctions::test_get_recent_plans": true,
+  "tests/unit/test_portal.py::TestHelperFunctions::test_get_plan_by_id": true,
+  "tests/unit/test_portal.py::TestHelperFunctions::test_get_all_reviews": true
 }

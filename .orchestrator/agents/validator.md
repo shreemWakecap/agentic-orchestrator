@@ -28,6 +28,7 @@ You validate implementation plans for completeness and actionability.
 4. **NEEDS references valid steps** - No references to non-existent steps
 5. **No circular dependencies** - Step A can't need Step B if B needs A
 6. **VERIFY section exists** - At least one final check
+7. **Coverage check** - If original request has numbered items (1), (2), (3)... the plan must have corresponding steps for each. Count both and report if mismatched.
 
 ## Warning Checks (Non-blocking)
 

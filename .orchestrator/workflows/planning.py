@@ -375,6 +375,78 @@ Focus on:
 
         return True, ""
 
+    def _count_required_steps_in_request(self, request: str) -> int:
+        """
+        Count the number of numbered steps explicitly listed in the request.
+
+        Looks for patterns like (1), (2), (3) or 1), 2), 3) or numbered lists.
+        Returns 0 if no explicit numbering found (simple request).
+        """
+        # Pattern 1: (1), (2), etc.
+        paren_matches = re.findall(r'\(\d+\)', request)
+        if len(paren_matches) >= 2:
+            return len(paren_matches)
+
+        # Pattern 2: 1), 2), etc.
+        bracket_matches = re.findall(r'\d+\)', request)
+        if len(bracket_matches) >= 2:
+            return len(bracket_matches)
+
+        # Pattern 3: 1., 2., etc. at start of lines or after newline
+        dot_matches = re.findall(r'(?:^|\n)\s*\d+\.', request)
+        if len(dot_matches) >= 2:
+            return len(dot_matches)
+
+        return 0  # No explicit numbered requirements
+
+    def _count_steps_in_plan(self, plan_content: str) -> int:
+        """
+        Count the number of steps in the generated plan output.
+
+        Looks for numbered steps in STEPS section (1., 2., 3., etc.)
+        """
+        # Extract STEPS section
+        steps_match = re.search(r'STEPS?:\s*(.*?)(?:VERIFY:|$)', plan_content, re.DOTALL | re.IGNORECASE)
+        if not steps_match:
+            # Try legacy format
+            steps_match = re.search(r'## Steps?\s*(.*?)(?:## |$)', plan_content, re.DOTALL | re.IGNORECASE)
+
+        if not steps_match:
+            return 0
+
+        steps_content = steps_match.group(1)
+
+        # Count numbered steps (1., 2., etc.)
+        step_numbers = re.findall(r'^\s*(\d+)\.', steps_content, re.MULTILINE)
+        return len(step_numbers)
+
+    def _validate_plan_coverage(self, request: str, plan_content: str) -> tuple[bool, str]:
+        """
+        Validate that the plan covers all numbered requirements in the request.
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        required_steps = self._count_required_steps_in_request(request)
+        plan_steps = self._count_steps_in_plan(plan_content)
+
+        # If request doesn't have explicit numbered requirements, skip this check
+        if required_steps == 0:
+            return True, ""
+
+        # Allow some flexibility (plan might combine or split steps)
+        # But if plan has significantly fewer steps, it's incomplete
+        min_acceptable = max(1, required_steps - 2)  # Allow up to 2 fewer steps (combining)
+
+        if plan_steps < min_acceptable:
+            return False, (
+                f"Plan is incomplete: request specifies {required_steps} numbered steps "
+                f"but plan only has {plan_steps} step(s). "
+                f"The planner must generate ALL {required_steps} steps from the request."
+            )
+
+        return True, ""
+
     def _get_next_plan_number(self) -> int:
         """
         Get the next sequential plan number.
@@ -563,14 +635,35 @@ Focus on:
             planner_base_context += f"\n\n{expert_context}"
         planner_context = self._build_depth_context("planner", depth, planner_base_context)
 
+        # Count required steps from request BEFORE calling planner
+        required_steps = self._count_required_steps_in_request(request)
+        if required_steps > 0:
+            self.console.print(f"  [dim]Request specifies {required_steps} numbered step(s)[/dim]")
+
         planner_result = self.run_agent(
             "planner",
-            message=f"User request: {request}\n\nCreate detailed implementation steps.",
+            message=f"User request: {request}\n\nCreate detailed implementation steps.\n\nIMPORTANT: If the request lists numbered items like (1), (2), (3)... you MUST create a separate step for EACH numbered item. Do not skip any.",
             context=planner_context
         )
         valid, error = self._validate_agent_response("Planner", planner_result)
         if not valid:
             return WorkflowResult(success=False, error=error)
+
+        # COVERAGE CHECK: Validate plan has enough steps to cover the request
+        valid, error = self._validate_plan_coverage(request, planner_result.content)
+        if not valid:
+            from core.symbols import CROSS
+            self.console.print(f"\n[red]{CROSS} Plan coverage validation failed[/red]")
+            self.console.print(f"  {error}")
+            return WorkflowResult(
+                success=False,
+                error=error,
+                data={"validation_type": "coverage"}
+            )
+
+        plan_steps = self._count_steps_in_plan(planner_result.content)
+        from core.symbols import CHECK
+        self.console.print(f"  [green]{CHECK}[/green] planner complete ({plan_steps} steps)")
         steps_completed.append("planner")
 
         # Save checkpoint after planner
@@ -1058,8 +1151,8 @@ Focus on:
             scout_lines = [l.strip() for l in scout.split('\n') if l.strip() and not l.startswith('#')]
             context_section = '\n'.join(f"- {l[:80]}" for l in scout_lines[:5])
 
-        # Extract STEPS section from planner
-        steps_match = re.search(r'STEPS:\s*((?:\d+\..+?(?=\n\d+\.|\nVERIFY:|\Z))+)', planner, re.DOTALL)
+        # Extract STEPS section from planner - get everything between STEPS: and VERIFY:
+        steps_match = re.search(r'STEPS:\s*(.*?)(?=\n\s*VERIFY:|\Z)', planner, re.DOTALL | re.IGNORECASE)
         if steps_match:
             steps_section = steps_match.group(1).strip()
         else:
@@ -1130,8 +1223,8 @@ Complexity: {adaptive.complexity}
             context_lines = [f"- {sp.name}: {sp.id}" for sp in sub_plans[:5]]
             context_section = '\n'.join(context_lines)
 
-        # Extract STEPS from synthesis
-        steps_match = re.search(r'STEPS:\s*((?:\d+\..+?(?=\n\d+\.|\nVERIFY:|\Z))+)', synthesis, re.DOTALL)
+        # Extract STEPS from synthesis - get everything between STEPS: and VERIFY:
+        steps_match = re.search(r'STEPS:\s*(.*?)(?=\n\s*VERIFY:|\Z)', synthesis, re.DOTALL | re.IGNORECASE)
         if steps_match:
             steps_section = steps_match.group(1).strip()
         else:

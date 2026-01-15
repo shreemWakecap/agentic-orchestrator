@@ -24,8 +24,6 @@ from typing import Optional
 from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.expert_loader import ExpertLoader, ExpertType
 from core.docs_loader import DocsLoader
-from core.scout_cache import ScoutCache
-from core.checkpoint import CheckpointManager, PlanningCheckpoint
 
 
 @dataclass
@@ -131,13 +129,6 @@ class PlanningWorkflow(Workflow):
 
         # Initialize expert loader for domain/module expert consultation
         self.expert_loader = ExpertLoader(project_root)
-
-        # Initialize scout cache for avoiding redundant codebase exploration
-        self.scout_cache = ScoutCache(project_root)
-
-        # Initialize checkpoint manager for recovery
-        specs_dir = project_root / ".orchestrator" / "specs"
-        self.checkpoint_mgr = CheckpointManager(specs_dir)
 
         # Load all agents from .claude/agents/
         self._load_agents()
@@ -549,45 +540,20 @@ Focus on:
             adaptive = AdaptiveConfig.default_simple()
 
         depth = adaptive.agent_depth
-        request_hash = self.checkpoint_mgr.compute_request_hash(request)
 
-        # Check for existing checkpoint to resume from
-        existing_checkpoint = self.checkpoint_mgr.load(request)
-        if existing_checkpoint and existing_checkpoint.phase != "completed":
-            from core.symbols import WARNING
-            self.console.print(f"[yellow]{WARNING} Found checkpoint at phase: {existing_checkpoint.phase}[/yellow]")
-            self.console.print("  Resuming from last successful phase...")
-
-        # Check for cached scout result
+        # Phase 1: Scout
         self.console.print("[bold]Phase 1:[/bold] Scouting codebase...")
-        cached_scout = self.scout_cache.get(request)
-        if cached_scout:
-            from core.symbols import CHECK
-            self.console.print(f"  [green]{CHECK}[/green] Using cached scout result")
-            scout_content = cached_scout
-        else:
-            scout_context = self._build_depth_context("scout", depth, codebase_context)
-            scout_result = self.run_agent(
-                "scout",
-                message=f"User request: {request}\n\nGather context about this codebase.",
-                context=scout_context
-            )
-            valid, error = self._validate_agent_response("Scout", scout_result)
-            if not valid:
-                return WorkflowResult(success=False, error=error)
-            scout_content = scout_result.content
-            # Cache the result
-            self.scout_cache.set(request, scout_content)
+        scout_context = self._build_depth_context("scout", depth, codebase_context)
+        scout_result = self.run_agent(
+            "scout",
+            message=f"User request: {request}\n\nGather context about this codebase.",
+            context=scout_context
+        )
+        valid, error = self._validate_agent_response("Scout", scout_result)
+        if not valid:
+            return WorkflowResult(success=False, error=error)
+        scout_content = scout_result.content
         steps_completed.append("scout")
-
-        # Save checkpoint after scout
-        self.checkpoint_mgr.save(PlanningCheckpoint(
-            request=request,
-            request_hash=request_hash,
-            phase="scout",
-            complexity=adaptive.complexity,
-            scout_result=scout_content
-        ))
 
         # Architect with depth-aware context
         self.console.print("\n[bold]Phase 2:[/bold] Designing architecture...")
@@ -602,16 +568,6 @@ Focus on:
         if not valid:
             return WorkflowResult(success=False, error=error)
         steps_completed.append("architect")
-
-        # Save checkpoint after architect
-        self.checkpoint_mgr.save(PlanningCheckpoint(
-            request=request,
-            request_hash=request_hash,
-            phase="architect",
-            complexity=adaptive.complexity,
-            scout_result=scout_content,
-            architect_result=architect_result.content
-        ))
 
         # Expert Consultation - skip for brief depth to save time
         expert_insights = []
@@ -665,17 +621,6 @@ Focus on:
         from core.symbols import CHECK
         self.console.print(f"  [green]{CHECK}[/green] planner complete ({plan_steps} steps)")
         steps_completed.append("planner")
-
-        # Save checkpoint after planner
-        self.checkpoint_mgr.save(PlanningCheckpoint(
-            request=request,
-            request_hash=request_hash,
-            phase="planner",
-            complexity=adaptive.complexity,
-            scout_result=scout_content,
-            architect_result=architect_result.content,
-            planner_result=planner_result.content
-        ))
 
         # Validator with depth-aware context
         self.console.print("\n[bold]Phase 4:[/bold] Validating plan...")
@@ -733,9 +678,6 @@ Focus on:
 
         dirname = self._generate_plan_dirname(request)
         output_path = self._save_plan_folder(dirname, plan_files)
-
-        # Clear checkpoint on success
-        self.checkpoint_mgr.clear(request)
 
         return WorkflowResult(
             success=True,

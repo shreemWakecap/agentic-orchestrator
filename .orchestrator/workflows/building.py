@@ -225,8 +225,8 @@ class BuildingWorkflow(Workflow):
         Parser → Coordinator → [Parallel Builders] → Integrator → Tester → Reviewer
 
     Features:
-    - Incremental building with checkpoint saves
-    - Resume from failure
+    - Incremental building with progress tracking
+    - Resume from failure (state saved in specs/state/)
     - Parallel step execution
     - Automatic plan file organization
     """

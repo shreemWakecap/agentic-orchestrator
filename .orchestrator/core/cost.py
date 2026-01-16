@@ -286,13 +286,6 @@ class CostEstimator:
         steps = re.findall(r'#{1,4}\s*Step\s+\d', content)
         return max(len(steps), 3)  # Minimum 3 steps
 
-    def get_average_cost(self, workflow: str) -> Optional[float]:
-        """Get average historical cost for a workflow type."""
-        relevant = [c for c in self.history if c.workflow == workflow]
-        if not relevant:
-            return None
-        return sum(c.estimated_cost for c in relevant) / len(relevant)
-
     def calculate_cost_from_tokens(self, total_tokens: int, model: Model = DEFAULT_MODEL) -> float:
         """Calculate cost from token count (assumes 40% input, 60% output)."""
         input_tokens = int(total_tokens * 0.4)

@@ -138,51 +138,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-    // Track expanded plans
-    const expandedPlans = new Set();
-
-    function togglePlan(planId) {
-        const filesEl = document.getElementById('files-' + planId);
-        const iconEl = document.getElementById('expand-icon-' + planId);
-
-        if (expandedPlans.has(planId)) {
-            // Collapse
-            filesEl.classList.remove('expanded');
-            iconEl.classList.remove('rotated');
-            expandedPlans.delete(planId);
-        } else {
-            // Expand
-            filesEl.classList.add('expanded');
-            iconEl.classList.add('rotated');
-            expandedPlans.add(planId);
-        }
-    }
-
-    function openFile(planId, filename) {
-        const url = `/api/plans/${planId}/files/${encodeURIComponent(filename)}`;
-        SidePopup.loadUrl(filename, url, {
-            contentClass: 'side-popup-content markdown-content'
-        });
-    }
-
-    // Allow expanding/collapsing all
-    function expandAll() {
-        document.querySelectorAll('.plan-item').forEach(item => {
-            const planId = item.dataset.planId;
-            if (!expandedPlans.has(planId)) {
-                togglePlan(planId);
-            }
-        });
-    }
-
-    function collapseAll() {
-        document.querySelectorAll('.plan-item').forEach(item => {
-            const planId = item.dataset.planId;
-            if (expandedPlans.has(planId)) {
-                togglePlan(planId);
-            }
-        });
-    }
-</script>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/plan-list.js"></script>
 {% endblock %}

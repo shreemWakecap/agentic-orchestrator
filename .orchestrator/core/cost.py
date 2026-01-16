@@ -152,9 +152,7 @@ class CostEstimator:
         "tester": TokenEstimate(2000, 2000),
         "integrator": TokenEstimate(3000, 4000),
 
-        # Review/Fix/Sync agents
-        "reviewer": TokenEstimate(3000, 2000),
-        "fixer": TokenEstimate(2500, 3000),
+        # Sync agents
         "syncer": TokenEstimate(2000, 1500),
 
         # Expert agents (average)
@@ -259,22 +257,6 @@ class CostEstimator:
             agents=agents,
             total_estimate=TokenEstimate(total_input, total_output),
             confidence=0.6
-        )
-
-    def estimate_reviewing(self, plan_path: Path) -> CostEstimate:
-        """Estimate cost for reviewing workflow."""
-        agents = {
-            "reviewer": self._scale_estimate("reviewer", 1.0),
-        }
-
-        total_input = sum(e.input_tokens for e in agents.values())
-        total_output = sum(e.output_tokens for e in agents.values())
-
-        return CostEstimate(
-            workflow="reviewing",
-            agents=agents,
-            total_estimate=TokenEstimate(total_input, total_output),
-            confidence=0.75
         )
 
     def _scale_estimate(self, agent: str, multiplier: float) -> TokenEstimate:

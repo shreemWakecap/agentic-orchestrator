@@ -3,7 +3,7 @@
 {% block title %}Run {{ run.id }} - SDLC Orchestrator{% endblock %}
 
 {% block content %}
-<div class="px-4 py-6 sm:px-0">
+<div id="run-detail-page" class="px-4 py-6 sm:px-0" data-run-status="{{ run.status }}" data-run-id="{{ run.id }}">
     <!-- Header -->
     <div class="mb-6">
         <div class="flex items-center justify-between">
@@ -126,65 +126,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
-// Stream events if run is not completed
-const runStatus = '{{ run.status }}';
-const runId = '{{ run.id }}';
-
-if (runStatus === 'running' || runStatus === 'pending') {
-    const eventSource = new EventSource('/api/runs/' + runId + '/events');
-
-    eventSource.onmessage = function(e) {
-        const event = JSON.parse(e.data);
-
-        // Update status
-        if (event.type === 'done') {
-            const badge = document.getElementById('status-badge');
-            badge.textContent = event.status;
-            badge.className = badge.className.replace(/bg-\w+-100 text-\w+-800/, '');
-            if (event.status === 'completed') {
-                badge.classList.add('bg-green-100', 'text-green-800');
-            } else {
-                badge.classList.add('bg-red-100', 'text-red-800');
-            }
-            eventSource.close();
-        }
-
-        // Update progress
-        if (event.progress !== undefined) {
-            document.getElementById('progress-bar').style.width = event.progress + '%';
-            document.getElementById('progress-percent').textContent = event.progress + '%';
-        }
-
-        // Update current step
-        if (event.step) {
-            const stepEl = document.getElementById('current-step');
-            if (stepEl) stepEl.textContent = event.step;
-        }
-
-        // Add event to log
-        const eventsLog = document.getElementById('events-log');
-        const eventDiv = document.createElement('div');
-        eventDiv.className = 'px-4 py-3 text-sm fade-in';
-
-        let badgeClass = 'bg-gray-100 text-gray-800';
-        if (event.type === 'error') badgeClass = 'bg-red-100 text-red-800';
-        else if (event.type === 'complete') badgeClass = 'bg-green-100 text-green-800';
-
-        let content = `<span class="text-gray-500">${event.timestamp || new Date().toISOString().slice(0, 19)}</span>`;
-        content += `<span class="ml-2 px-2 py-0.5 rounded text-xs font-medium ${badgeClass}">${event.type}</span>`;
-        if (event.step) content += `<span class="ml-2 text-gray-700">${event.step}</span>`;
-        if (event.message) content += `<span class="ml-2 text-gray-700">${event.message}</span>`;
-
-        eventDiv.innerHTML = content;
-        eventsLog.appendChild(eventDiv);
-        eventsLog.scrollTop = eventsLog.scrollHeight;
-    };
-
-    eventSource.onerror = function() {
-        console.log('SSE connection closed');
-        eventSource.close();
-    };
-}
-</script>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/logs.js"></script>
+<script src="/static/js/build-progress.js"></script>
 {% endblock %}

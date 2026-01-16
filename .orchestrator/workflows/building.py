@@ -1,8 +1,8 @@
 """
 Smart Building Workflow: Executes implementation plans with parallel sub-agents.
 
-For simple plans: Parser → Builder (per step) → Tester → Reviewer
-For complex/master plans: Parser → Coordinator → [Parallel Builders] → Integrator → Tester → Reviewer
+For simple plans: Parser → Builder (per step) → Tester → Goal-Verifier
+For complex/master plans: Parser → Coordinator → [Parallel Builders] → Integrator → Tester → Goal-Verifier
 
 Features:
 - Incremental building with progress tracking
@@ -219,10 +219,10 @@ class BuildingWorkflow(Workflow):
     Smart building workflow with parallel execution and progress tracking.
 
     For simple plans:
-        Parser → Builder (sequential steps) → Tester → Reviewer
+        Parser → Builder (sequential steps) → Tester → Goal-Verifier
 
     For complex/master plans:
-        Parser → Coordinator → [Parallel Builders] → Integrator → Tester → Reviewer
+        Parser → Coordinator → [Parallel Builders] → Integrator → Tester → Goal-Verifier
 
     Features:
     - Incremental building with progress tracking
@@ -268,7 +268,7 @@ class BuildingWorkflow(Workflow):
 
     def _load_agents(self):
         """Load all agents needed for building."""
-        agents = ["parser", "builder", "tester", "reviewer", "coordinator", "integrator", "goal-verifier"]
+        agents = ["parser", "builder", "tester", "coordinator", "integrator", "goal-verifier"]
         for agent_name in agents:
             try:
                 self.register_agent(Agent.load(agent_name, self.project_root))
@@ -363,8 +363,11 @@ Respond in JSON:
 ```
 """
 
-        # Try to use goal-verifier agent, fall back to reviewer
-        agent_name = "goal-verifier" if "goal-verifier" in self.agents else "reviewer"
+        # Use goal-verifier agent for goal verification
+        agent_name = "goal-verifier"
+        if agent_name not in self.agents:
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Goal-verifier agent not available")
+            return False, ["Goal-verifier agent not found"]
 
         result = self.run_agent(
             agent_name,
@@ -1902,23 +1905,14 @@ Ensure all features work together correctly.""",
         return result.success
 
     def _run_review(self, plan: ParsedPlan) -> dict:
-        """Run final code review."""
-        result = self.run_agent(
-            "reviewer",
-            message=f"""Review the implementation of: {plan.plan_id}
-
-Files created: {len(self.build_state.files_created)}
-Files modified: {len(self.build_state.files_modified)}
-Steps completed: {len(self.build_state.completed_steps)}
-
-Provide a quality assessment.""",
-            context=f"Plan type: {plan.plan_type}",
-            show_progress=True
-        )
-
-        if result.success:
-            return self._parse_json_from_response(result.content)
-        return {"status": "skipped", "reason": "Reviewer failed"}
+        """Run final code review (simplified - goal verification done separately)."""
+        # Review step is now simplified - goal verification happens via goal-verifier
+        return {
+            "status": "completed",
+            "files_created": len(self.build_state.files_created),
+            "files_modified": len(self.build_state.files_modified),
+            "steps_completed": len(self.build_state.completed_steps)
+        }
 
     def execute(self, plan_path_str: str) -> WorkflowResult:
         """

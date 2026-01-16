@@ -30,28 +30,28 @@
             <div class="border-t border-gray-200">
                 <dl>
                     <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Workflow</dt>
+                        <dt class="text-sm font-medium text-gray-600">Workflow</dt>
                         <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.workflow|title }}</dd>
                     </div>
                     <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Started</dt>
+                        <dt class="text-sm font-medium text-gray-600">Started</dt>
                         <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.started_at[:19] }}</dd>
                     </div>
                     {% if run.completed_at %}
                     <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Completed</dt>
+                        <dt class="text-sm font-medium text-gray-600">Completed</dt>
                         <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.completed_at[:19] }}</dd>
                     </div>
                     {% endif %}
                     {% if run.description %}
                     <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Description</dt>
+                        <dt class="text-sm font-medium text-gray-600">Description</dt>
                         <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.description }}</dd>
                     </div>
                     {% endif %}
                     {% if run.output_file %}
                     <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-500">Output</dt>
+                        <dt class="text-sm font-medium text-gray-600">Output</dt>
                         <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.output_file }}</dd>
                     </div>
                     {% endif %}
@@ -98,7 +98,7 @@
             <div id="events-log" class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
                 {% for event in run.events %}
                 <div class="px-4 py-3 text-sm fade-in">
-                    <span class="text-gray-500">{{ event.timestamp[:19] if event.timestamp else '' }}</span>
+                    <span class="text-gray-600">{{ event.timestamp[:19] if event.timestamp else '' }}</span>
                     <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium
                         {% if event.type == 'error' %}bg-red-100 text-red-800
                         {% elif event.type == 'complete' %}bg-green-100 text-green-800

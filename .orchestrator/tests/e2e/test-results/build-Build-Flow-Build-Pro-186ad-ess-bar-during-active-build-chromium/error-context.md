@@ -1,0 +1,55 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e5]:
+      - link "SDLC Orchestrator" [ref=e7] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e8]:
+        - link "Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: /
+        - link "Plans" [ref=e10] [cursor=pointer]:
+          - /url: /plans
+        - link "Runs" [ref=e11] [cursor=pointer]:
+          - /url: /runs
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - heading "Building Run" [level=1] [ref=e17]
+          - paragraph [ref=e18]: "Run ID: f1168759"
+        - generic [ref=e19]: failed
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - heading "Run Details" [level=3] [ref=e23]
+          - generic [ref=e25]:
+            - generic [ref=e26]:
+              - term [ref=e27]: Workflow
+              - definition [ref=e28]: Building
+            - generic [ref=e29]:
+              - term [ref=e30]: Started
+              - definition [ref=e31]: 2026-01-16T22:39:20
+            - generic [ref=e32]:
+              - term [ref=e33]: Error
+              - definition [ref=e34]: "[Errno 22] Invalid argument"
+        - generic [ref=e35]:
+          - heading "Progress" [level=3] [ref=e37]
+          - generic [ref=e40]:
+            - generic [ref=e41]: Progress
+            - generic [ref=e42]: 0%
+      - generic [ref=e44]:
+        - heading "Event Log" [level=3] [ref=e46]
+        - generic [ref=e48]:
+          - generic [ref=e49]: 2026-01-16T22:39:20 start
+          - generic [ref=e50]: 2026-01-16T22:39:20 error [Errno 22] Invalid argument
+      - link "← Back to Runs" [ref=e52] [cursor=pointer]:
+        - /url: /runs
+  - contentinfo [ref=e53]:
+    - paragraph [ref=e55]: SDLC Orchestrator v1.0.0
+  - dialog "Title" [ref=e56]:
+    - generic [ref=e57]:
+      - heading "Title" [level=2] [ref=e58]
+      - button "Close panel" [ref=e59] [cursor=pointer]:
+        - img [ref=e60]
+```

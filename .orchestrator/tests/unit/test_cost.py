@@ -72,8 +72,12 @@ class TestCostEstimate:
         )
         result = estimate.to_dict()
         assert result["workflow"] == "test"
-        assert result["confidence"] == 0.8
+        # Confidence 0.8 maps to "high" (>= 0.7)
+        assert result["confidence"] == "high"
         assert "agent1" in result["agents"]
+        # Also check the alias fields for API compatibility
+        assert "estimated_tokens" in result
+        assert "estimated_cost_usd" in result
 
 
 class TestActualCost:

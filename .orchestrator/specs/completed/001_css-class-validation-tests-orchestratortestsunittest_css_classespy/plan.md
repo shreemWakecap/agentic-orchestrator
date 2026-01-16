@@ -1,0 +1,81 @@
+# Plan: Add CSS class validation tests in .orchestrator/tests/unit/test_css_classes.py. Tests should: (1) Pa
+
+Request: Add CSS class validation tests in .orchestrator/tests/unit/test_css_classes.py. Tests should: (1) Parse HTML templates from .orchestrator/server/templates/. (2) Verify form inputs have 'form-control' class. (3) Verify primary buttons have 'btn btn-primary' classes. (4) Verify secondary buttons have 'btn btn-secondary' classes. (5) Verify form groups have 'mb-3' or similar spacing classes. (6) Use BeautifulSoup or similar for HTML parsing. (7) Follow existing pytest patterns from the codebase.
+Complexity: medium
+
+## Goal
+
+Create test file validating CSS classes on form elements across all templates, adapted from Bootstrap class names to actual Tailwind classes used in codebase.
+
+## Context
+
+- Templates use Tailwind CSS, not Bootstrap - must test actual classes present
+- Form inputs use 'border border-gray-300 rounded-md' pattern, not 'form-control'
+- Primary buttons use 'bg-blue-600 text-white', not 'btn btn-primary'
+- Secondary buttons use 'bg-gray-' patterns, not 'btn btn-secondary'
+- Spacing uses Tailwind 'mb-4', 'space-y-', 'gap-' not Bootstrap 'mb-3'
+- BeautifulSoup4 available in test dependencies
+- Tests follow class-based organization (TestXxx pattern)
+
+## Steps
+
+1. Create test file with imports and fixtures
+   DO: Create test_css_classes.py with BeautifulSoup import, pathlib for template discovery, pytest fixtures to load and parse HTML templates from .orchestrator/server/templates/
+   IN: .orchestrator/server/templates/*.html
+   OUT: .orchestrator/tests/unit/test_css_classes.py (initial structure)
+   DONE: File exists with valid imports and template loading fixture
+   NEEDS: none
+
+2. Add template parsing helper class
+   DO: Create TestCSSClasses class with helper method to parse HTML files using BeautifulSoup, and fixture that discovers all .html files in templates directory
+   IN: none
+   OUT: .orchestrator/tests/unit/test_css_classes.py (TestCSSClasses class added)
+   DONE: Helper can load and parse any template file into BeautifulSoup object
+   NEEDS: 1
+
+3. Add form input class validation test
+   DO: Create test_form_inputs_have_styling method that finds all input, select, textarea elements and verifies they have Tailwind styling classes like 'border', 'rounded' or 'rounded-md' (equivalent to Bootstrap form-control purpose)
+   IN: .orchestrator/server/templates/dashboard.html
+   OUT: .orchestrator/tests/unit/test_css_classes.py (test method added)
+   DONE: Test passes when form inputs have border/rounded classes
+   NEEDS: 2
+
+4. Add primary button class validation test
+   DO: Create test_primary_buttons_have_styling method that finds buttons/links with primary action styling and verifies they have 'bg-blue-600' or 'bg-indigo-600' and 'text-white' classes (Tailwind equivalent of btn-primary)
+   IN: .orchestrator/server/templates/*.html
+   OUT: .orchestrator/tests/unit/test_css_classes.py (test method added)
+   DONE: Test passes when primary buttons have blue/indigo background with white text
+   NEEDS: 2
+
+5. Add secondary button class validation test
+   DO: Create test_secondary_buttons_have_styling method that finds secondary action buttons and verifies they have 'bg-gray-' or 'border-gray-' styling patterns (Tailwind equivalent of btn-secondary)
+   IN: .orchestrator/server/templates/*.html
+   OUT: .orchestrator/tests/unit/test_css_classes.py (test method added)
+   DONE: Test passes when secondary buttons have gray styling classes
+   NEEDS: 2
+
+6. Add form group spacing validation test
+   DO: Create test_form_groups_have_spacing method that finds form containers/groups and verifies they have Tailwind spacing classes like 'mb-4', 'space-y-4', 'gap-4', or 'py-' (equivalent purpose to Bootstrap mb-3)
+   IN: .orchestrator/server/templates/dashboard.html
+   OUT: .orchestrator/tests/unit/test_css_classes.py (test method added)
+   DONE: Test passes when form groups have margin/spacing classes
+   NEEDS: 2
+
+7. Verify BeautifulSoup parsing works correctly
+   DO: Add test_can_parse_all_templates method that iterates through all template files, parses each with BeautifulSoup, and asserts no parsing errors occur
+   IN: .orchestrator/server/templates/*.html
+   OUT: .orchestrator/tests/unit/test_css_classes.py (test method added)
+   DONE: Test passes confirming all templates are valid parseable HTML
+   NEEDS: 2
+
+8. Follow existing pytest patterns
+   DO: Review test_form_css.py structure and ensure test_css_classes.py follows same patterns: class-based organization, descriptive test names, clear assertions with helpful failure messages
+   IN: .orchestrator/tests/unit/test_form_css.py
+   OUT: .orchestrator/tests/unit/test_css_classes.py (finalized)
+   DONE: Code style matches existing test files, pytest -v shows clean test names
+   NEEDS: 3, 4, 5, 6, 7
+
+## Verify
+
+- pytest .orchestrator/tests/unit/test_css_classes.py -v passes all tests
+- python -c "from bs4 import BeautifulSoup; print('OK')" confirms BeautifulSoup available

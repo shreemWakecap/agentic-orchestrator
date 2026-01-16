@@ -11,9 +11,13 @@
     "test:report": "playwright show-report",
     "test:plans": "playwright test plans.spec.ts",
     "test:plan-details": "playwright test plan-details.spec.ts",
-    "test:build": "playwright test build.spec.ts"
+    "test:build": "playwright test build.spec.ts",
+    "test:visual": "percy exec -- playwright test visual/"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.8.0",
+    "@percy/cli": "^1.28.0",
+    "@percy/playwright": "^1.0.6",
     "@playwright/test": "^1.40.0"
   },
   "engines": {

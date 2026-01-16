@@ -1,0 +1,260 @@
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e5]:
+      - link "SDLC Orchestrator" [ref=e7] [cursor=pointer]:
+        - /url: /
+      - generic [ref=e8]:
+        - link "Dashboard" [ref=e9] [cursor=pointer]:
+          - /url: /
+        - link "Plans" [ref=e10] [cursor=pointer]:
+          - /url: /plans
+        - link "Runs" [ref=e11] [cursor=pointer]:
+          - /url: /runs
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e15]:
+        - heading "Plans" [level=1] [ref=e16]
+        - paragraph [ref=e17]: All implementation plans (7 total)
+      - list [ref=e19]:
+        - listitem [ref=e20]:
+          - generic [ref=e21] [cursor=pointer]:
+            - generic [ref=e22]:
+              - generic [ref=e23]:
+                - img [ref=e24]
+                - generic [ref=e26]:
+                  - paragraph [ref=e27]: "Add CSS class validation tests in .orchestrator/tests/unit/test_css_classes.py. Tests should: (1) Pa"
+                  - paragraph [ref=e28]: "Add CSS class validation tests in .orchestrator/tests/unit/test_css_classes.py. Tests should: (1) Parse HTML templates from .orchestrator/server/templates/. (2) Verify form inputs have 'form-control' class. (3) Verify primary buttons have 'btn btn-primary' classes. (4) Verify secondary buttons have 'btn btn-secondary' classes. (5) Verify form groups have 'mb-3' or similar spacing classes. (6) Use BeautifulSoup or similar for HTML parsing. (7) Follow existing pytest patterns from the codebase."
+              - generic [ref=e29]:
+                - generic [ref=e30]: medium
+                - generic [ref=e31]: completed
+            - generic [ref=e32]:
+              - generic [ref=e33]:
+                - paragraph [ref=e34]:
+                  - img [ref=e35]
+                  - text: 001_css-class-validation-tests-orchestratortestsunittest_css_classespy
+                - paragraph [ref=e37]:
+                  - img [ref=e38]
+                  - text: 1 files
+              - generic [ref=e40]:
+                - img [ref=e41]
+                - paragraph [ref=e43]: 2026-01-16
+          - generic [ref=e45]:
+            - heading "Plan Files" [level=4] [ref=e46]
+            - generic [ref=e48] [cursor=pointer]:
+              - generic [ref=e49]:
+                - img [ref=e50]
+                - generic [ref=e52]: plan.md
+              - img [ref=e53]
+            - link "View Full Plan" [ref=e57] [cursor=pointer]:
+              - /url: /plans/001_css-class-validation-tests-orchestratortestsunittest_css_classespy
+              - img [ref=e58]
+              - text: View Full Plan
+        - listitem [ref=e60]:
+          - generic [ref=e61] [cursor=pointer]:
+            - generic [ref=e62]:
+              - generic [ref=e63]:
+                - img [ref=e64]
+                - generic [ref=e66]:
+                  - paragraph [ref=e67]: Add form input visibility test assertions to the existing test suite in .orchestrator/tests/unit/. C
+                  - paragraph [ref=e68]: "Add form input visibility test assertions to the existing test suite in .orchestrator/tests/unit/. Create test_form_visibility.py that: (1) Checks that form inputs are visible and interactable before filling. (2) Uses pytest fixtures and patterns from existing tests. (3) Tests input elements have proper visibility attributes. (4) Validates that disabled/hidden inputs are properly detected."
+              - generic [ref=e69]:
+                - generic [ref=e70]: simple
+                - generic [ref=e71]: completed
+            - generic [ref=e72]:
+              - generic [ref=e73]:
+                - paragraph [ref=e74]:
+                  - img [ref=e75]
+                  - text: 001_form-input-visibility-test-assertions
+                - paragraph [ref=e77]:
+                  - img [ref=e78]
+                  - text: 1 files
+              - generic [ref=e80]:
+                - img [ref=e81]
+                - paragraph [ref=e83]: 2026-01-16
+          - generic [ref=e85]:
+            - heading "Plan Files" [level=4] [ref=e86]
+            - generic [ref=e88] [cursor=pointer]:
+              - generic [ref=e89]:
+                - img [ref=e90]
+                - generic [ref=e92]: plan.md
+              - img [ref=e93]
+            - link "View Full Plan" [ref=e97] [cursor=pointer]:
+              - /url: /plans/001_form-input-visibility-test-assertions
+              - img [ref=e98]
+              - text: View Full Plan
+        - listitem [ref=e100]:
+          - generic [ref=e101] [cursor=pointer]:
+            - generic [ref=e102]:
+              - generic [ref=e103]:
+                - img [ref=e104]
+                - generic [ref=e106]:
+                  - paragraph [ref=e107]: Add a /health API endpoint to server/app.py that returns JSON with status, version, and uptime. Incl
+                  - paragraph [ref=e108]: Add a /health API endpoint to server/app.py that returns JSON with status, version, and uptime. Include pytest tests in tests/unit/test_portal.py
+              - generic [ref=e109]:
+                - generic [ref=e110]: simple
+                - generic [ref=e111]: completed
+            - generic [ref=e112]:
+              - generic [ref=e113]:
+                - paragraph [ref=e114]:
+                  - img [ref=e115]
+                  - text: 001_health-api-endpoint-serverapppy-that
+                - paragraph [ref=e117]:
+                  - img [ref=e118]
+                  - text: 1 files
+              - generic [ref=e120]:
+                - img [ref=e121]
+                - paragraph [ref=e123]: 2026-01-16
+          - generic [ref=e125]:
+            - heading "Plan Files" [level=4] [ref=e126]
+            - generic [ref=e128] [cursor=pointer]:
+              - generic [ref=e129]:
+                - img [ref=e130]
+                - generic [ref=e132]: plan.md
+              - img [ref=e133]
+            - link "View Full Plan" [ref=e137] [cursor=pointer]:
+              - /url: /plans/001_health-api-endpoint-serverapppy-that
+              - img [ref=e138]
+              - text: View Full Plan
+        - listitem [ref=e140]:
+          - generic [ref=e141] [cursor=pointer]:
+            - generic [ref=e142]:
+              - generic [ref=e143]:
+                - img [ref=e144]
+                - generic [ref=e146]:
+                  - paragraph [ref=e147]: "Create a parallel build test module structure in .orchestrator/tests/parallel_test/. Create: (1) mod"
+                  - paragraph [ref=e148]: "Create a parallel build test module structure in .orchestrator/tests/parallel_test/. Create: (1) models/user.py with User class containing id, name, email fields and validation. (2) models/product.py with Product class containing id, name, price fields. (3) models/order.py with Order class containing id, user_id, product_ids, total. (4) models/__init__.py that exports all models. (5) registry.py that imports all models and provides get_model(name) function. (6) utils/validators.py with validate_email, validate_price functions. (7) utils/formatters.py with format_currency, format_date functions. (8) utils/__init__.py that exports utilities. Each file should have simple, independent implementations."
+              - generic [ref=e149]:
+                - generic [ref=e150]: medium
+                - generic [ref=e151]: completed
+            - generic [ref=e152]:
+              - generic [ref=e153]:
+                - paragraph [ref=e154]:
+                  - img [ref=e155]
+                  - text: 001_parallel-build-test-module-structure
+                - paragraph [ref=e157]:
+                  - img [ref=e158]
+                  - text: 1 files
+              - generic [ref=e160]:
+                - img [ref=e161]
+                - paragraph [ref=e163]: 2026-01-16
+          - generic [ref=e165]:
+            - heading "Plan Files" [level=4] [ref=e166]
+            - generic [ref=e168] [cursor=pointer]:
+              - generic [ref=e169]:
+                - img [ref=e170]
+                - generic [ref=e172]: plan.md
+              - img [ref=e173]
+            - link "View Full Plan" [ref=e177] [cursor=pointer]:
+              - /url: /plans/001_parallel-build-test-module-structure
+              - img [ref=e178]
+              - text: View Full Plan
+        - listitem [ref=e180]:
+          - generic [ref=e181] [cursor=pointer]:
+            - generic [ref=e182]:
+              - generic [ref=e183]:
+                - img [ref=e184]
+                - generic [ref=e186]:
+                  - paragraph [ref=e187]: Add Playwright E2E tests for the orchestrator web UI. (1) Create .orchestrator/tests/e2e/ directory
+                  - paragraph [ref=e188]: "Add Playwright E2E tests for the orchestrator web UI. (1) Create .orchestrator/tests/e2e/ directory structure. (2) Add playwright.config.ts with baseURL pointing to localhost:8000, screenshot on failure, and proper timeout settings. (3) Create tests/e2e/plans.spec.ts testing: view plan list page, verify plan items display, click on a plan to view details. (4) Create tests/e2e/plan-details.spec.ts testing: view plan detail page, verify metadata displays, verify steps are listed. (5) Create tests/e2e/build.spec.ts testing: start a build from plan detail page, verify build progress updates. (6) Add package.json with @playwright/test dependency. (7) Add npm scripts for running e2e tests."
+              - generic [ref=e189]:
+                - generic [ref=e190]: medium
+                - generic [ref=e191]: completed
+            - generic [ref=e192]:
+              - generic [ref=e193]:
+                - paragraph [ref=e194]:
+                  - img [ref=e195]
+                  - text: 002_playwright-e2e-tests-orchestrator-web
+                - paragraph [ref=e197]:
+                  - img [ref=e198]
+                  - text: 1 files
+              - generic [ref=e200]:
+                - img [ref=e201]
+                - paragraph [ref=e203]: 2026-01-16
+          - generic [ref=e205]:
+            - heading "Plan Files" [level=4] [ref=e206]
+            - generic [ref=e208] [cursor=pointer]:
+              - generic [ref=e209]:
+                - img [ref=e210]
+                - generic [ref=e212]: plan.md
+              - img [ref=e213]
+            - link "View Full Plan" [ref=e217] [cursor=pointer]:
+              - /url: /plans/002_playwright-e2e-tests-orchestrator-web
+              - img [ref=e218]
+              - text: View Full Plan
+        - listitem [ref=e220]:
+          - generic [ref=e221] [cursor=pointer]:
+            - generic [ref=e222]:
+              - generic [ref=e223]:
+                - img [ref=e224]
+                - generic [ref=e226]:
+                  - paragraph [ref=e227]: Create comprehensive E2E test suite in .orchestrator/tests/e2e/. (1) Create e2e/fixtures/ with test
+                  - paragraph [ref=e228]: "Create comprehensive E2E test suite in .orchestrator/tests/e2e/. (1) Create e2e/fixtures/ with test data setup and teardown helpers. (2) Create e2e/workflows/plan-lifecycle.spec.ts testing full plan create-build-review cycle. (3) Create e2e/workflows/expert-management.spec.ts testing expert listing and creation. (4) Create e2e/workflows/cost-tracking.spec.ts testing cost estimation display. (5) Create e2e/error-handling.spec.ts testing error states: invalid plan, failed build, network errors. (6) Create e2e/navigation.spec.ts testing all navigation links and breadcrumbs. (7) Create e2e/accessibility.spec.ts with basic a11y checks using @axe-core/playwright. (8) Add shared test utilities in e2e/utils/. (9) Ensure proper test isolation and cleanup between tests."
+              - generic [ref=e229]:
+                - generic [ref=e230]: complex
+                - generic [ref=e231]: completed
+            - generic [ref=e232]:
+              - generic [ref=e233]:
+                - paragraph [ref=e234]:
+                  - img [ref=e235]
+                  - text: 003_master-comprehensive-e2e-test-suite-orchestratortestse2e
+                - paragraph [ref=e237]:
+                  - img [ref=e238]
+                  - text: 1 files
+              - generic [ref=e240]:
+                - img [ref=e241]
+                - paragraph [ref=e243]: 2026-01-16
+          - generic [ref=e245]:
+            - heading "Plan Files" [level=4] [ref=e246]
+            - generic [ref=e248] [cursor=pointer]:
+              - generic [ref=e249]:
+                - img [ref=e250]
+                - generic [ref=e252]: plan.md
+              - img [ref=e253]
+            - link "View Full Plan" [ref=e257] [cursor=pointer]:
+              - /url: /plans/003_master-comprehensive-e2e-test-suite-orchestratortestse2e
+              - img [ref=e258]
+              - text: View Full Plan
+        - listitem [ref=e260]:
+          - generic [ref=e261] [cursor=pointer]:
+            - generic [ref=e262]:
+              - generic [ref=e263]:
+                - img [ref=e264]
+                - generic [ref=e266]:
+                  - paragraph [ref=e267]: Refactor .orchestrator/server/app.py to use dependency injection. (1) Create .orchestrator/server/se
+                  - paragraph [ref=e268]: "Refactor .orchestrator/server/app.py to use dependency injection. (1) Create .orchestrator/server/services/ module directory. (2) Create services/interfaces.py with abstract base classes: IPlanRegistry, IFileService, IConfigService. (3) Create services/plan_registry.py implementing IPlanRegistry with methods: list_plans, get_plan, update_plan_status. (4) Create services/file_service.py implementing IFileService for file path operations. (5) Create services/config_service.py implementing IConfigService for configuration loading. (6) Create services/container.py with dependency container that provides service instances. (7) Refactor app.py routes to accept services via FastAPI Depends(). (8) Update .orchestrator/tests/unit/test_portal.py to use mock services. (9) Create test fixtures for mock services in conftest.py."
+              - generic [ref=e269]:
+                - generic [ref=e270]: complex
+                - generic [ref=e271]: completed
+            - generic [ref=e272]:
+              - generic [ref=e273]:
+                - paragraph [ref=e274]:
+                  - img [ref=e275]
+                  - text: 004_master-refactor-orchestratorserverapppy-use-dependency-injection
+                - paragraph [ref=e277]:
+                  - img [ref=e278]
+                  - text: 1 files
+              - generic [ref=e280]:
+                - img [ref=e281]
+                - paragraph [ref=e283]: 2026-01-16
+          - generic [ref=e285]:
+            - heading "Plan Files" [level=4] [ref=e286]
+            - generic [ref=e288] [cursor=pointer]:
+              - generic [ref=e289]:
+                - img [ref=e290]
+                - generic [ref=e292]: plan.md
+              - img [ref=e293]
+            - link "View Full Plan" [ref=e297] [cursor=pointer]:
+              - /url: /plans/004_master-refactor-orchestratorserverapppy-use-dependency-injection
+              - img [ref=e298]
+              - text: View Full Plan
+  - contentinfo [ref=e300]:
+    - paragraph [ref=e302]: SDLC Orchestrator v1.0.0
+  - dialog "Title" [ref=e303]:
+    - generic [ref=e304]:
+      - heading "Title" [level=2] [ref=e305]
+      - button "Close panel" [ref=e306] [cursor=pointer]:
+        - img [ref=e307]
+```

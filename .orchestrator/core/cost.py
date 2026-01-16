@@ -77,11 +77,21 @@ class CostEstimate:
         return self.total_estimate.estimated_cost
 
     def to_dict(self) -> dict:
+        # Convert numeric confidence (0-1) to string level
+        if self.confidence >= 0.7:
+            confidence_str = "high"
+        elif self.confidence >= 0.5:
+            confidence_str = "medium"
+        else:
+            confidence_str = "low"
+
         return {
             "workflow": self.workflow,
             "total_tokens": self.total_estimate.total_tokens,
+            "estimated_tokens": self.total_estimate.total_tokens,  # Alias for compatibility
             "total_cost_usd": self.total_cost,
-            "confidence": self.confidence,
+            "estimated_cost_usd": self.total_cost,  # Alias for compatibility
+            "confidence": confidence_str,
             "agents": {
                 name: {
                     "input": est.input_tokens,
@@ -308,6 +318,7 @@ class CostReporter:
         return {
             "date": date.date().isoformat(),
             "total_runs": len(runs),
+            "workflow_count": len(runs),  # Alias for test compatibility
             "total_tokens": sum(c.total_tokens for c in runs),
             "total_cost": sum(c.estimated_cost for c in runs),
             "by_workflow": self._group_by_workflow(runs)
@@ -324,6 +335,7 @@ class CostReporter:
         return {
             "period": f"{week_start.date().isoformat()} to {now.date().isoformat()}",
             "total_runs": len(runs),
+            "workflow_count": len(runs),  # Alias for test compatibility
             "total_tokens": sum(c.total_tokens for c in runs),
             "total_cost": sum(c.estimated_cost for c in runs),
             "by_workflow": self._group_by_workflow(runs)
@@ -340,6 +352,7 @@ class CostReporter:
         return {
             "month": now.strftime("%Y-%m"),
             "total_runs": len(runs),
+            "workflow_count": len(runs),  # Alias for test compatibility
             "total_tokens": sum(c.total_tokens for c in runs),
             "total_cost": sum(c.estimated_cost for c in runs),
             "by_workflow": self._group_by_workflow(runs)
@@ -430,20 +443,42 @@ class BudgetManager:
         weekly = reporter.weekly_report()
         monthly = reporter.monthly_report()
 
+        # Calculate remaining amounts (None if no limit set)
+        daily_remaining = (self.budget.daily_limit - daily["total_cost"]) if self.budget.daily_limit else None
+        weekly_remaining = (self.budget.weekly_limit - weekly["total_cost"]) if self.budget.weekly_limit else None
+        monthly_remaining = (self.budget.monthly_limit - monthly["total_cost"]) if self.budget.monthly_limit else None
+        per_workflow_remaining = self.budget.per_workflow_limit  # Per-workflow limit is the remaining
+
+        # Check if within budget (all applicable limits must be positive or unlimited)
+        is_within_budget = True
+        if daily_remaining is not None and daily_remaining < 0:
+            is_within_budget = False
+        if weekly_remaining is not None and weekly_remaining < 0:
+            is_within_budget = False
+        if monthly_remaining is not None and monthly_remaining < 0:
+            is_within_budget = False
+
         return {
+            # Flat structure for test compatibility
+            "daily_remaining": daily_remaining,
+            "weekly_remaining": weekly_remaining,
+            "monthly_remaining": monthly_remaining,
+            "per_workflow_remaining": per_workflow_remaining,
+            "is_within_budget": is_within_budget,
+            # Also include detailed nested structure for UI
             "daily": {
                 "limit": self.budget.daily_limit,
                 "used": daily["total_cost"],
-                "remaining": (self.budget.daily_limit - daily["total_cost"]) if self.budget.daily_limit else None
+                "remaining": daily_remaining
             },
             "weekly": {
                 "limit": self.budget.weekly_limit,
                 "used": weekly["total_cost"],
-                "remaining": (self.budget.weekly_limit - weekly["total_cost"]) if self.budget.weekly_limit else None
+                "remaining": weekly_remaining
             },
             "monthly": {
                 "limit": self.budget.monthly_limit,
                 "used": monthly["total_cost"],
-                "remaining": (self.budget.monthly_limit - monthly["total_cost"]) if self.budget.monthly_limit else None
+                "remaining": monthly_remaining
             }
         }

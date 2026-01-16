@@ -22,7 +22,7 @@
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Pending</dt>
+                            <dt class="text-sm font-medium text-gray-600 truncate">Pending</dt>
                             <dd class="text-lg font-medium text-gray-900">{{ counts.pending }}</dd>
                         </dl>
                     </div>
@@ -40,7 +40,7 @@
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">In Progress</dt>
+                            <dt class="text-sm font-medium text-gray-600 truncate">In Progress</dt>
                             <dd class="text-lg font-medium text-gray-900">{{ counts.in_progress }}</dd>
                         </dl>
                     </div>
@@ -58,7 +58,7 @@
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Completed</dt>
+                            <dt class="text-sm font-medium text-gray-600 truncate">Completed</dt>
                             <dd class="text-lg font-medium text-gray-900">{{ counts.completed }}</dd>
                         </dl>
                     </div>
@@ -76,7 +76,7 @@
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Failed</dt>
+                            <dt class="text-sm font-medium text-gray-600 truncate">Failed</dt>
                             <dd class="text-lg font-medium text-gray-900">{{ counts.failed }}</dd>
                         </dl>
                     </div>
@@ -94,7 +94,7 @@
                     </div>
                     <div class="ml-5 w-0 flex-1">
                         <dl>
-                            <dt class="text-sm font-medium text-gray-500 truncate">Reviews</dt>
+                            <dt class="text-sm font-medium text-gray-600 truncate">Reviews</dt>
                             <dd class="text-lg font-medium text-gray-900">{{ counts.reviews }}</dd>
                         </dl>
                     </div>
@@ -133,7 +133,7 @@
                                 <a href="/plans/{{ plan.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
                                     {{ plan.name }}
                                 </a>
-                                <p class="text-sm text-gray-500">{{ plan.modified[:10] }}</p>
+                                <p class="text-sm text-gray-600">{{ plan.modified[:10] }}</p>
                             </div>
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                 {% if plan.state == 'completed' %}bg-green-100 text-green-800
@@ -150,7 +150,7 @@
                     View all plans &rarr;
                 </a>
                 {% else %}
-                <p class="text-sm text-gray-500">No plans yet. Create your first plan above!</p>
+                <p class="text-sm text-gray-600">No plans yet. Create your first plan above!</p>
                 {% endif %}
             </div>
         </div>
@@ -168,7 +168,7 @@
                                 <a href="/runs/{{ run.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
                                     {{ run.workflow|title }} - {{ run.id }}
                                 </a>
-                                <p class="text-sm text-gray-500">Started: {{ run.started_at[:19] }}</p>
+                                <p class="text-sm text-gray-600">Started: {{ run.started_at[:19] }}</p>
                             </div>
                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                 {% if run.status == 'completed' %}bg-green-100 text-green-800
@@ -187,7 +187,7 @@
                     {% endfor %}
                 </ul>
                 {% else %}
-                <p class="text-sm text-gray-500">No active runs.</p>
+                <p class="text-sm text-gray-600">No active runs.</p>
                 {% endif %}
             </div>
         </div>

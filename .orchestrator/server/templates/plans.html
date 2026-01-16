@@ -22,7 +22,7 @@
                     <div class="flex items-center justify-between">
                         <div class="flex items-center">
                             <!-- Expand Icon -->
-                            <svg id="expand-icon-{{ plan.id }}" class="expand-icon h-5 w-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg id="expand-icon-{{ plan.id }}" class="expand-icon h-5 w-5 text-gray-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                             </svg>
                             <div>
@@ -36,7 +36,7 @@
                         </div>
                         <div class="ml-2 flex items-center gap-3">
                             {% if plan.complexity %}
-                            <span class="text-xs text-gray-400">{{ plan.complexity }}</span>
+                            <span class="text-xs text-gray-600">{{ plan.complexity }}</span>
                             {% endif %}
                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
                                 {% if plan.state == 'completed' %}bg-green-100 text-green-800
@@ -49,23 +49,23 @@
                     </div>
                     <div class="mt-2 sm:flex sm:justify-between">
                         <div class="sm:flex">
-                            <p class="flex items-center text-sm text-gray-500">
-                                <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <p class="flex items-center text-sm text-gray-600">
+                                <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                                 </svg>
                                 {{ plan.id }}
                             </p>
                             {% if plan.files %}
-                            <p class="ml-4 flex items-center text-sm text-gray-400">
-                                <svg class="flex-shrink-0 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <p class="ml-4 flex items-center text-sm text-gray-600">
+                                <svg class="flex-shrink-0 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                 </svg>
                                 {{ plan.files|length }} files
                             </p>
                             {% endif %}
                         </div>
-                        <div class="mt-2 flex items-center text-sm text-gray-500 sm:mt-0">
-                            <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <div class="mt-2 flex items-center text-sm text-gray-600 sm:mt-0">
+                            <svg class="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                             </svg>
                             <p>{{ plan.modified[:10] }}</p>
@@ -76,14 +76,14 @@
                 <!-- Expandable Files Section -->
                 <div id="files-{{ plan.id }}" class="expand-content bg-gray-50 border-t border-gray-100">
                     <div class="px-6 py-4">
-                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Plan Files</h4>
+                        <h4 id="plan-files-{{ plan.id }}" class="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">Plan Files</h4>
                         {% if plan.files %}
                         <div class="grid gap-2">
                             {% for file in plan.files %}
                             <div class="file-item flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 cursor-pointer"
                                  onclick="event.stopPropagation(); openFile('{{ plan.id }}', '{{ file }}')">
                                 <div class="flex items-center">
-                                    <svg class="h-5 w-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="h-5 w-5 text-gray-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         {% if file.endswith('.json') %}
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
                                         {% else %}
@@ -92,7 +92,7 @@
                                     </svg>
                                     <span class="text-sm font-medium text-gray-700">{{ file }}</span>
                                 </div>
-                                <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
                                 </svg>
@@ -122,11 +122,11 @@
     </div>
     {% else %}
     <div class="text-center py-12">
-        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
         </svg>
         <h3 class="mt-2 text-sm font-medium text-gray-900">No plans</h3>
-        <p class="mt-1 text-sm text-gray-500">Get started by creating a new plan from the dashboard.</p>
+        <p class="mt-1 text-sm text-gray-600">Get started by creating a new plan from the dashboard.</p>
         <div class="mt-6">
             <a href="/" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
                 Go to Dashboard

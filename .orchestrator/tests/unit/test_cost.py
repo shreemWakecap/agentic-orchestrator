@@ -156,13 +156,6 @@ Final step
         builder_agents = [a for a in estimate.agents if a.startswith("builder_step_")]
         assert len(builder_agents) == 5
 
-    def test_estimate_reviewing(self, estimator, tmp_path):
-        plan_file = tmp_path / "test_plan.md"
-        plan_file.write_text("Test plan")
-        estimate = estimator.estimate_reviewing(plan_file)
-        assert estimate.workflow == "reviewing"
-        assert "reviewer" in estimate.agents
-
     def test_record_and_load_history(self, tmp_path):
         history_file = tmp_path / "cost_history.json"
         estimator = CostEstimator(history_file)

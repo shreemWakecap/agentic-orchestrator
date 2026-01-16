@@ -2,7 +2,7 @@
 
 Provides a browser-based dashboard for:
 - Viewing and managing plans
-- Running workflows (plan, build, review, fix)
+- Running workflows (plan, build, sync)
 - Real-time progress streaming via SSE
 - Historical run tracking
 """
@@ -30,8 +30,6 @@ sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
 from workflows.planning import PlanningWorkflow
 from workflows.building import BuildingWorkflow
-from workflows.reviewing import ReviewingWorkflow
-from workflows.fixing import FixingWorkflow
 from workflows.syncing import SyncingWorkflow
 from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
 
@@ -67,19 +65,6 @@ class BuildRequest(BaseModel):
     plan_path: str
 
 
-class ReviewRequest(BaseModel):
-    """Request to start a review."""
-    plan_path: str
-    refresh_docs: bool = False
-
-
-class FixRequest(BaseModel):
-    """Request to start fixing issues."""
-    review_path: str
-    dry_run: bool = False
-    min_severity: str = "low"
-
-
 # ============== HTML Routes ==============
 
 @app.get("/", response_class=HTMLResponse)
@@ -92,8 +77,7 @@ async def dashboard(request: Request):
         "pending": 0,
         "in_progress": 0,
         "completed": 0,
-        "failed": 0,
-        "reviews": 0
+        "failed": 0
     }
 
     for state in ["pending", "in-progress", "completed", "failed"]:
@@ -104,10 +88,6 @@ async def dashboard(request: Request):
                         if d.is_dir() and not d.name.startswith('.')])
             key = state.replace("-", "_")
             counts[key] = count
-
-    reviews_dir = specs_dir / "reviews"
-    if reviews_dir.exists():
-        counts["reviews"] = len(list(reviews_dir.glob("*.md")))
 
     # Get recent plans
     recent_plans = await _get_recent_plans(5)
@@ -278,62 +258,6 @@ async def api_start_build(request: BuildRequest, background_tasks: BackgroundTas
     return {"run_id": run_id, "status": "started"}
 
 
-@app.post("/api/workflows/review")
-async def api_start_review(request: ReviewRequest, background_tasks: BackgroundTasks):
-    """Start a review workflow."""
-    run_id = str(uuid.uuid4())[:8]
-
-    active_runs[run_id] = {
-        "id": run_id,
-        "workflow": "reviewing",
-        "status": "pending",
-        "started_at": datetime.now().isoformat(),
-        "plan_path": request.plan_path,
-        "progress": 0,
-        "events": [],
-        "output_file": None,
-        "error": None
-    }
-
-    background_tasks.add_task(
-        _run_reviewing_workflow,
-        run_id,
-        request.plan_path,
-        request.refresh_docs
-    )
-
-    return {"run_id": run_id, "status": "started"}
-
-
-@app.post("/api/workflows/fix")
-async def api_start_fix(request: FixRequest, background_tasks: BackgroundTasks):
-    """Start a fixing workflow."""
-    run_id = str(uuid.uuid4())[:8]
-
-    active_runs[run_id] = {
-        "id": run_id,
-        "workflow": "fixing",
-        "status": "pending",
-        "started_at": datetime.now().isoformat(),
-        "review_path": request.review_path,
-        "dry_run": request.dry_run,
-        "progress": 0,
-        "events": [],
-        "output_file": None,
-        "error": None
-    }
-
-    background_tasks.add_task(
-        _run_fixing_workflow,
-        run_id,
-        request.review_path,
-        request.dry_run,
-        request.min_severity
-    )
-
-    return {"run_id": run_id, "status": "started"}
-
-
 @app.post("/api/workflows/sync-remote")
 async def api_sync_remote(background_tasks: BackgroundTasks):
     """Start a sync-remote workflow to commit changes and create PR."""
@@ -397,13 +321,6 @@ async def api_stream_events(run_id: str):
     )
 
 
-@app.get("/api/reviews")
-async def api_list_reviews():
-    """List all review reports."""
-    reviews = await _get_all_reviews()
-    return {"reviews": reviews}
-
-
 # ============== Cost API Routes ==============
 
 @app.get("/api/cost/estimate/{workflow}")
@@ -416,9 +333,6 @@ async def api_estimate_cost(workflow: str, request_text: str = "", plan_path: st
     elif workflow == "build":
         path = Path(plan_path) if plan_path else ORCHESTRATOR_DIR / "dummy.md"
         estimate = estimator.estimate_building(path)
-    elif workflow == "review":
-        path = Path(plan_path) if plan_path else ORCHESTRATOR_DIR / "dummy.md"
-        estimate = estimator.estimate_reviewing(path)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown workflow: {workflow}")
 
@@ -624,36 +538,6 @@ async def _get_plan_by_id(plan_id: str) -> Optional[Dict]:
     return None
 
 
-async def _get_all_reviews() -> List[Dict]:
-    """Get all review reports."""
-    reviews_dir = ORCHESTRATOR_DIR / "specs" / "reviews"
-    reviews = []
-
-    if reviews_dir.exists():
-        for review_file in reviews_dir.glob("*.md"):
-            content = review_file.read_text(encoding="utf-8")
-
-            # Try to extract score from content
-            score = None
-            for line in content.split("\n"):
-                if "Score:" in line or "score:" in line:
-                    try:
-                        score_str = line.split(":")[1].strip().replace("%", "").split()[0]
-                        score = float(score_str)
-                        break
-                    except (ValueError, IndexError):
-                        pass
-
-            reviews.append({
-                "id": review_file.stem,
-                "file": str(review_file),
-                "score": score,
-                "modified": datetime.fromtimestamp(review_file.stat().st_mtime).isoformat()
-            })
-
-    return sorted(reviews, key=lambda r: r["modified"], reverse=True)
-
-
 # ============== Background Tasks ==============
 
 def _add_event(run_id: str, event: Dict):
@@ -713,66 +597,6 @@ async def _run_building_workflow(run_id: str, plan_path: str):
             "type": "complete",
             "success": result.success,
             "steps_completed": result.steps_completed
-        })
-
-    except Exception as e:
-        run["status"] = "failed"
-        run["error"] = str(e)
-        _add_event(run_id, {"type": "error", "message": str(e)})
-
-
-async def _run_reviewing_workflow(run_id: str, plan_path: str, refresh_docs: bool):
-    """Execute reviewing workflow."""
-    run = active_runs[run_id]
-    run["status"] = "running"
-    _add_event(run_id, {"type": "start", "workflow": "reviewing"})
-
-    try:
-        workflow = ReviewingWorkflow(project_root=PROJECT_ROOT, refresh_docs=refresh_docs)
-        result = workflow.run(plan_path)
-
-        run["status"] = "completed" if result.success else "failed"
-        run["completed_at"] = datetime.now().isoformat()
-        run["output_file"] = str(result.output_file) if result.output_file else None
-        run["progress"] = 100
-        run["data"] = result.data
-
-        _add_event(run_id, {
-            "type": "complete",
-            "success": result.success,
-            "output": str(result.output_file) if result.output_file else None
-        })
-
-    except Exception as e:
-        run["status"] = "failed"
-        run["error"] = str(e)
-        _add_event(run_id, {"type": "error", "message": str(e)})
-
-
-async def _run_fixing_workflow(run_id: str, review_path: str, dry_run: bool, min_severity: str):
-    """Execute fixing workflow."""
-    run = active_runs[run_id]
-    run["status"] = "running"
-    _add_event(run_id, {"type": "start", "workflow": "fixing"})
-
-    try:
-        workflow = FixingWorkflow(
-            project_root=PROJECT_ROOT,
-            dry_run=dry_run,
-            min_severity=min_severity
-        )
-        result = workflow.run(review_path)
-
-        run["status"] = "completed" if result.success else "failed"
-        run["completed_at"] = datetime.now().isoformat()
-        run["output_file"] = str(result.output_file) if result.output_file else None
-        run["progress"] = 100
-        run["data"] = result.data
-
-        _add_event(run_id, {
-            "type": "complete",
-            "success": result.success,
-            "fixes_applied": result.data.get("fixes_applied", 0) if result.data else 0
         })
 
     except Exception as e:

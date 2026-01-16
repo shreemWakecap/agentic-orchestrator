@@ -6,8 +6,6 @@ Usage:
     uv run python .orchestrator/cli.py setup
     uv run python .orchestrator/cli.py plan "Add user authentication"
     uv run python .orchestrator/cli.py build .orchestrator/specs/pending/plan.md
-    uv run python .orchestrator/cli.py review .orchestrator/specs/completed/plan.md
-    uv run python .orchestrator/cli.py fix .orchestrator/specs/reviews/review.md
     uv run python .orchestrator/cli.py list
     uv run python .orchestrator/cli.py docs
     uv run python .orchestrator/cli.py experts
@@ -100,71 +98,6 @@ def cmd_build(args):
     from workflows.building import BuildingWorkflow
     workflow = BuildingWorkflow(project_root=PROJECT_ROOT)
     result = workflow.run(args[0])
-    return 0 if result.success else 1
-
-
-def cmd_review(args):
-    """Review a completed build."""
-    if not args:
-        print("Usage: cli.py review <plan-file>")
-        cmd_list()
-        return 1
-
-    from workflows.reviewing import ReviewingWorkflow
-    refresh_docs = "--refresh-docs" in args
-    plan_path = [a for a in args if not a.startswith("--")][0]
-
-    workflow = ReviewingWorkflow(project_root=PROJECT_ROOT, refresh_docs=refresh_docs)
-    result = workflow.run(plan_path)
-
-    if result.success and result.data:
-        print(f"\nScore: {result.data.get('overall_score', 0):.0f}/100")
-        print(f"Report: {result.output_file}")
-
-    return 0 if result.success else 1
-
-
-def cmd_fix(args):
-    """Fix issues from a review report."""
-    if not args:
-        print("Usage: cli.py fix <review-file> [options]")
-        print("\nOptions:")
-        print("  --dry-run         Show fixes without applying")
-        print("  --min-severity    Minimum severity (critical|high|medium|low)")
-        print("\nExample: cli.py fix .orchestrator/specs/reviews/review-auth-20240115.md")
-        cmd_list()
-        return 1
-
-    from workflows.fixing import FixingWorkflow
-
-    # Parse options
-    dry_run = "--dry-run" in args
-    min_severity = "low"
-
-    # Find min-severity value
-    for i, arg in enumerate(args):
-        if arg == "--min-severity" and i + 1 < len(args):
-            min_severity = args[i + 1]
-
-    # Get review file (first non-option arg)
-    review_path = [a for a in args if not a.startswith("--")][0]
-
-    workflow = FixingWorkflow(
-        project_root=PROJECT_ROOT,
-        dry_run=dry_run,
-        min_severity=min_severity
-    )
-    result = workflow.run(review_path)
-
-    if result.success and result.data:
-        print(f"\nFixes applied: {result.data.get('fixes_applied', 0)}")
-        if result.data.get('fixes_failed', 0) > 0:
-            print(f"Fixes failed: {result.data.get('fixes_failed', 0)}")
-        if result.data.get('unfixable', 0) > 0:
-            print(f"Unfixable issues: {result.data.get('unfixable', 0)}")
-        if result.output_file:
-            print(f"Report: {result.output_file}")
-
     return 0 if result.success else 1
 
 
@@ -971,8 +904,6 @@ COMMANDS = {
     'plan': (cmd_plan, "Create implementation plan"),
     'build': (cmd_build, "Execute a plan"),
     'status': (cmd_status, "Show build status for a plan"),
-    'review': (cmd_review, "Review completed build"),
-    'fix': (cmd_fix, "Fix issues from review"),
     'list': (cmd_list, "List all plans"),
     'docs': (cmd_docs, "Check documentation"),
     'experts': (cmd_experts, "Manage expert agents"),
@@ -994,9 +925,7 @@ def main():
         print("  cli.py setup")
         print("  cli.py plan 'Add user authentication'")
         print("  cli.py build .orchestrator/specs/pending/user-auth.md")
-        print("  cli.py review .orchestrator/specs/completed/user-auth.md")
-        print("  cli.py fix .orchestrator/specs/reviews/review-user-auth.md")
-        print("  cli.py fix .orchestrator/specs/reviews/review.md --dry-run")
+        print("  cli.py status 001_user-auth              # Show build progress")
         print("  cli.py experts list                      # List all experts")
         print("  cli.py experts create auth --type domain --keywords auth,login")
         print("  cli.py test                              # Run all tests")

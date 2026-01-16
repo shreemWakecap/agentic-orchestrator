@@ -1,0 +1,104 @@
+{
+  "plan_id": "001_extract-inline-javascript-from-orchestratorservertemplateshtml",
+  "plan_file": "D:\\agentic-orchestrator\\.orchestrator\\specs\\completed\\001_extract-inline-javascript-from-orchestratorservertemplateshtml",
+  "status": "building",
+  "started_at": "2026-01-16T11:13:04.947063",
+  "updated_at": "2026-01-16T15:58:08.300533",
+  "current_phase": 0,
+  "current_step": "",
+  "total_steps": 18,
+  "completed_steps": [
+    "step-1",
+    "step-2",
+    "step-3",
+    "step-4",
+    "step-5",
+    "step-6",
+    "step-7",
+    "step-8",
+    "step-9",
+    "step-10",
+    "step-11"
+  ],
+  "failed_steps": [],
+  "skipped_steps": [],
+  "step_states": {
+    "step-1": {
+      "step_id": "step-1",
+      "status": "completed",
+      "started_at": "2026-01-16T11:13:47.033000",
+      "completed_at": "2026-01-16T11:16:18.610899",
+      "retry_count": 0,
+      "error": null,
+      "files_affected": [
+        "Analysis notes identifying script boundaries",
+        "shared code",
+        "and Jinja2 variable usage"
+      ],
+      "summary": "## Summary\n\nCompleted a comprehensive analysis of all 6 HTML templates in the orchestrator server, documenting each inline script's functionality, variables, and dependencies.\n\n## Files Affected\n- `D:"
+    },
+    "step-2": {
+      "step_id": "step-2",
+      "status": "completed",
+      "started_at": "2026-01-16T11:16:18.610899",
+      "completed_at": "2026-01-16T11:17:12.270639",
+      "retry_count": 0,
+      "error": null,
+      "files_affected": [
+        ".orchestrator/server/static/js/__tests__/"
+      ],
+      "summary": "## Files Affected\n- `.orchestrator/server/static/js/__tests__/.gitkeep` - created\n\n## Goal Progress\nThis step establishes the directory structure for JavaScript tests. The `__tests__` subdirectory is "
+    },
+    "step-8": {
+      "step_id": "step-8",
+      "status": "completed",
+      "started_at": "2026-01-16T11:21:32.962682",
+      "completed_at": "2026-01-16T11:23:30.210295",
+      "retry_count": 0,
+      "error": null,
+      "files_affected": [
+        ".orchestrator/server/static/js/common.js"
+      ],
+      "summary": "## Summary\n\nCreated `.orchestrator/server/static/js/common.js` with a comprehensive set of shared utilities extracted from analysis of the existing JavaScript modules (chat.js, logs.js, build-progress"
+    },
+    "step-9": {
+      "step_id": "step-9",
+      "status": "completed",
+      "started_at": "2026-01-16T11:23:30.210295",
+      "completed_at": "2026-01-16T11:25:54.005666",
+      "retry_count": 0,
+      "error": null,
+      "files_affected": [
+        ".orchestrator/server/templates/plans.html"
+      ],
+      "summary": "Template plans.html (equivalent to plan_list.html in plan) was already updated during step-3 execution. External script references for common.js and plan-list.js are in place."
+    },
+    "step-10": {
+      "step_id": "step-10",
+      "status": "completed",
+      "started_at": "2026-01-16T11:23:30.210295",
+      "completed_at": "2026-01-16T11:25:54.005666",
+      "retry_count": 0,
+      "error": null,
+      "files_affected": [
+        ".orchestrator/server/templates/run_detail.html"
+      ],
+      "summary": "Template run_detail.html (which contains build progress functionality) was already updated during step-4 execution. External script references for common.js, logs.js, and build-progress.js are in place."
+    },
+    "step-11": {
+      "step_id": "step-11",
+      "status": "completed",
+      "started_at": "2026-01-16T11:23:30.210295",
+      "completed_at": "2026-01-16T11:25:54.005666",
+      "retry_count": 0,
+      "error": null,
+      "files_affected": [
+        ".orchestrator/server/templates/run_detail.html"
+      ],
+      "summary": "Logs functionality is handled by run_detail.html which was already updated. External script reference for logs.js is in place alongside build-progress.js and common.js."
+    }
+  },
+  "files_created": [],
+  "files_modified": [],
+  "last_error": null
+}

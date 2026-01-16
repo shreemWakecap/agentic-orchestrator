@@ -140,21 +140,6 @@ class TestAPIModels:
         req = BuildRequest(plan_path="/path/to/plan.md")
         assert req.plan_path == "/path/to/plan.md"
 
-    def test_review_request_model(self):
-        """ReviewRequest model works correctly."""
-        from server.app import ReviewRequest
-        req = ReviewRequest(plan_path="/path/to/plan.md")
-        assert req.plan_path == "/path/to/plan.md"
-        assert req.refresh_docs is False  # default
-
-    def test_fix_request_model(self):
-        """FixRequest model works correctly."""
-        from server.app import FixRequest
-        req = FixRequest(review_path="/path/to/review.md")
-        assert req.review_path == "/path/to/review.md"
-        assert req.dry_run is False  # default
-        assert req.min_severity == "low"  # default
-
     def test_budget_update_request_model(self):
         """BudgetUpdateRequest model works correctly."""
         from server.app import BudgetUpdateRequest
@@ -209,13 +194,6 @@ class TestHelperFunctions:
         """Test _get_plan_by_id function exists."""
         from server.app import _get_plan_by_id
         assert callable(_get_plan_by_id)
-
-    @pytest.mark.asyncio
-    async def test_get_all_reviews(self):
-        """Test _get_all_reviews function exists."""
-        from server.app import _get_all_reviews
-        assert callable(_get_all_reviews)
-
 
 class TestEventSystem:
     """Test the event system for workflow streaming."""
@@ -280,13 +258,6 @@ class TestFastAPIEndpoints:
         data = response.json()
         assert "plans" in data
 
-    def test_api_list_reviews_endpoint(self, client):
-        """Test API reviews endpoint returns JSON."""
-        response = client.get("/api/reviews")
-        assert response.status_code == 200
-        data = response.json()
-        assert "reviews" in data
-
     def test_api_get_nonexistent_run(self, client):
         """Test getting non-existent run returns 404."""
         response = client.get("/api/runs/nonexistent-id")
@@ -349,31 +320,6 @@ class TestWorkflowAPIs:
             assert response.status_code == 200
             data = response.json()
             assert "run_id" in data
-
-    @pytest.mark.timeout(10)
-    def test_start_review_workflow(self, client):
-        """Test starting a review workflow - API accepts and responds."""
-        with patch('server.app._run_reviewing_workflow'):
-            response = client.post(
-                "/api/workflows/review",
-                json={"plan_path": "/path/to/plan.md", "refresh_docs": True}
-            )
-            assert response.status_code == 200
-            data = response.json()
-            assert "run_id" in data
-
-    @pytest.mark.timeout(10)
-    def test_start_fix_workflow(self, client):
-        """Test starting a fix workflow - API accepts and responds."""
-        with patch('server.app._run_fixing_workflow'):
-            response = client.post(
-                "/api/workflows/fix",
-                json={"review_path": "/path/to/review.md", "dry_run": True}
-            )
-            assert response.status_code == 200
-            data = response.json()
-            assert "run_id" in data
-
 
 class TestBudgetAPI:
     """Test budget API endpoints."""

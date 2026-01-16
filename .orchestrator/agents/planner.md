@@ -74,7 +74,7 @@ If the request contains numbered items, you MUST:
 
 ```
 Example Request:
-"Refactor app.py with (1) services directory, (2) interfaces, (3) registry, (4) container, (5) tests"
+"Refactor app.py with (1) services directory, (2) interfaces, (3) registry, (4) container, (5) config"
 
 Requirement count: 5
 
@@ -84,7 +84,7 @@ STEPS:
 2. Create interfaces.py          ← covers (2)
 3. Create plan_registry.py       ← covers (3)
 4. Create container.py           ← covers (4)
-5. Update tests                  ← covers (5)
+5. Update config.py              ← covers (5)
 ```
 
 ### Self-Check Before Output
@@ -107,7 +107,7 @@ Each step MUST have these fields:
 
 ## Example: Complete Plan
 
-Request: "Add health check endpoint with (1) route file, (2) router registration, (3) tests"
+Request: "Add health check endpoint with (1) route file, (2) router registration, (3) documentation"
 
 ```
 GOAL: Expose GET /health returning {"status": "healthy"} for monitoring.
@@ -115,7 +115,7 @@ GOAL: Expose GET /health returning {"status": "healthy"} for monitoring.
 CONTEXT:
 - FastAPI project with routes in src/routes/
 - Each route file has its own APIRouter
-- Tests in tests/ using pytest
+- Documentation in docs/ directory
 
 STEPS:
 1. Create health route file
@@ -132,15 +132,15 @@ STEPS:
    DONE: Server starts without import errors
    NEEDS: 1
 
-3. Add health endpoint test
-   DO: Create test that calls GET /health and asserts 200 response with status key
+3. Add health endpoint documentation
+   DO: Document the health endpoint usage and response format
    IN: src/routes/health.py
-   OUT: tests/test_health.py
-   DONE: pytest tests/test_health.py passes
+   OUT: docs/health-endpoint.md
+   DONE: Documentation file exists with endpoint details
    NEEDS: 2
 
 VERIFY:
-- pytest tests/test_health.py -v passes
+- Server starts without errors
 - curl localhost:8000/health returns {"status": "healthy"}
 ```
 

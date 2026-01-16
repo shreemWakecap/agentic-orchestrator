@@ -29,7 +29,6 @@ uv run cli.py <command>
 | `docs` | `cli.py docs` | Check/refresh AI documentation cache |
 | `experts` | `cli.py experts list` | Manage expert agents |
 | `cost` | `cli.py cost report daily` | Cost estimation and budget tracking |
-| `test` | `cli.py test` | Run test suite |
 | `portal` | `cli.py portal` | Start web management portal |
 | `sync-remote` | `cli.py sync-remote` | Commit changes and create PR (AI-generated messages) |
 
@@ -63,7 +62,7 @@ uv run cli.py status specs/pending/001_jwt-authentication
 # Output: Code changes written to project + plan moved to /completed/
 ```
 
-**Process:** Parse all .md files in folder → Execute each step → Run tests → Self-review
+**Process:** Parse all .md files in folder → Execute each step → Self-review
 
 **Note:** The build command takes the plan **folder** path. All `.md` files inside are read in sorted order (00_overview.md, 01_context.md, etc.) and combined for execution.
 
@@ -184,133 +183,6 @@ plan "Add feature" → specs/pending/001_feature/
               ↓
          fix (auto-apply)
 ```
-
-## Testing
-
-The orchestrator includes a comprehensive test suite with unit tests, E2E tests, and visual regression tests.
-
-### Quick Test Commands
-
-```bash
-cd .orchestrator
-
-# Run all unit tests
-uv run pytest tests/unit -v
-
-# Run specific test file
-uv run pytest tests/unit/test_agent.py -v
-
-# Run tests with coverage
-uv run pytest tests/unit --cov=core --cov=server --cov-report=html
-```
-
-### Unit Tests (Python/pytest)
-
-Located in `tests/unit/`, these tests cover core functionality:
-
-```bash
-# Run all unit tests
-uv run pytest tests/unit -v
-
-# Run with verbose output
-uv run pytest tests/unit -v --tb=short
-
-# Run specific test module
-uv run pytest tests/unit/test_cost.py -v
-
-# Run tests matching a pattern
-uv run pytest tests/unit -k "test_agent" -v
-```
-
-**Test modules:**
-- `test_agent.py` - Agent execution, retries, error handling
-- `test_config.py` - Configuration loading and validation
-- `test_cost.py` - Cost estimation and budget management
-- `test_portal.py` - FastAPI endpoints and workflows
-- `test_system_explorer.py` - Technology detection
-- `test_css_classes.py` - CSS class validation
-
-### E2E Tests (Playwright)
-
-Located in `tests/e2e/`, these tests verify the web portal functionality:
-
-```bash
-cd tests/e2e
-
-# Install dependencies (first time)
-npm install
-npx playwright install
-
-# Run all E2E tests
-npm test
-
-# Run in headed mode (see browser)
-npm run test:headed
-
-# Run with Playwright UI
-npm run test:ui
-
-# Run specific test file
-npx playwright test plans.spec.ts
-
-# Run tests matching pattern
-npx playwright test --grep "navigation"
-
-# Debug a specific test
-npm run test:debug
-```
-
-**Test files:**
-- `plans.spec.ts` - Plan listing and management
-- `plan-details.spec.ts` - Plan detail page
-- `build.spec.ts` - Build workflow execution
-- `navigation.spec.ts` - Navigation and routing
-- `accessibility.spec.ts` - WCAG accessibility checks
-- `error-handling.spec.ts` - Error scenarios
-- `cost-tracking.spec.ts` - Cost tracking workflow
-- `plan-lifecycle.spec.ts` - Full plan lifecycle
-- `expert-management.spec.ts` - Expert management
-
-### Visual Regression Tests (Percy)
-
-Located in `tests/e2e/visual/`, these tests detect unintended UI changes:
-
-```bash
-cd tests/e2e
-
-# Set Percy token (required)
-export PERCY_TOKEN="your_token_here"  # Linux/macOS
-$env:PERCY_TOKEN="your_token_here"    # Windows PowerShell
-
-# Run visual regression tests
-npm run test:visual
-
-# Run without uploading to Percy (local only)
-npx playwright test visual/
-```
-
-**Configuration:**
-- `percy.yml` - Percy configuration (viewports: 1280px, 768px, 375px)
-- See `tests/e2e/docs/PERCY_SETUP.md` for detailed setup instructions
-
-### Test Infrastructure
-
-**Fixtures (`tests/e2e/fixtures/`):**
-- `test-fixtures.ts` - Custom Playwright fixtures (APIClient, testPlan)
-- `mock-errors.ts` - Route interception helpers for error testing
-- `index.ts` - Shared selectors and utilities
-
-**Utilities (`tests/e2e/utils/`):**
-- `navigation.helpers.ts` - Navigation testing utilities
-- `accessibility.helpers.ts` - Axe-core accessibility helpers
-- `index.ts` - Utility exports
-
-### CI/CD Integration
-
-Tests run automatically on GitHub Actions:
-- **Unit tests**: On every push and PR
-- **E2E tests**: On PR to main branches
-- **Visual tests**: On PR (requires `PERCY_TOKEN` secret)
 
 ## Web Portal
 

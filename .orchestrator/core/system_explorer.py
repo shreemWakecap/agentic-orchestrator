@@ -40,7 +40,6 @@ TECH_PATTERNS = {
 
     # Tools
     "docker": {"files": ["Dockerfile", "docker-compose.yml"], "category": "tool"},
-    "pytest": {"deps": ["pytest"], "files": ["conftest.py", "test_*.py"], "category": "tool"},
 }
 
 
@@ -135,7 +134,7 @@ def _get_python_deps(project_root: Path) -> set[str]:
         try:
             content = pyproject.read_text().lower()
             # Simple extraction - look for common deps
-            for dep in ["fastapi", "django", "flask", "pytest", "pydantic"]:
+            for dep in ["fastapi", "django", "flask", "pydantic"]:
                 if dep in content:
                     deps.add(dep)
         except Exception:

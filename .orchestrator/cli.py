@@ -10,7 +10,6 @@ Usage:
     uv run python .orchestrator/cli.py docs
     uv run python .orchestrator/cli.py experts
     uv run python .orchestrator/cli.py cost
-    uv run python .orchestrator/cli.py test
     uv run python .orchestrator/cli.py portal
 """
 import shutil
@@ -830,40 +829,6 @@ def _cost_budget(args, budget_manager):
         return 1
 
 
-def cmd_test(args):
-    """Run test suite."""
-    import subprocess
-
-    print("Running SDLC Orchestrator Tests\n" + "=" * 50)
-
-    # Build pytest command
-    pytest_args = [sys.executable, "-m", "pytest", str(ORCHESTRATOR_DIR / "tests")]
-
-    # Pass through common pytest options
-    if "-v" in args or "--verbose" in args:
-        pytest_args.append("-v")
-    if "-x" in args:
-        pytest_args.append("-x")
-    if "--cov" in args:
-        pytest_args.extend(["--cov=.", "--cov-report=term-missing"])
-
-    # Filter by test type
-    if "--unit" in args:
-        pytest_args.append(str(ORCHESTRATOR_DIR / "tests" / "unit"))
-    elif "--integration" in args:
-        pytest_args.append(str(ORCHESTRATOR_DIR / "tests" / "integration"))
-
-    # Pass specific test file or pattern
-    for arg in args:
-        if arg.endswith(".py") or "::" in arg:
-            pytest_args.append(arg)
-
-    print(f"Command: {' '.join(pytest_args)}\n")
-
-    result = subprocess.run(pytest_args, cwd=PROJECT_ROOT)
-    return result.returncode
-
-
 # =============================================================================
 # Sync Remote Command
 # =============================================================================
@@ -908,7 +873,6 @@ COMMANDS = {
     'docs': (cmd_docs, "Check documentation"),
     'experts': (cmd_experts, "Manage expert agents"),
     'cost': (cmd_cost, "Cost estimation and budgets"),
-    'test': (cmd_test, "Run test suite"),
     'portal': (cmd_portal, "Start management portal"),
     'sync-remote': (cmd_sync_remote, "Sync changes to remote via PR"),
 }
@@ -928,10 +892,6 @@ def main():
         print("  cli.py status 001_user-auth              # Show build progress")
         print("  cli.py experts list                      # List all experts")
         print("  cli.py experts create auth --type domain --keywords auth,login")
-        print("  cli.py test                              # Run all tests")
-        print("  cli.py test --unit                       # Run unit tests only")
-        print("  cli.py test --integration                # Run integration tests only")
-        print("  cli.py test -v --cov                     # Verbose with coverage")
         print("  cli.py portal                            # Start management portal")
         print("  cli.py portal --port 8080                # Custom port")
         print("  cli.py cost estimate plan --request 'Add auth'")

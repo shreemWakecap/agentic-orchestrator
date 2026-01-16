@@ -35,9 +35,9 @@ NOTES: [important constraints or conventions]
 ## Example Output
 
 ```
-PROJECT_TYPE: Python/FastAPI with pytest
-STRUCTURE: src/routes/, src/models/, tests/
-PATTERNS: Each route in separate file, models use Pydantic, tests mirror src/
+PROJECT_TYPE: Python/FastAPI
+STRUCTURE: src/routes/, src/models/, docs/
+PATTERNS: Each route in separate file, models use Pydantic
 RELEVANT_FILES: src/routes/users.py (similar endpoint pattern), src/models/base.py
 NOTES: Uses SQLAlchemy ORM, alembic for migrations, all routes need auth decorator
 ```

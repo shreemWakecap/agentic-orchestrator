@@ -57,7 +57,7 @@ You validate implementation plans for completeness and actionability.
   "status": "needs_revision",
   "score": 70,
   "blocking_issues": [
-    {"step": 3, "issue": "Missing DONE field", "fix": "Add: DONE: pytest test_health.py passes"},
+    {"step": 3, "issue": "Missing DONE field", "fix": "Add: DONE: Server starts without errors"},
     {"step": 5, "issue": "NEEDS references step 7 which doesn't exist", "fix": "Change NEEDS to valid step number"}
   ],
   "warnings": [

@@ -153,45 +153,6 @@ except Exception as e:
     raise NewError(str(e))  # Lost traceback, no chaining
 ```
 
-### Testing (category: testing)
-
-**Required:**
-- Use pytest fixtures, not setUp/tearDown
-- Parametrize tests for multiple cases
-- Mock external dependencies
-- Test both success and error paths
-
-**Good:**
-```python
-@pytest.fixture
-def db_session():
-    session = create_test_session()
-    yield session
-    session.rollback()
-
-@pytest.mark.parametrize("input,expected", [
-    ("valid@email.com", True),
-    ("invalid", False),
-    ("", False),
-])
-def test_validate_email(input: str, expected: bool):
-    assert validate_email(input) == expected
-
-def test_user_not_found_raises(db_session):
-    with pytest.raises(UserNotFoundError):
-        get_user(db_session, user_id=99999)
-```
-
-**Bad:**
-```python
-class TestUser(unittest.TestCase):  # Use pytest instead
-    def setUp(self):
-        self.db = create_db()
-
-    def test_user(self):
-        assert get_user(1)  # Only tests happy path
-```
-
 ### Security (category: security)
 
 **Critical Issues:**

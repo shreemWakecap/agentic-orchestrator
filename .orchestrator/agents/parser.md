@@ -62,7 +62,7 @@ VERIFY: [checklist]
       "parallel_groups": []
     }
   ],
-  "validation_commands": ["pytest tests/", "curl localhost:8000/health"]
+  "validation_commands": ["curl localhost:8000/health"]
 }
 ```
 
@@ -128,7 +128,6 @@ STEPS:
    NEEDS: 1
 
 VERIFY:
-- pytest passes
 - curl /health returns 200
 ```
 
@@ -166,7 +165,6 @@ VERIFY:
     }
   ],
   "validation_commands": [
-    "pytest passes",
     "curl /health returns 200"
   ]
 }

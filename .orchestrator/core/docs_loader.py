@@ -19,7 +19,7 @@ RATE_LIMIT_SECONDS = 1.0
 TIMEOUT_SECONDS = 30
 
 # Keywords for documentation filtering (Python-focused)
-PYTHON_DOC_KEYWORDS = ["python", "pip", "pytest", "pep", "typing", "asyncio", "fastapi", "django", "flask"]
+PYTHON_DOC_KEYWORDS = ["python", "pip", "pep", "typing", "asyncio", "fastapi", "django", "flask"]
 
 
 def strip_html(html: str) -> str:

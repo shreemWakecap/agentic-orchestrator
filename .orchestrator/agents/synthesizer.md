@@ -91,15 +91,8 @@ STEPS:
    DONE: Server starts without errors
    NEEDS: 3
 
-5. Add auth tests
-   DO: Create tests for login success, login failure, and logout
-   IN: src/routes/auth.py
-   OUT: tests/test_auth.py
-   DONE: pytest tests/test_auth.py passes
-   NEEDS: 4
-
 VERIFY:
-- pytest tests/test_auth.py -v passes
+- Server starts without errors
 - POST /login with valid credentials returns token
 - POST /logout invalidates session
 ```

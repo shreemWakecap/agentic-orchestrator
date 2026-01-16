@@ -352,15 +352,13 @@ Modified: {', '.join(self.build_state.files_modified) if self.build_state.files_
 2. Verify the files exist and contain proper implementation (not empty/placeholder)
 3. Identify any MISSING items that still need to be done
 
-Respond in JSON:
-```json
-{{
-    "goal_achieved": true/false,
-    "completion_percentage": 0-100,
-    "missing_items": ["item 1 that's missing", "item 2 that's missing"],
-    "verification_notes": "Brief explanation"
-}}
-```
+Respond in this format:
+ACHIEVED: yes|no
+COMPLETION: [0-100]%
+MISSING:
+- [item 1 that's missing]
+- [item 2 that's missing]
+NOTES: [Brief explanation]
 """
 
         # Use goal-verifier agent for goal verification
@@ -380,12 +378,19 @@ Respond in JSON:
             self.console.print(f"  [yellow]{WARNING}[/yellow] Could not verify goal (agent failed)")
             return False, ["Verification failed - unable to assess"]
 
-        # Parse result
-        parsed = self._parse_json_from_response(result.content)
-        goal_achieved = parsed.get("goal_achieved", False)
-        missing_items = parsed.get("missing_items", [])
-        completion_pct = parsed.get("completion_percentage", 0)
-        notes = parsed.get("verification_notes", "")
+        # Parse KEY: VALUE result
+        parsed = self._parse_key_value(result.content)
+        # Convert yes/no to bool
+        achieved_str = str(parsed.get("achieved", "no")).lower()
+        goal_achieved = achieved_str in ("yes", "true", "1")
+        missing_items = parsed.get("missing", [])
+        # Parse completion percentage (strip % if present)
+        completion_str = str(parsed.get("completion", "0")).rstrip('%')
+        try:
+            completion_pct = int(completion_str)
+        except ValueError:
+            completion_pct = 0
+        notes = parsed.get("notes", "")
 
         goal_context.completion_percentage = completion_pct
         goal_context.missing_items = missing_items
@@ -834,6 +839,34 @@ STEPS:
             return json.loads(response)
         except json.JSONDecodeError:
             return {}
+
+    def _parse_key_value(self, content: str) -> dict:
+        """Parse KEY: VALUE format from agent response."""
+        result = {}
+        current_key = None
+        current_list = []
+
+        for line in content.split('\n'):
+            line = line.strip()
+            if ':' in line and not line.startswith('-'):
+                # Save previous list if any
+                if current_key and current_list:
+                    result[current_key] = current_list
+                    current_list = []
+                # New key
+                key, value = line.split(':', 1)
+                current_key = key.strip().lower().replace(' ', '_')
+                value = value.strip()
+                if value:
+                    result[current_key] = value
+            elif line.startswith('-') and current_key:
+                current_list.append(line.lstrip('- ').strip())
+
+        # Save final list
+        if current_key and current_list:
+            result[current_key] = current_list
+
+        return result
 
     def _validate_parsed_structure(self, parsed_data: dict) -> tuple[bool, str]:
         """

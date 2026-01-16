@@ -229,20 +229,16 @@ class PlanningWorkflow(Workflow):
 
         expert_prompt = """Based on the user request and architecture design, provide planning insights from your domain expertise.
 
-Respond in this JSON format:
-```json
-{
-    "insights": "Your analysis of how this request relates to your domain",
-    "recommendations": ["Specific recommendation 1", "Specific recommendation 2"],
-    "concerns": ["Potential concern or risk 1", "Potential concern or risk 2"]
-}
-```
+Respond in this format:
+INSIGHTS: [Your analysis of how this request relates to your domain]
+RECOMMENDATIONS:
+- [Specific recommendation 1]
+- [Specific recommendation 2]
+CONCERNS:
+- [Potential concern or risk 1]
+- [Potential concern or risk 2]
 
-Focus on:
-- Domain-specific patterns and best practices
-- Potential pitfalls or anti-patterns to avoid
-- Security or performance considerations in your domain
-- Integration points with other parts of the system
+Focus on domain-specific patterns, pitfalls, security/performance, and integration points.
 """
 
         insights: list[ExpertInsight] = []
@@ -252,8 +248,8 @@ Focus on:
             try:
                 result = expert.run(expert_prompt, context=expert_context)
                 if result.success and result.content:
-                    # Parse JSON response
-                    parsed = self._parse_json_from_response(result.content)
+                    # Parse KEY: VALUE response
+                    parsed = self._parse_key_value(result.content)
                     return ExpertInsight(
                         expert_name=expert.name,
                         expert_type=getattr(expert, 'expert_type', 'domain'),
@@ -518,6 +514,34 @@ Focus on:
             return json.loads(response)
         except json.JSONDecodeError:
             return {}
+
+    def _parse_key_value(self, content: str) -> dict:
+        """Parse KEY: VALUE format from agent response."""
+        result = {}
+        current_key = None
+        current_list = []
+
+        for line in content.split('\n'):
+            line = line.strip()
+            if ':' in line and not line.startswith('-'):
+                # Save previous list if any
+                if current_key and current_list:
+                    result[current_key] = current_list
+                    current_list = []
+                # New key
+                key, value = line.split(':', 1)
+                current_key = key.strip().lower().replace(' ', '_')
+                value = value.strip()
+                if value:
+                    result[current_key] = value
+            elif line.startswith('-') and current_key:
+                current_list.append(line.lstrip('- ').strip())
+
+        # Save final list
+        if current_key and current_list:
+            result[current_key] = current_list
+
+        return result
 
     def _run_simple_planning(
         self,

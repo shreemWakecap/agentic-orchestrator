@@ -163,6 +163,34 @@ class SyncingWorkflow(Workflow):
 
         return {}
 
+    def _parse_key_value(self, content: str) -> dict:
+        """Parse KEY: VALUE format from agent response."""
+        result = {}
+        current_key = None
+        current_value_lines = []
+
+        for line in content.split('\n'):
+            stripped = line.strip()
+            if ':' in stripped and not stripped.startswith('-'):
+                # Save previous value if any
+                if current_key:
+                    result[current_key] = '\n'.join(current_value_lines).strip()
+                    current_value_lines = []
+                # New key
+                key, value = stripped.split(':', 1)
+                current_key = key.strip().lower().replace(' ', '_')
+                value = value.strip()
+                if value:
+                    current_value_lines.append(value)
+            elif current_key:
+                current_value_lines.append(line.rstrip())
+
+        # Save final value
+        if current_key:
+            result[current_key] = '\n'.join(current_value_lines).strip()
+
+        return result
+
     def _get_fallback_commit_message(self, changed_files: list[str]) -> str:
         """Generate fallback commit message when agent unavailable."""
         return f"chore: sync changes ({len(changed_files)} files)"
@@ -207,7 +235,7 @@ None
 
         result = self.run_agent(
             "syncer",
-            message="Generate a commit message following conventional commits format. Return JSON with 'commit_message' key.",
+            message="Generate a commit message following conventional commits format. Respond with COMMIT: [your commit message]",
             context=context,
             show_progress=True
         )
@@ -216,9 +244,9 @@ None
             self.console.print(f"  [yellow]{WARNING}[/yellow] Agent failed, using fallback")
             return self._get_fallback_commit_message(changed_files)
 
-        # Parse JSON response
-        parsed = self._parse_json_from_response(result.content)
-        commit_msg = parsed.get("commit_message", "").strip()
+        # Parse KEY: VALUE response
+        parsed = self._parse_key_value(result.content)
+        commit_msg = parsed.get("commit", "").strip()
 
         if not commit_msg:
             self.console.print(f"  [yellow]{WARNING}[/yellow] No commit message in response, using fallback")
@@ -256,7 +284,7 @@ Head: {branch_info.get('head', '')}
 
         result = self.run_agent(
             "syncer",
-            message="Generate a PR description with Summary, Changes, Testing, and Breaking Changes sections. Return JSON with 'pr_description' key.",
+            message="Generate a PR description. Respond with PR_SUMMARY:, PR_CHANGES:, PR_TESTING:, PR_BREAKING: sections.",
             context=context,
             show_progress=True
         )
@@ -264,8 +292,20 @@ Head: {branch_info.get('head', '')}
         if not result.success or not result.content:
             return self._get_fallback_pr_description(diff_stats)
 
-        parsed = self._parse_json_from_response(result.content)
-        pr_desc = parsed.get("pr_description", "").strip()
+        parsed = self._parse_key_value(result.content)
+        # Build PR description from parsed sections
+        pr_desc = f"""## Summary
+{parsed.get('pr_summary', 'Synced changes')}
+
+## Changes
+{parsed.get('pr_changes', '- See diff for details')}
+
+## Testing
+{parsed.get('pr_testing', '- Review the diff')}
+
+## Breaking Changes
+{parsed.get('pr_breaking', 'None')}
+""".strip()
 
         if not pr_desc:
             return self._get_fallback_pr_description(diff_stats)

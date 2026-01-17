@@ -434,3 +434,19 @@ Head: {branch_info.get('head', '')}
                 "files_changed": changed_files,
             }
         )
+
+
+def run(args=None) -> int:
+    """Run syncing action."""
+    project_root = Path(__file__).parent.parent.parent
+
+    workflow = SyncingWorkflow(project_root=project_root)
+    result = workflow.run("")
+    if result.success:
+        print(f"\nPR: {result.data.get('pr_url')}")
+    return 0 if result.success else 1
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(run(sys.argv[1:]))

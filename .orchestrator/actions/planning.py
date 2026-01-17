@@ -1233,22 +1233,20 @@ Complexity: {complexity}
         return slug[:30]  # Limit length
 
 
-def main():
-    """CLI entry point."""
-    import sys
+def run(args=None) -> int:
+    """Run planning action."""
+    if not args:
+        print("Usage: plan 'Your feature request'")
+        return 1
 
-    if len(sys.argv) < 2:
-        print("Usage: python -m orchestrator.workflows.planning 'Your request'")
-        sys.exit(1)
-
-    request = " ".join(sys.argv[1:])
-    project_root = Path.cwd()
+    request = " ".join(args)
+    project_root = Path(__file__).parent.parent.parent
 
     workflow = PlanningWorkflow(project_root=project_root)
     result = workflow.run(request)
-
-    sys.exit(0 if result.success else 1)
+    return 0 if result.success else 1
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(run(sys.argv[1:]))

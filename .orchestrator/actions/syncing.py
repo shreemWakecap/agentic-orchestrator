@@ -8,6 +8,8 @@ Steps:
 4. Generate commit message via syncer agent
 5. Commit and push
 6. Generate PR description and create PR
+7. Merge PR and delete remote branch
+8. Pull changes to base branch
 """
 import json
 import re
@@ -88,6 +90,32 @@ class SyncingWorkflow(Workflow):
         if check and result.returncode != 0:
             raise RuntimeError(f"GitHub CLI failed: gh {' '.join(cmd)}\n{result.stderr}")
         return result.stdout.strip() if capture else ""
+
+    def _pull_changes(self, base_branch: str) -> str:
+        """Pull changes from remote into the local base branch.
+
+        Args:
+            base_branch: The branch to pull changes into (e.g., 'main', 'developmet')
+
+        Returns:
+            Output from the git pull command
+        """
+        return self._run_git(["pull", "origin", base_branch])
+
+    def _merge_pr(self, pr_number: int) -> str:
+        """Merge a pull request and delete the remote branch.
+
+        Args:
+            pr_number: The PR number to merge
+
+        Returns:
+            Output from the gh pr merge command
+        """
+        return self._run_gh([
+            "pr", "merge", str(pr_number),
+            "--merge",
+            "--delete-branch"
+        ])
 
     def _check_prerequisites(self) -> tuple[bool, str]:
         """Verify git and gh CLI are available and configured."""
@@ -328,7 +356,7 @@ Head: {branch_info.get('head', '')}
         self.console.print("=" * 50)
 
         # Step 1: Check prerequisites
-        self.console.print("\n[bold]Step 1/6:[/bold] Checking prerequisites...")
+        self.console.print("\n[bold]Step 1/8:[/bold] Checking prerequisites...")
         ok, error = self._check_prerequisites()
         if not ok:
             self.console.print(f"  [red]{CROSS}[/red] {error}")
@@ -337,7 +365,7 @@ Head: {branch_info.get('head', '')}
         steps_completed.append("prerequisites")
 
         # Step 2: Check for changes
-        self.console.print("\n[bold]Step 2/6:[/bold] Checking for changes...")
+        self.console.print("\n[bold]Step 2/8:[/bold] Checking for changes...")
         changed_files, diff_stats, diff_content = self._get_changes()
         if not changed_files:
             self.console.print(f"  [yellow]{WARNING}[/yellow] No changes to commit")
@@ -350,7 +378,7 @@ Head: {branch_info.get('head', '')}
         steps_completed.append("check_changes")
 
         # Step 3: Get current branch and create feature branch
-        self.console.print("\n[bold]Step 3/6:[/bold] Creating feature branch...")
+        self.console.print("\n[bold]Step 3/8:[/bold] Creating feature branch...")
         base_branch = self._run_git(["rev-parse", "--abbrev-ref", "HEAD"])
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         new_branch = f"sync/{base_branch}/{timestamp}"
@@ -359,7 +387,7 @@ Head: {branch_info.get('head', '')}
         steps_completed.append("create_branch")
 
         # Step 4: Generate commit message and commit
-        self.console.print("\n[bold]Step 4/6:[/bold] Generating commit message...")
+        self.console.print("\n[bold]Step 4/8:[/bold] Generating commit message...")
         self._run_git(["add", "-A"])
         commit_message = self._generate_commit_message(diff_stats, diff_content, changed_files)
         self._run_git(["commit", "-m", commit_message])
@@ -368,13 +396,13 @@ Head: {branch_info.get('head', '')}
         steps_completed.append("commit")
 
         # Step 5: Push to remote
-        self.console.print("\n[bold]Step 5/6:[/bold] Pushing to remote...")
+        self.console.print("\n[bold]Step 5/8:[/bold] Pushing to remote...")
         self._run_git(["push", "-u", "origin", new_branch])
         self.console.print(f"  [green]{CHECK}[/green] Pushed to origin/{new_branch}")
         steps_completed.append("push")
 
         # Step 6: Create PR
-        self.console.print("\n[bold]Step 6/6:[/bold] Creating pull request...")
+        self.console.print("\n[bold]Step 6/8:[/bold] Creating pull request...")
         branch_info = {"base": base_branch, "head": new_branch}
         pr_description = self._generate_pr_description(commit_message, diff_stats, branch_info)
         pr_title = commit_message.split("\n")[0]
@@ -415,8 +443,44 @@ Head: {branch_info.get('head', '')}
                 }
             )
 
+        # Step 7: Merge PR
+        self.console.print("\n[bold]Step 7/8:[/bold] Merging pull request...")
+        try:
+            self._merge_pr(pr_number)
+            self.console.print(f"  [green]{CHECK}[/green] PR #{pr_number} merged and branch deleted")
+            steps_completed.append("merge_pr")
+        except RuntimeError as e:
+            self.console.print(f"  [red]{CROSS}[/red] PR merge failed: {e}")
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Manual: gh pr merge {pr_number} --merge --delete-branch")
+            # Return to base branch
+            self._run_git(["checkout", base_branch])
+            return WorkflowResult(
+                success=False,
+                error=f"PR merge failed: {e}",
+                steps_completed=steps_completed,
+                total_tokens=self.total_tokens,
+                data={
+                    "pr_url": pr_url,
+                    "pr_number": pr_number,
+                    "branch_name": new_branch,
+                    "commit_hash": commit_hash,
+                    "commit_message": commit_message,
+                    "files_changed": changed_files,
+                }
+            )
+
+        # Step 8: Pull changes to base branch
+        self.console.print("\n[bold]Step 8/8:[/bold] Pulling changes to base branch...")
         # Return to base branch
         self._run_git(["checkout", base_branch])
+        try:
+            self._pull_changes(base_branch)
+            self.console.print(f"  [green]{CHECK}[/green] Pulled latest changes to {base_branch}")
+            steps_completed.append("pull")
+        except RuntimeError as e:
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Pull failed: {e}")
+            self.console.print(f"  [yellow]{WARNING}[/yellow] Manual: git pull origin {base_branch}")
+            # Continue anyway - merge was successful
 
         self.console.print("\n" + "=" * 50)
         self.console.print("[bold green]SYNC COMPLETE[/bold green]")

@@ -65,6 +65,11 @@ class BuildRequest(BaseModel):
     plan_path: str
 
 
+class MovePlanRequest(BaseModel):
+    """Request to move a plan between states."""
+    target_state: str  # pending, failed
+
+
 # ============== HTML Routes ==============
 
 @app.get("/", response_class=HTMLResponse)
@@ -218,6 +223,336 @@ async def api_get_plan_file(plan_id: str, filename: str):
     raise HTTPException(status_code=404, detail="Plan not found")
 
 
+@app.post("/api/plans/{plan_id}/start-build")
+async def api_start_plan_build(plan_id: str, background_tasks: BackgroundTasks):
+    """Start a build workflow for a specific plan.
+
+    Validates that the plan exists and is in 'pending' state before starting.
+    Returns run_id for progress tracking.
+    """
+    specs_dir = ORCHESTRATOR_DIR / "specs"
+
+    # Find the plan and validate its state
+    plan_dir = None
+    plan_state = None
+
+    for state in ["pending", "in-progress", "completed", "failed"]:
+        test_dir = specs_dir / state / plan_id
+        if test_dir.exists() and test_dir.is_dir():
+            plan_dir = test_dir
+            plan_state = state
+            break
+
+    if not plan_dir:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    # Validate plan is in pending state
+    if plan_state != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plan '{plan_id}' is in '{plan_state}' state. Only pending plans can be built."
+        )
+
+    # Create run entry
+    run_id = str(uuid.uuid4())[:8]
+
+    active_runs[run_id] = {
+        "id": run_id,
+        "workflow": "building",
+        "status": "pending",
+        "started_at": datetime.now().isoformat(),
+        "plan_id": plan_id,
+        "plan_path": str(plan_dir),
+        "progress": 0,
+        "current_step": None,
+        "events": [],
+        "output_file": None,
+        "error": None
+    }
+
+    # Start build workflow in background
+    background_tasks.add_task(_run_building_workflow, run_id, str(plan_dir))
+
+    return {"run_id": run_id, "status": "started", "plan_id": plan_id}
+
+
+@app.delete("/api/plans/{plan_id}")
+async def api_delete_plan(plan_id: str):
+    """Delete a plan and its directory.
+
+    Removes the plan directory and any associated state files.
+    """
+    import shutil
+
+    specs_dir = ORCHESTRATOR_DIR / "specs"
+
+    # Find the plan directory
+    plan_dir = None
+    plan_state = None
+
+    for state in ["pending", "in-progress", "completed", "failed"]:
+        test_dir = specs_dir / state / plan_id
+        if test_dir.exists() and test_dir.is_dir():
+            plan_dir = test_dir
+            plan_state = state
+            break
+
+    if not plan_dir:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    # Remove plan directory
+    try:
+        shutil.rmtree(plan_dir)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete plan directory: {str(e)}")
+
+    # Also remove state file if it exists
+    state_file = specs_dir / "state" / f"{plan_id}.state.json"
+    if state_file.exists():
+        try:
+            state_file.unlink()
+        except Exception:
+            pass  # State file removal is best-effort
+
+    return {
+        "status": "deleted",
+        "plan_id": plan_id,
+        "previous_state": plan_state
+    }
+
+
+@app.put("/api/plans/{plan_id}/move")
+async def api_move_plan(plan_id: str, request: MovePlanRequest):
+    """Move a plan between states (pending/failed).
+
+    Only allows moving between pending and failed states.
+    Plans in in-progress or completed states cannot be moved.
+    """
+    import shutil
+
+    valid_target_states = ["pending", "failed"]
+
+    if request.target_state not in valid_target_states:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid target state '{request.target_state}'. Must be one of: {valid_target_states}"
+        )
+
+    specs_dir = ORCHESTRATOR_DIR / "specs"
+
+    # Find the plan directory
+    plan_dir = None
+    current_state = None
+
+    for state in ["pending", "in-progress", "completed", "failed"]:
+        test_dir = specs_dir / state / plan_id
+        if test_dir.exists() and test_dir.is_dir():
+            plan_dir = test_dir
+            current_state = state
+            break
+
+    if not plan_dir:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    # Validate current state allows moving
+    if current_state == "in-progress":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot move plan in 'in-progress' state. Wait for build to complete or fail."
+        )
+
+    if current_state == "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot move completed plans. Create a new plan instead."
+        )
+
+    # Already in target state
+    if current_state == request.target_state:
+        return {
+            "status": "unchanged",
+            "plan_id": plan_id,
+            "state": current_state,
+            "message": f"Plan is already in '{current_state}' state"
+        }
+
+    # Move to target state directory
+    target_dir = specs_dir / request.target_state
+    target_dir.mkdir(parents=True, exist_ok=True)
+    new_plan_dir = target_dir / plan_id
+
+    try:
+        shutil.move(str(plan_dir), str(new_plan_dir))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to move plan: {str(e)}")
+
+    return {
+        "status": "moved",
+        "plan_id": plan_id,
+        "previous_state": current_state,
+        "new_state": request.target_state,
+        "path": str(new_plan_dir)
+    }
+
+
+@app.get("/api/plans/{plan_id}/state")
+async def api_get_plan_state(plan_id: str):
+    """Get build state details for a plan.
+
+    Returns the BuildState JSON which includes:
+    - status: pending, building, completed, failed, paused
+    - current_phase and current_step
+    - completed_steps and failed_steps lists
+    - files_created and files_modified
+    - step_states with detailed per-step info
+    - last_error if any
+    """
+    specs_dir = ORCHESTRATOR_DIR / "specs"
+
+    # Find the plan to verify it exists
+    plan_dir = None
+    plan_state = None
+
+    for state in ["pending", "in-progress", "completed", "failed"]:
+        test_dir = specs_dir / state / plan_id
+        if test_dir.exists() and test_dir.is_dir():
+            plan_dir = test_dir
+            plan_state = state
+            break
+
+    if not plan_dir:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    # Look for state file
+    state_file = specs_dir / "state" / f"{plan_id}.state.json"
+
+    # Also check for plan.md based state file (older format uses plan filename)
+    if not state_file.exists():
+        # Try with plan.md stem
+        state_file = specs_dir / "state" / "plan.state.json"
+
+    if not state_file.exists():
+        # No build state exists yet - return a default state
+        return {
+            "plan_id": plan_id,
+            "plan_file": str(plan_dir / "plan.md"),
+            "status": "pending",
+            "started_at": None,
+            "updated_at": None,
+            "current_phase": 0,
+            "current_step": None,
+            "total_steps": 0,
+            "completed_steps": [],
+            "failed_steps": [],
+            "step_states": {},
+            "files_created": [],
+            "files_modified": [],
+            "last_error": None,
+            "folder_state": plan_state
+        }
+
+    try:
+        state_data = json.loads(state_file.read_text(encoding="utf-8"))
+        # Add folder state for reference
+        state_data["folder_state"] = plan_state
+        return state_data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read state file: {str(e)}")
+
+
+@app.get("/api/plans/{plan_id}/build-state")
+async def api_get_plan_build_state(plan_id: str):
+    """Get detailed build state for a plan including step-level progress.
+
+    Returns the full BuildState JSON from specs/state/{plan_id}.state.json including:
+    - status: pending, building, completed, failed, paused
+    - completed_steps: List of completed step IDs
+    - failed_steps: List of failed step IDs
+    - step_states: Dict with detailed per-step info (status, started_at, completed_at, error)
+    - progress_percentage: Calculated progress (0-100)
+    - current_step: Currently executing step (if any)
+    - total_steps: Total number of steps in the plan
+    """
+    specs_dir = ORCHESTRATOR_DIR / "specs"
+
+    # Verify plan exists
+    plan_dir = None
+    plan_state = None
+
+    for state in ["pending", "in-progress", "completed", "failed"]:
+        test_dir = specs_dir / state / plan_id
+        if test_dir.exists() and test_dir.is_dir():
+            plan_dir = test_dir
+            plan_state = state
+            break
+
+    if not plan_dir:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    # Look for state file
+    state_file = specs_dir / "state" / f"{plan_id}.state.json"
+
+    if not state_file.exists():
+        # No build state exists - return default structure
+        return {
+            "plan_id": plan_id,
+            "status": "pending",
+            "folder_state": plan_state,
+            "started_at": None,
+            "updated_at": None,
+            "current_step": None,
+            "total_steps": 0,
+            "completed_steps": [],
+            "failed_steps": [],
+            "step_states": {},
+            "progress_percentage": 0,
+            "files_created": [],
+            "files_modified": [],
+            "last_error": None
+        }
+
+    try:
+        state_data = json.loads(state_file.read_text(encoding="utf-8"))
+
+        # Calculate progress percentage
+        total_steps = state_data.get("total_steps", 0)
+        completed_steps = state_data.get("completed_steps", [])
+        failed_steps = state_data.get("failed_steps", [])
+
+        if total_steps > 0:
+            # Progress is based on completed + failed steps (both are "done" processing)
+            processed_steps = len(completed_steps) + len(failed_steps)
+            progress_percentage = round((processed_steps / total_steps) * 100, 1)
+        else:
+            progress_percentage = 0
+
+        # Enrich response with calculated fields
+        response = {
+            "plan_id": plan_id,
+            "status": state_data.get("status", "unknown"),
+            "folder_state": plan_state,
+            "started_at": state_data.get("started_at"),
+            "updated_at": state_data.get("updated_at"),
+            "current_step": state_data.get("current_step"),
+            "current_phase": state_data.get("current_phase"),
+            "total_steps": total_steps,
+            "completed_steps": completed_steps,
+            "failed_steps": failed_steps,
+            "step_states": state_data.get("step_states", {}),
+            "progress_percentage": progress_percentage,
+            "files_created": state_data.get("files_created", []),
+            "files_modified": state_data.get("files_modified", []),
+            "last_error": state_data.get("last_error")
+        }
+
+        return response
+
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Invalid JSON in state file: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read build state: {str(e)}")
+
+
 @app.post("/api/workflows/plan")
 async def api_create_plan(request: PlanRequest, background_tasks: BackgroundTasks):
     """Start a new planning workflow."""
@@ -284,6 +619,35 @@ async def api_sync_remote(background_tasks: BackgroundTasks):
     background_tasks.add_task(_run_syncing_workflow, run_id)
 
     return {"run_id": run_id, "status": "started"}
+
+
+@app.get("/api/runs")
+async def api_list_runs(status: Optional[str] = None):
+    """List all active runs with optional status filter.
+
+    Args:
+        status: Optional filter by status (pending, running, completed, failed)
+
+    Returns:
+        runs: List of run objects
+        counts: Dict with running, completed, failed counts
+    """
+    runs = list(active_runs.values())
+
+    # Filter by status if provided
+    if status:
+        runs = [r for r in runs if r.get("status") == status]
+
+    # Calculate counts from all runs (not filtered)
+    all_runs = list(active_runs.values())
+    counts = {
+        "running": len([r for r in all_runs if r.get("status") == "running"]),
+        "completed": len([r for r in all_runs if r.get("status") == "completed"]),
+        "failed": len([r for r in all_runs if r.get("status") == "failed"]),
+        "pending": len([r for r in all_runs if r.get("status") == "pending"])
+    }
+
+    return {"runs": runs, "counts": counts}
 
 
 @app.get("/api/runs/{run_id}")
@@ -619,7 +983,7 @@ async def _run_syncing_workflow(run_id: str):
 
     try:
         workflow = SyncingWorkflow(project_root=PROJECT_ROOT)
-        result = workflow.run()
+        result = workflow.run("")  # Pass empty string as request (required by base Workflow)
 
         run["status"] = "completed" if result.success else "failed"
         run["completed_at"] = datetime.now().isoformat()

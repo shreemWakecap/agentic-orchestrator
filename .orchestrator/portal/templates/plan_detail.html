@@ -2,6 +2,58 @@
 
 {% block title %}{{ plan.name }} - SDLC Orchestrator{% endblock %}
 
+{% block head %}
+<style>
+    /* Step item animations */
+    .step-item {
+        transition: all 0.3s ease;
+    }
+
+    .step-item.step-running .step-header {
+        animation: pulse-border 2s infinite;
+    }
+
+    @keyframes pulse-border {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+        50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
+    }
+
+    /* Step details expand/collapse */
+    .step-details {
+        transition: max-height 0.3s ease-out;
+    }
+
+    /* Step chevron rotation */
+    .step-chevron {
+        transition: transform 0.2s ease;
+    }
+
+    /* Step connector line */
+    .step-connector {
+        transition: background-color 0.3s ease;
+    }
+
+    /* Scrollbar styling for steps list */
+    #steps-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    #steps-list::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+
+    #steps-list::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    #steps-list::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="px-4 py-6 sm:px-0">
     <!-- Header -->
@@ -12,44 +64,147 @@
                 <p class="mt-1 text-sm text-gray-600">{{ plan.file }}</p>
             </div>
             <div class="flex items-center space-x-4">
-                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
+                <span id="plan-status-badge" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
                     {% if plan.state == 'completed' %}bg-green-100 text-green-800
                     {% elif plan.state == 'pending' %}bg-yellow-100 text-yellow-800
                     {% elif plan.state == 'in-progress' %}bg-blue-100 text-blue-800
-                    {% else %}bg-red-100 text-red-800{% endif %}">
+                    {% elif plan.state == 'paused' %}bg-orange-100 text-orange-800
+                    {% elif plan.state == 'failed' %}bg-red-100 text-red-800
+                    {% else %}bg-gray-100 text-gray-800{% endif %}">
                     {{ plan.state }}
                 </span>
             </div>
         </div>
     </div>
 
-    <!-- Actions -->
-    <div class="mb-6 flex space-x-4">
-        {% if plan.state == 'pending' %}
-        <button onclick="startBuild('{{ plan.file }}')"
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
-            <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-            Start Build
-        </button>
+    <!-- Build Actions & Progress Section -->
+    <div id="build-section" class="mb-6 bg-white shadow sm:rounded-lg overflow-hidden">
+        <div class="px-4 py-4 sm:px-6 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-medium text-gray-900">Build Controls</h3>
+                <div id="build-actions" class="flex space-x-3">
+                    {% if plan.state == 'pending' %}
+                    <button id="start-build-btn" onclick="PlanDetail.startBuild('{{ plan.id }}')"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Start Build
+                    </button>
+                    {% elif plan.state == 'paused' or plan.state == 'failed' %}
+                    <button id="resume-build-btn" onclick="PlanDetail.resumeBuild('{{ plan.id }}')"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors">
+                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Resume Build
+                    </button>
+                    {% elif plan.state == 'in-progress' %}
+                    <button id="pause-build-btn" onclick="PlanDetail.pauseBuild()"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors">
+                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Pause Build
+                    </button>
+                    {% elif plan.state == 'completed' %}
+                    <button onclick="PlanDetail.startReview('{{ plan.id }}')"
+                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors">
+                        <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                        Start Review
+                    </button>
+                    {% endif %}
+                    <a href="/plans" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
+                        &larr; Back to Plans
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Failed Step Info (shown for paused/failed plans) -->
+        {% if plan.state == 'paused' or plan.state == 'failed' %}
+        <div id="failed-step-info" class="px-4 py-3 bg-red-50 border-b border-red-200">
+            <div class="flex items-start">
+                <svg class="h-5 w-5 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                <div class="ml-3">
+                    <h4 class="text-sm font-medium text-red-800">Build {{ 'paused' if plan.state == 'paused' else 'failed' }} at step:</h4>
+                    <p id="failed-step-name" class="mt-1 text-sm text-red-700">{{ plan.failed_step or plan.current_step or 'Unknown step' }}</p>
+                    {% if plan.error_message %}
+                    <p class="mt-1 text-xs text-red-600">{{ plan.error_message }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
         {% endif %}
-        {% if plan.state == 'completed' %}
-        <button onclick="startReview('{{ plan.file }}')"
-                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700">
-            <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-            </svg>
-            Start Review
-        </button>
-        {% endif %}
-        <a href="/plans" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-            &larr; Back to Plans
-        </a>
+
+        <!-- Inline Progress Section (hidden by default, shown during build) -->
+        <div id="build-progress-section" class="hidden">
+            <!-- Progress Bar -->
+            <div class="px-4 py-4 border-b border-gray-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span id="current-step-label" class="text-sm font-medium text-gray-700">Initializing...</span>
+                    <span id="progress-percent" class="text-sm font-medium text-blue-600">0%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                    <div id="progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Step-by-Step Progress Visualization -->
+            <div id="steps-visualization" class="px-4 py-4 border-b border-gray-200">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-medium text-gray-700">Build Steps</h4>
+                    <div class="flex items-center space-x-2">
+                        <button onclick="PlanDetail.expandAllSteps()" class="text-xs text-blue-600 hover:text-blue-800 transition-colors">
+                            Expand All
+                        </button>
+                        <span class="text-gray-300">|</span>
+                        <button onclick="PlanDetail.collapseAllSteps()" class="text-xs text-blue-600 hover:text-blue-800 transition-colors">
+                            Collapse All
+                        </button>
+                    </div>
+                </div>
+                <div id="steps-list" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- Steps will be dynamically populated -->
+                    <div class="step-placeholder text-sm text-gray-500 italic">
+                        Steps will appear here when the build starts...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Events Log -->
+            <div class="px-4 py-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-sm font-medium text-gray-700">Build Log</h4>
+                    <button onclick="PlanDetail.clearLog()" class="text-xs text-gray-500 hover:text-gray-700">Clear</button>
+                </div>
+                <div id="events-log" class="bg-gray-900 rounded-lg p-3 h-48 overflow-y-auto font-mono text-xs text-gray-300">
+                    <div class="text-gray-500">Waiting for build to start...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Success Message (hidden by default) -->
+        <div id="build-success-section" class="hidden px-4 py-4 bg-green-50">
+            <div class="flex items-center">
+                <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div class="ml-3">
+                    <p class="text-sm font-medium text-green-800">Build completed successfully!</p>
+                    <p id="build-duration" class="text-xs text-green-600 mt-1"></p>
+                </div>
+                <a id="view-run-link" href="#" class="ml-auto text-sm text-green-700 hover:text-green-900 underline">View Run Details</a>
+            </div>
+        </div>
     </div>
 
-    <!-- Content -->
+    <!-- Plan Content -->
     <div class="bg-white shadow overflow-hidden sm:rounded-lg">
         <div class="px-4 py-5 sm:px-6">
             <h3 class="text-lg font-medium text-gray-900">Plan Content</h3>
@@ -62,8 +217,22 @@
         </div>
     </div>
 </div>
+
+<!-- Hidden data for JavaScript -->
+<script>
+    window.PLAN_DATA = {
+        id: "{{ plan.id }}",
+        file: "{{ plan.file }}",
+        state: "{{ plan.state }}",
+        name: "{{ plan.name }}",
+        failedStep: "{{ plan.failed_step or '' }}",
+        currentStep: "{{ plan.current_step or '' }}"
+    };
+</script>
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/toast.js"></script>
+<script src="/static/js/build-progress.js"></script>
 <script src="/static/js/plan-detail.js"></script>
 {% endblock %}

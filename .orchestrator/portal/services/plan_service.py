@@ -15,7 +15,7 @@ class PlanService:
         self.plan_repo = plan_repo
 
     async def get_all_plans(self) -> List[Dict]:
-        """Get all plans from database, sorted by numeric prefix."""
+        """Get all plans from database, sorted by created_at DESC."""
         db_plans = self.plan_repo.list_all()
         plans = []
 
@@ -23,8 +23,7 @@ class PlanService:
             plan_data = self._build_plan_data(db_plan)
             plans.append(plan_data)
 
-        # Sort by numeric prefix (001_, 002_, etc.)
-        return sorted(plans, key=lambda p: self._extract_plan_number(p["id"]))
+        return plans
 
     async def get_plan_by_id(self, plan_id: str) -> Optional[Dict]:
         """Get a specific plan by ID from database."""
@@ -49,6 +48,7 @@ class PlanService:
             "name": plan_id.replace("-", " ").replace("_", " ").title(),
             "state": db_plan.get("status", "pending"),
             "files": ["plan.md"],
+            "created": db_plan.get("created_at", ""),
             "modified": db_plan.get("updated_at", db_plan.get("created_at", "")),
             "request": db_plan.get("request", ""),
             "goal": db_plan.get("goal", ""),

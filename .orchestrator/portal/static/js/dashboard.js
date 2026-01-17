@@ -20,6 +20,12 @@ function initDashboard() {
             return;
         }
 
+        // Show confirmation dialog before proceeding
+        const confirmed = await PlanConfirmDialog.showPlanConfirmDialog(description);
+        if (!confirmed) {
+            return;
+        }
+
         button.disabled = true;
         button.textContent = 'Creating...';
 

@@ -94,9 +94,10 @@
                     <label for="plan-description" class="block text-sm font-medium text-secondary dark:text-secondary mb-2">
                         Feature Description
                     </label>
-                    <input type="text" id="plan-description" name="description"
-                           class="input-modern w-full"
-                           placeholder="e.g., Add user authentication with JWT tokens">
+                    <textarea id="plan-description" name="description"
+                              class="input-modern w-full resize-y"
+                              rows="4"
+                              placeholder="Describe the feature you want to implement...&#10;&#10;e.g., Add user authentication with JWT tokens&#10;- Include login and logout endpoints&#10;- Support password reset via email"></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary btn-modern w-full sm:w-auto group">
                     <svg class="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -395,6 +396,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/js/plan-confirm-dialog.js"></script>
 <script src="/static/js/dashboard.js"></script>
 <script src="/static/js/build-progress.js"></script>
 <script>

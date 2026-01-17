@@ -333,6 +333,38 @@
         </div>
     </div>
 
+    <!-- Create New Plan Section -->
+    <div class="glass-card p-8 hover:shadow-lg transition-all duration-300 mb-8">
+        <div class="flex items-start mb-6">
+            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+            </div>
+            <div class="ml-5">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Create New Plan</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Generate an AI-powered implementation plan for a feature</p>
+            </div>
+        </div>
+        <form id="plan-form" class="space-y-5">
+            <div>
+                <label for="plan-description" class="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-2">
+                    Feature Description
+                </label>
+                <textarea id="plan-description" name="description"
+                          class="input-modern w-full resize-y"
+                          rows="4"
+                          placeholder="Describe the feature you want to implement...&#10;&#10;e.g., Add user authentication with JWT tokens&#10;- Include login and logout endpoints&#10;- Support password reset via email"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-modern w-full sm:w-auto group">
+                <svg class="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                </svg>
+                Create Plan
+            </button>
+        </form>
+    </div>
+
     {% if plans %}
     <div class="space-y-4" id="plans-list">
         {% for plan in plans %}
@@ -420,7 +452,7 @@
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                         </svg>
-                        {{ plan.modified[:10] }}
+                        {{ plan.created[:10] }}
                     </span>
                 </div>
             </div>
@@ -573,6 +605,76 @@
 <script src="/static/js/toast.js"></script>
 <script src="/static/js/plan-manager.js"></script>
 <script src="/static/js/plan-list.js"></script>
+<script src="/static/js/plan-confirm-dialog.js"></script>
+<script>
+/**
+ * Create Plan form handler for the plans page
+ * Uses the same logic as dashboard.js but adapted for this page
+ */
+function initPlanForm() {
+    var form = document.getElementById('plan-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        var input = document.getElementById('plan-description');
+        var description = input.value;
+        var button = this.querySelector('button[type="submit"]');
+
+        if (!description.trim()) {
+            input.focus();
+            input.style.borderColor = '#EF4444';
+            setTimeout(function() { input.style.borderColor = ''; }, 2000);
+            return;
+        }
+
+        // Show confirmation dialog before proceeding
+        var confirmed = await PlanConfirmDialog.showPlanConfirmDialog(description);
+        if (!confirmed) {
+            return;
+        }
+
+        button.disabled = true;
+        button.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Creating...';
+
+        try {
+            var response = await fetch('/api/workflows/plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ description: description })
+            });
+
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+            }
+
+            var data = await response.json();
+            if (data.run_id) {
+                if (typeof Toast !== 'undefined') {
+                    Toast.show('Plan created! Redirecting...', 'success');
+                }
+                window.location.href = '/runs/' + data.run_id;
+            } else {
+                throw new Error('No run_id in response');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            if (typeof Toast !== 'undefined') {
+                Toast.show('Failed to create plan: ' + error.message, 'error');
+            } else {
+                alert('Failed to create plan: ' + error.message);
+            }
+            button.disabled = false;
+            button.innerHTML = '<svg class="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>Create Plan';
+        }
+    });
+}
+
+// Initialize the plan form on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initPlanForm();
+});
+</script>
 <script>
 /**
  * Plans page event handlers

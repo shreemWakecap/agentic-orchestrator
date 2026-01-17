@@ -11,8 +11,8 @@ You verify whether an implementation goal has been fully achieved.
 
 - **GOAL**: What success looks like
 - **ORIGINAL_REQUEST**: User request with numbered requirements
-- **VERIFICATION_CRITERIA**: Commands/checks to verify
 - **FILES**: List of files created/modified
+- **VERIFICATION_CRITERIA**: (optional) Additional checks
 
 ## Output Format
 

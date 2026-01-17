@@ -23,11 +23,8 @@ STEPS:
    DO: ...
    IN: ...
    OUT: ...
-   DONE: ...
+   DONE: [how to verify this step]
    NEEDS: ...
-
-VERIFY:
-- [Combined verification checks]
 ```
 
 ## Synthesis Process
@@ -36,8 +33,7 @@ VERIFY:
 2. Merge shared setup steps (models, configs)
 3. Renumber all steps sequentially (1, 2, 3...)
 4. Update NEEDS references to new numbers
-5. Add integration verification steps
-6. Combine VERIFY sections
+5. Add integration steps between sub-features
 
 ## Rules
 
@@ -51,5 +47,5 @@ VERIFY:
 
 - Don't keep sub-feature numbering (1.1, 1.2)
 - Don't duplicate shared setup steps
-- Don't lose verification checks
+- Don't skip DONE field for any step
 - Don't change instruction content, only organization

@@ -660,15 +660,18 @@ Focus on domain-specific patterns, pitfalls, security/performance, and integrati
             return WorkflowResult(success=False, error=error)
 
         # VALIDATION GATE: Check if plan actually passed validation
-        validation_data = self._parse_json_from_response(validator_result.content)
-        validation_status = validation_data.get("status", "unknown")
-        validation_score = validation_data.get("score", 0)
+        validation_data = self._parse_key_value(validator_result.content)
+        validation_status = validation_data.get("status", "unknown").lower()
+        try:
+            validation_score = int(validation_data.get("score", 0))
+        except (ValueError, TypeError):
+            validation_score = 0
 
-        if validation_status != "approved" or validation_score < 70:
-            blocking_issues = validation_data.get("blocking_issues", [])
+        # Accept approved or needs_revision with score >= 60
+        if validation_status == "rejected" or validation_score < 60:
+            blocking_issues = validation_data.get("blocking", [])
             issue_summary = "; ".join(
-                issue.get("issue", "unknown")[:60]
-                for issue in blocking_issues[:3]
+                issue[:60] for issue in blocking_issues[:3]
             ) if blocking_issues else "Plan did not meet quality threshold"
 
             from core.symbols import CROSS
@@ -677,9 +680,7 @@ Focus on domain-specific patterns, pitfalls, security/performance, and integrati
             if blocking_issues:
                 self.console.print("  Issues:")
                 for issue in blocking_issues[:5]:
-                    step = issue.get("step", "?")
-                    issue_text = issue.get("issue", "Unknown issue")
-                    self.console.print(f"    - Step {step}: {issue_text[:70]}")
+                    self.console.print(f"    - {issue[:70]}")
 
             return WorkflowResult(
                 success=False,
@@ -1003,15 +1004,18 @@ Focus on domain-specific patterns, pitfalls, security/performance, and integrati
             return WorkflowResult(success=False, error=error)
 
         # VALIDATION GATE: Check if master plan actually passed validation
-        validation_data = self._parse_json_from_response(validator_result.content)
-        validation_status = validation_data.get("status", "unknown")
-        validation_score = validation_data.get("score", 0)
+        validation_data = self._parse_key_value(validator_result.content)
+        validation_status = validation_data.get("status", "unknown").lower()
+        try:
+            validation_score = int(validation_data.get("score", 0))
+        except (ValueError, TypeError):
+            validation_score = 0
 
-        if validation_status != "approved" or validation_score < 70:
-            blocking_issues = validation_data.get("blocking_issues", [])
+        # Accept approved or needs_revision with score >= 60
+        if validation_status == "rejected" or validation_score < 60:
+            blocking_issues = validation_data.get("blocking", [])
             issue_summary = "; ".join(
-                issue.get("issue", "unknown")[:60]
-                for issue in blocking_issues[:3]
+                issue[:60] for issue in blocking_issues[:3]
             ) if blocking_issues else "Master plan did not meet quality threshold"
 
             from core.symbols import CROSS
@@ -1117,23 +1121,15 @@ Focus on domain-specific patterns, pitfalls, security/performance, and integrati
             scout_lines = [l.strip() for l in scout.split('\n') if l.strip() and not l.startswith('#')]
             context_section = '\n'.join(f"- {l[:80]}" for l in scout_lines[:5])
 
-        # Extract STEPS section from planner - get everything between STEPS: and VERIFY:
-        steps_match = re.search(r'STEPS:\s*(.*?)(?=\n\s*VERIFY:|\Z)', planner, re.DOTALL | re.IGNORECASE)
+        # Extract STEPS section from planner
+        steps_match = re.search(r'STEPS:\s*(.*?)$', planner, re.DOTALL | re.IGNORECASE)
         if steps_match:
             steps_section = steps_match.group(1).strip()
         else:
             # Fallback: use planner content as-is (for backward compatibility)
             steps_section = planner
 
-        # Extract VERIFY section from planner
-        verify_match = re.search(r'VERIFY:\s*((?:- .+\n?)+)', planner)
-        if verify_match:
-            verify_section = verify_match.group(1).strip()
-        else:
-            # Create verify from validator output
-            verify_section = "- Run tests to verify implementation"
-
-        # Build the minimal plan
+        # Build the minimal plan (no VERIFY section - each step has DONE field)
         content = f"""# Plan: {request[:100]}
 
 Request: {request}
@@ -1150,10 +1146,6 @@ Complexity: {adaptive.complexity}
 ## Steps
 
 {steps_section}
-
-## Verify
-
-{verify_section}
 """
 
         return {"plan.md": content}
@@ -1189,20 +1181,14 @@ Complexity: {adaptive.complexity}
             context_lines = [f"- {sp.name}: {sp.id}" for sp in sub_plans[:5]]
             context_section = '\n'.join(context_lines)
 
-        # Extract STEPS from synthesis - get everything between STEPS: and VERIFY:
-        steps_match = re.search(r'STEPS:\s*(.*?)(?=\n\s*VERIFY:|\Z)', synthesis, re.DOTALL | re.IGNORECASE)
+        # Extract STEPS from synthesis
+        steps_match = re.search(r'STEPS:\s*(.*?)$', synthesis, re.DOTALL | re.IGNORECASE)
         if steps_match:
             steps_section = steps_match.group(1).strip()
         else:
             steps_section = synthesis
 
-        # Extract VERIFY from synthesis
-        verify_match = re.search(r'VERIFY:\s*((?:- .+\n?)+)', synthesis)
-        if verify_match:
-            verify_section = verify_match.group(1).strip()
-        else:
-            verify_section = "- Run full test suite\n- Verify all sub-features integrate correctly"
-
+        # Build master plan (no VERIFY section - each step has DONE field)
         content = f"""# Plan: {request[:100]}
 
 Request: {request}
@@ -1219,10 +1205,6 @@ Complexity: {complexity}
 ## Steps
 
 {steps_section}
-
-## Verify
-
-{verify_section}
 """
         return {"plan.md": content}
 

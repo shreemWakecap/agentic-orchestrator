@@ -2184,23 +2184,20 @@ Ensure all features work together correctly.""",
         return result
 
 
-def main():
-    """CLI entry point."""
-    import sys
+def run(args=None) -> int:
+    """Run building action."""
+    if not args:
+        print("Usage: build <plan-name>")
+        return 1
 
-    if len(sys.argv) < 2:
-        print("Usage: python -m orchestrator.workflows.building <plan-file>")
-        print("Example: python -m orchestrator.workflows.building .orchestrator/specs/pending/user-auth.md")
-        sys.exit(1)
-
-    plan_path = sys.argv[1]
-    project_root = Path.cwd()
+    plan_path = args[0]
+    project_root = Path(__file__).parent.parent.parent
 
     workflow = BuildingWorkflow(project_root=project_root)
     result = workflow.run(plan_path)
-
-    sys.exit(0 if result.success else 1)
+    return 0 if result.success else 1
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.exit(run(sys.argv[1:]))

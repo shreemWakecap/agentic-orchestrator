@@ -26,6 +26,20 @@ from .plan_parser import (
     parse_plan_file,
     validate_plan_coverage,
 )
+from .database import (
+    Database,
+    PlanRepository,
+    BuildStateRepository,
+    KnowledgeRepository,
+    CostRepository,
+    RunRepository,
+    get_database,
+    get_plan_repository,
+    get_build_state_repository,
+    get_knowledge_repository,
+    get_cost_repository,
+    get_run_repository,
+)
 
 __all__ = [
     "Agent",
@@ -62,4 +76,17 @@ __all__ = [
     "parse_plan",
     "parse_plan_file",
     "validate_plan_coverage",
+    # Database
+    "Database",
+    "PlanRepository",
+    "BuildStateRepository",
+    "KnowledgeRepository",
+    "CostRepository",
+    "RunRepository",
+    "get_database",
+    "get_plan_repository",
+    "get_build_state_repository",
+    "get_knowledge_repository",
+    "get_cost_repository",
+    "get_run_repository",
 ]

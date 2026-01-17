@@ -8,6 +8,8 @@ from pathlib import Path
 import json
 import re
 
+from .database import get_cost_repository, CostRepository
+
 
 class Model(Enum):
     """Claude model identifiers."""
@@ -177,30 +179,54 @@ class CostEstimator:
         "massive": 4.0
     }
 
-    def __init__(self, history_file: Optional[Path] = None):
-        self.history_file = history_file or Path(".orchestrator/cost_history.json")
+    def __init__(self, project_root: Optional[Path] = None):
+        """
+        Initialize cost estimator.
+
+        Args:
+            project_root: Project root path. If provided, uses SQLite database.
+                         If None, uses in-memory storage only.
+        """
+        self.project_root = project_root
+        self._cost_repo: Optional[CostRepository] = None
         self.history: list[ActualCost] = []
-        self._load_history()
+
+        if project_root:
+            self._cost_repo = get_cost_repository(project_root)
+            self._load_history()
 
     def _load_history(self):
-        """Load historical cost data."""
-        if self.history_file.exists():
-            try:
-                data = json.loads(self.history_file.read_text())
-                self.history = [ActualCost.from_dict(item) for item in data]
-            except (json.JSONDecodeError, KeyError):
-                self.history = []
-
-    def _save_history(self):
-        """Save cost history."""
-        self.history_file.parent.mkdir(parents=True, exist_ok=True)
-        data = [cost.to_dict() for cost in self.history]
-        self.history_file.write_text(json.dumps(data, indent=2))
+        """Load historical cost data from database."""
+        if self._cost_repo:
+            rows = self._cost_repo.get_history()
+            self.history = [
+                ActualCost(
+                    workflow=row['workflow'],
+                    run_id=row['run_id'],
+                    started_at=row['started_at'],
+                    completed_at=row['completed_at'],
+                    agents=row.get('agents', {}),
+                    total_tokens=row['total_tokens'],
+                    estimated_cost=row['estimated_cost'],
+                    actual_cost=row.get('actual_cost')
+                )
+                for row in rows
+            ]
 
     def record_actual_cost(self, cost: ActualCost):
         """Record actual cost from completed workflow."""
         self.history.append(cost)
-        self._save_history()
+        if self._cost_repo:
+            self._cost_repo.record(
+                workflow=cost.workflow,
+                run_id=cost.run_id,
+                started_at=cost.started_at,
+                completed_at=cost.completed_at,
+                total_tokens=cost.total_tokens,
+                estimated_cost=cost.estimated_cost,
+                agents=cost.agents,
+                actual_cost=cost.actual_cost
+            )
 
     def estimate_planning(
         self,

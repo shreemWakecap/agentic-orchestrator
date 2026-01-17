@@ -4,6 +4,7 @@ import socket
 from pathlib import Path
 
 ORCHESTRATOR_DIR = Path(__file__).parent
+PROJECT_ROOT = ORCHESTRATOR_DIR.parent
 
 
 def _find_free_port() -> int:
@@ -44,10 +45,19 @@ def run_setup(args=None) -> int:
             print(f"  [!] {cmd} missing")
             ok = False
 
-    # Create directories
-    for d in ['specs/pending', 'specs/completed', 'specs/failed', 'agents/experts', 'config', 'knowledge']:
+    # Create directories (only config and agents/experts remain file-based)
+    for d in ['agents/experts', 'config']:
         (ORCHESTRATOR_DIR / d).mkdir(parents=True, exist_ok=True)
     print("  [+] Directories created")
+
+    # Initialize SQLite database
+    try:
+        from core.database import get_database
+        db = get_database(PROJECT_ROOT)
+        print(f"  [+] Database initialized: {db.db_path}")
+    except Exception as e:
+        print(f"  [!] Database error: {e}")
+        ok = False
 
     print("\n" + ("Setup complete!" if ok else "Setup completed with issues"))
     return 0 if ok else 1
@@ -101,9 +111,8 @@ def run_experts(args=None) -> int:
     from core.expert_loader import ExpertLoader, ExpertType
     from core.expert_generator import ExpertGenerator
 
-    project_root = ORCHESTRATOR_DIR.parent
-    loader = ExpertLoader(project_root)
-    generator = ExpertGenerator(project_root)
+    loader = ExpertLoader(PROJECT_ROOT)
+    generator = ExpertGenerator(PROJECT_ROOT)
 
     if parsed.action == "list":
         experts = loader.list_experts()
@@ -197,11 +206,10 @@ def run_experts(args=None) -> int:
 
 
 def run_knowledge(args=None) -> int:
-    """View knowledge store status."""
+    """View knowledge store status (from SQLite database)."""
     from core.knowledge_store import KnowledgeStore
 
-    project_root = ORCHESTRATOR_DIR.parent
-    store = KnowledgeStore(project_root)
+    store = KnowledgeStore(PROJECT_ROOT)
 
     print("Knowledge Store\n" + "=" * 40)
 

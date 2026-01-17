@@ -1,18 +1,22 @@
 """
-Simplified Planning Workflow.
+Knowledge-Enhanced Planning Workflow.
 
 Takes a user request and creates a plan.md file in specs/pending/.
 
 Flow:
-    User Request → Planner Agent → specs/pending/NNN_feature-name/plan.md
+    User Request → Expert Selection → Planner Agent → specs/pending/NNN_feature-name/plan.md
 
-The planner agent:
-1. Explores the codebase (using Read, Glob, Grep tools)
-2. Designs the implementation approach
-3. Outputs a structured plan
+The planning workflow:
+1. Loads codebase knowledge (if available from scout)
+2. Selects relevant experts based on request keywords
+3. Gathers expert guidance for the planner
+4. Runs planner with enriched context
+5. Outputs a structured plan
 
-This replaces the previous complex multi-agent workflow
-(scout → architect → experts → planner → validator).
+Enhanced with:
+- Knowledge store integration for architecture context
+- Expert selection and consultation
+- Displays "Consulting experts: ..." for transparency
 """
 import re
 from datetime import datetime
@@ -21,14 +25,18 @@ from typing import Optional
 
 from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.plan_parser import PlanParser, validate_plan_coverage
+from core.knowledge_store import KnowledgeStore
+from core.expert_selector import ExpertSelector
 
 
 class PlanningWorkflow(Workflow):
     """
-    Simplified planning workflow.
+    Knowledge-enhanced planning workflow.
 
-    Creates implementation plans from user requests using a single planner agent
-    that can explore the codebase and design the approach.
+    Creates implementation plans from user requests using:
+    - Codebase knowledge from scout (if available)
+    - Expert selection based on request keywords
+    - Expert guidance injected into planner context
     """
 
     def __init__(
@@ -44,6 +52,10 @@ class PlanningWorkflow(Workflow):
         output_dir.mkdir(parents=True, exist_ok=True)
 
         super().__init__(name="Planning Workflow", output_dir=output_dir)
+
+        # Knowledge and expert systems
+        self.knowledge_store = KnowledgeStore(project_root)
+        self.expert_selector = ExpertSelector(project_root)
 
         # Load the planner agent
         self._load_agents()
@@ -121,20 +133,46 @@ class PlanningWorkflow(Workflow):
 
         self.console.print(f"  [dim]Output: {plan_dir.name}/plan.md[/dim]")
 
-        # Get codebase context
+        # Get codebase context (basic or from knowledge store)
         codebase_summary = self._get_codebase_summary()
+
+        # Get architecture context from knowledge store
+        arch_context = ""
+        if self.knowledge_store.exists():
+            arch_context = self.knowledge_store.get_planning_context()
+            if arch_context:
+                self.console.print(f"  [dim]Using codebase knowledge[/dim]")
+
+        # Select relevant experts
+        expert_names = self.expert_selector.select_experts(request)
+        expert_context = ""
+        if expert_names:
+            self.console.print(f"  [dim]Consulting experts: {', '.join(expert_names)}[/dim]")
+            expert_context = self.expert_selector.get_expert_context(expert_names)
 
         # Run planner agent
         self.console.print(f"\n[cyan]{ARROW_RIGHT}[/cyan] Running planner agent...")
 
-        planner_prompt = f"""Create an implementation plan for this request:
+        # Build enhanced prompt with knowledge and expert context
+        prompt_sections = [f"""Create an implementation plan for this request:
 
 ## REQUEST
 {request}
 
 ## CODEBASE
-{codebase_summary}
+{codebase_summary}"""]
 
+        if arch_context:
+            prompt_sections.append(f"""
+## ARCHITECTURE CONTEXT
+{arch_context}""")
+
+        if expert_context:
+            prompt_sections.append(f"""
+## EXPERT GUIDANCE
+{expert_context}""")
+
+        prompt_sections.append("""
 ## INSTRUCTIONS
 1. First, explore the codebase using Glob/Read to understand:
    - Project structure and patterns
@@ -149,7 +187,10 @@ Remember:
 - Be specific with file paths
 - Include DONE criteria for each step
 - Follow existing patterns you discover
-"""
+- Use architecture and expert guidance above (if provided)
+""")
+
+        planner_prompt = "\n".join(prompt_sections)
 
         result = self.run_agent(
             "planner",

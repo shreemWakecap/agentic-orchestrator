@@ -4,33 +4,297 @@
 
 {% block head %}
 <style>
-    /* Step item animations */
-    .step-item {
-        transition: all 0.3s ease;
+    /* Modern gradient progress bar animation */
+    .progress-gradient {
+        background: linear-gradient(90deg, #3b82f6, #8b5cf6, #06b6d4, #3b82f6);
+        background-size: 300% 100%;
+        animation: gradient-flow 2s ease infinite;
     }
 
-    .step-item.step-running .step-header {
-        animation: pulse-border 2s infinite;
+    @keyframes gradient-flow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
     }
 
-    @keyframes pulse-border {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-        50% { box-shadow: 0 0 0 4px rgba(59, 130, 246, 0); }
+    /* Progress bar shimmer effect */
+    .progress-shimmer {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .progress-shimmer::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+        animation: shimmer 2s infinite;
+    }
+
+    @keyframes shimmer {
+        0% { left: -100%; }
+        100% { left: 100%; }
+    }
+
+    /* Timeline step styling */
+    .timeline-step {
+        position: relative;
+        padding-left: 2.5rem;
+    }
+
+    .timeline-step::before {
+        content: '';
+        position: absolute;
+        left: 0.9375rem;
+        top: 2rem;
+        bottom: -0.75rem;
+        width: 2px;
+        background: linear-gradient(180deg, #e2e8f0 0%, #e2e8f0 100%);
+        transition: background 0.3s ease;
+    }
+
+    .timeline-step:last-child::before {
+        display: none;
+    }
+
+    .timeline-step.step-completed::before {
+        background: linear-gradient(180deg, #22c55e 0%, #22c55e 100%);
+    }
+
+    .timeline-step.step-running::before {
+        background: linear-gradient(180deg, #3b82f6 0%, #e2e8f0 100%);
+    }
+
+    /* Timeline dot */
+    .timeline-dot {
+        position: absolute;
+        left: 0;
+        top: 0.25rem;
+        width: 2rem;
+        height: 2rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1;
+    }
+
+    .timeline-dot-pending {
+        background: #f1f5f9;
+        border: 2px solid #e2e8f0;
+        color: #94a3b8;
+    }
+
+    .timeline-dot-running {
+        background: #dbeafe;
+        border: 2px solid #3b82f6;
+        color: #3b82f6;
+        animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    .timeline-dot-completed {
+        background: #dcfce7;
+        border: 2px solid #22c55e;
+        color: #22c55e;
+    }
+
+    .timeline-dot-failed {
+        background: #fee2e2;
+        border: 2px solid #ef4444;
+        color: #ef4444;
+    }
+
+    @keyframes pulse-ring {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+        }
+        50% {
+            box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+        }
+    }
+
+    /* Step card styling */
+    .step-card {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.75rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .step-card:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    .step-card.step-running {
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .step-card.step-completed {
+        border-color: #22c55e;
+        background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+    }
+
+    .step-card.step-failed {
+        border-color: #ef4444;
+        background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
     }
 
     /* Step details expand/collapse */
     .step-details {
-        transition: max-height 0.3s ease-out;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .step-details.expanded {
+        max-height: 500px;
     }
 
     /* Step chevron rotation */
     .step-chevron {
-        transition: transform 0.2s ease;
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* Step connector line */
-    .step-connector {
-        transition: background-color 0.3s ease;
+    .step-chevron.rotated {
+        transform: rotate(180deg);
+    }
+
+    /* Modern button styles */
+    .btn-primary {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.39);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.5);
+    }
+
+    .btn-primary:active {
+        transform: translateY(0);
+    }
+
+    .btn-success {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        box-shadow: 0 4px 14px 0 rgba(34, 197, 94, 0.39);
+    }
+
+    .btn-success:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px 0 rgba(34, 197, 94, 0.5);
+    }
+
+    .btn-warning {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.39);
+    }
+
+    .btn-warning:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px 0 rgba(245, 158, 11, 0.5);
+    }
+
+    .btn-purple {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        box-shadow: 0 4px 14px 0 rgba(139, 92, 246, 0.39);
+    }
+
+    .btn-purple:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.5);
+    }
+
+    .btn-secondary {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-secondary:hover {
+        background: #f8fafc;
+        border-color: #cbd5e1;
+        transform: translateY(-1px);
+    }
+
+    /* Success animation */
+    @keyframes success-bounce {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    .success-animate {
+        animation: success-bounce 0.5s ease-in-out;
+    }
+
+    /* Error shake animation */
+    @keyframes error-shake {
+        0%, 100% { transform: translateX(0); }
+        10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+        20%, 40%, 60%, 80% { transform: translateX(5px); }
+    }
+
+    .error-animate {
+        animation: error-shake 0.5s ease-in-out;
+    }
+
+    /* Fade in animation */
+    @keyframes fade-in-up {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fade-in-up {
+        animation: fade-in-up 0.4s ease-out forwards;
+    }
+
+    /* Status badge modern styling */
+    .status-badge {
+        padding: 0.375rem 1rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        text-transform: uppercase;
+        transition: all 0.3s ease;
+    }
+
+    .status-completed {
+        background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        color: #166534;
+    }
+
+    .status-pending {
+        background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+        color: #854d0e;
+    }
+
+    .status-in-progress {
+        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+        color: #1e40af;
+    }
+
+    .status-paused {
+        background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%);
+        color: #9a3412;
+    }
+
+    .status-failed {
+        background: linear-gradient(135deg, #fecaca 0%, #fca5a5 100%);
+        color: #991b1b;
     }
 
     /* Scrollbar styling for steps list */
@@ -44,48 +308,106 @@
     }
 
     #steps-list::-webkit-scrollbar-thumb {
-        background: #cbd5e1;
+        background: linear-gradient(180deg, #94a3b8, #cbd5e1);
         border-radius: 3px;
     }
 
     #steps-list::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8;
+        background: linear-gradient(180deg, #64748b, #94a3b8);
+    }
+
+    /* Card glassmorphism effect */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Terminal log styling */
+    .terminal-log {
+        background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+        border-radius: 0.75rem;
+        font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', monospace;
+    }
+
+    .terminal-log::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .terminal-log::-webkit-scrollbar-track {
+        background: #1e293b;
+    }
+
+    .terminal-log::-webkit-scrollbar-thumb {
+        background: #475569;
+        border-radius: 3px;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="px-4 py-6 sm:px-0">
-    <!-- Header -->
-    <div class="mb-6">
+    <!-- Header with modern styling -->
+    <div class="mb-8 animate-fade-in-up">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900">{{ plan.name }}</h1>
-                <p class="mt-1 text-sm text-gray-600">{{ plan.file }}</p>
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900">{{ plan.name }}</h1>
+                        <p class="text-sm text-gray-500 flex items-center mt-1">
+                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            {{ plan.file }}
+                        </p>
+                    </div>
+                </div>
             </div>
             <div class="flex items-center space-x-4">
-                <span id="plan-status-badge" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
-                    {% if plan.state == 'completed' %}bg-green-100 text-green-800
-                    {% elif plan.state == 'pending' %}bg-yellow-100 text-yellow-800
-                    {% elif plan.state == 'in-progress' %}bg-blue-100 text-blue-800
-                    {% elif plan.state == 'paused' %}bg-orange-100 text-orange-800
-                    {% elif plan.state == 'failed' %}bg-red-100 text-red-800
+                <span id="plan-status-badge" class="status-badge
+                    {% if plan.state == 'completed' %}status-completed
+                    {% elif plan.state == 'pending' %}status-pending
+                    {% elif plan.state == 'in-progress' %}status-in-progress
+                    {% elif plan.state == 'paused' %}status-paused
+                    {% elif plan.state == 'failed' %}status-failed
                     {% else %}bg-gray-100 text-gray-800{% endif %}">
-                    {{ plan.state }}
+                    <span class="flex items-center">
+                        {% if plan.state == 'in-progress' %}
+                        <span class="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
+                        {% elif plan.state == 'completed' %}
+                        <svg class="w-3.5 h-3.5 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                        </svg>
+                        {% endif %}
+                        {{ plan.state }}
+                    </span>
                 </span>
             </div>
         </div>
     </div>
 
     <!-- Build Actions & Progress Section -->
-    <div id="build-section" class="mb-6 bg-white shadow sm:rounded-lg overflow-hidden">
-        <div class="px-4 py-4 sm:px-6 border-b border-gray-200">
+    <div id="build-section" class="mb-8 bg-white shadow-lg sm:rounded-2xl overflow-hidden border border-gray-100 animate-fade-in-up" style="animation-delay: 0.1s;">
+        <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
             <div class="flex items-center justify-between">
-                <h3 class="text-lg font-medium text-gray-900">Build Controls</h3>
-                <div id="build-actions" class="flex space-x-3">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-gray-100 rounded-lg">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Build Controls</h3>
+                </div>
+                <div id="build-actions" class="flex items-center space-x-3">
                     {% if plan.state == 'pending' %}
                     <button id="start-build-btn" onclick="PlanDetail.startBuild('{{ plan.id }}')"
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                            class="btn-primary inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
                         <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
@@ -94,7 +416,7 @@
                     </button>
                     {% elif plan.state == 'paused' or plan.state == 'failed' %}
                     <button id="resume-build-btn" onclick="PlanDetail.resumeBuild('{{ plan.id }}')"
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-orange-600 hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 transition-colors">
+                            class="btn-warning inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
                         <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                         </svg>
@@ -102,7 +424,7 @@
                     </button>
                     {% elif plan.state == 'in-progress' %}
                     <button id="pause-build-btn" onclick="PlanDetail.pauseBuild()"
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors">
+                            class="btn-warning inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
                         <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
@@ -110,15 +432,18 @@
                     </button>
                     {% elif plan.state == 'completed' %}
                     <button onclick="PlanDetail.startReview('{{ plan.id }}')"
-                            class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors">
+                            class="btn-purple inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
                         <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                         </svg>
                         Start Review
                     </button>
                     {% endif %}
-                    <a href="/plans" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors">
-                        &larr; Back to Plans
+                    <a href="/plans" class="btn-secondary inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-xl text-gray-700">
+                        <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        Back to Plans
                     </a>
                 </div>
             </div>
@@ -126,16 +451,18 @@
 
         <!-- Failed Step Info (shown for paused/failed plans) -->
         {% if plan.state == 'paused' or plan.state == 'failed' %}
-        <div id="failed-step-info" class="px-4 py-3 bg-red-50 border-b border-red-200">
+        <div id="failed-step-info" class="px-6 py-4 bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100 error-animate">
             <div class="flex items-start">
-                <svg class="h-5 w-5 text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                </svg>
-                <div class="ml-3">
-                    <h4 class="text-sm font-medium text-red-800">Build {{ 'paused' if plan.state == 'paused' else 'failed' }} at step:</h4>
-                    <p id="failed-step-name" class="mt-1 text-sm text-red-700">{{ plan.failed_step or plan.current_step or 'Unknown step' }}</p>
+                <div class="flex-shrink-0 p-2 bg-red-100 rounded-lg">
+                    <svg class="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h4 class="text-sm font-semibold text-red-800">Build {{ 'paused' if plan.state == 'paused' else 'failed' }} at step:</h4>
+                    <p id="failed-step-name" class="mt-1 text-sm text-red-700 font-medium">{{ plan.failed_step or plan.current_step or 'Unknown step' }}</p>
                     {% if plan.error_message %}
-                    <p class="mt-1 text-xs text-red-600">{{ plan.error_message }}</p>
+                    <p class="mt-2 text-xs text-red-600 bg-red-100 rounded-lg px-3 py-2 font-mono">{{ plan.error_message }}</p>
                     {% endif %}
                 </div>
             </div>
@@ -144,75 +471,136 @@
 
         <!-- Inline Progress Section (hidden by default, shown during build) -->
         <div id="build-progress-section" class="hidden">
-            <!-- Progress Bar -->
-            <div class="px-4 py-4 border-b border-gray-200">
-                <div class="flex items-center justify-between mb-2">
-                    <span id="current-step-label" class="text-sm font-medium text-gray-700">Initializing...</span>
-                    <span id="progress-percent" class="text-sm font-medium text-blue-600">0%</span>
+            <!-- Modern Progress Bar -->
+            <div class="px-6 py-5 border-b border-gray-100">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                        <span id="current-step-label" class="text-sm font-medium text-gray-700">Initializing...</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span id="progress-percent" class="text-sm font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">0%</span>
+                    </div>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div id="progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                <div class="relative w-full h-4 bg-gray-100 rounded-full overflow-hidden shadow-inner">
+                    <div id="progress-bar" class="progress-gradient progress-shimmer h-full rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
+                </div>
+                <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                    <span id="steps-completed-count">0 steps completed</span>
+                    <span id="estimated-time">Calculating...</span>
                 </div>
             </div>
 
-            <!-- Step-by-Step Progress Visualization -->
-            <div id="steps-visualization" class="px-4 py-4 border-b border-gray-200">
-                <div class="flex items-center justify-between mb-3">
-                    <h4 class="text-sm font-medium text-gray-700">Build Steps</h4>
+            <!-- Timeline Step-by-Step Progress Visualization -->
+            <div id="steps-visualization" class="px-6 py-5 border-b border-gray-100 bg-gradient-to-b from-gray-50 to-white">
+                <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-2">
-                        <button onclick="PlanDetail.expandAllSteps()" class="text-xs text-blue-600 hover:text-blue-800 transition-colors">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                        <h4 class="text-sm font-semibold text-gray-700">Build Steps</h4>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <button onclick="PlanDetail.expandAllSteps()" class="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center">
+                            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                            </svg>
                             Expand All
                         </button>
                         <span class="text-gray-300">|</span>
-                        <button onclick="PlanDetail.collapseAllSteps()" class="text-xs text-blue-600 hover:text-blue-800 transition-colors">
+                        <button onclick="PlanDetail.collapseAllSteps()" class="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center">
+                            <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                            </svg>
                             Collapse All
                         </button>
                     </div>
                 </div>
-                <div id="steps-list" class="space-y-3 max-h-96 overflow-y-auto">
-                    <!-- Steps will be dynamically populated -->
-                    <div class="step-placeholder text-sm text-gray-500 italic">
-                        Steps will appear here when the build starts...
+                <div id="steps-list" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    <!-- Steps will be dynamically populated with timeline design -->
+                    <div class="step-placeholder flex items-center justify-center py-8">
+                        <div class="text-center">
+                            <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                            <p class="text-sm text-gray-500">Steps will appear here when the build starts...</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Live Events Log -->
-            <div class="px-4 py-4">
+            <!-- Modern Terminal Live Events Log -->
+            <div class="px-6 py-5">
                 <div class="flex items-center justify-between mb-3">
-                    <h4 class="text-sm font-medium text-gray-700">Build Log</h4>
-                    <button onclick="PlanDetail.clearLog()" class="text-xs text-gray-500 hover:text-gray-700">Clear</button>
+                    <div class="flex items-center space-x-2">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                        <h4 class="text-sm font-semibold text-gray-700">Build Log</h4>
+                    </div>
+                    <button onclick="PlanDetail.clearLog()" class="text-xs font-medium text-gray-500 hover:text-gray-700 transition-colors flex items-center">
+                        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Clear Log
+                    </button>
                 </div>
-                <div id="events-log" class="bg-gray-900 rounded-lg p-3 h-48 overflow-y-auto font-mono text-xs text-gray-300">
-                    <div class="text-gray-500">Waiting for build to start...</div>
+                <div id="events-log" class="terminal-log p-4 h-48 overflow-y-auto text-xs text-gray-300">
+                    <div class="flex items-center text-gray-500">
+                        <span class="text-green-400 mr-2">$</span>
+                        <span>Waiting for build to start...</span>
+                        <span class="ml-2 animate-pulse">_</span>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Success Message (hidden by default) -->
-        <div id="build-success-section" class="hidden px-4 py-4 bg-green-50">
+        <div id="build-success-section" class="hidden px-6 py-5 bg-gradient-to-r from-green-50 to-emerald-50 border-t border-green-100 success-animate">
             <div class="flex items-center">
-                <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <div class="ml-3">
-                    <p class="text-sm font-medium text-green-800">Build completed successfully!</p>
+                <div class="flex-shrink-0 p-3 bg-green-100 rounded-xl">
+                    <svg class="h-6 w-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-semibold text-green-800">Build completed successfully!</p>
                     <p id="build-duration" class="text-xs text-green-600 mt-1"></p>
                 </div>
-                <a id="view-run-link" href="#" class="ml-auto text-sm text-green-700 hover:text-green-900 underline">View Run Details</a>
+                <a id="view-run-link" href="#" class="ml-auto inline-flex items-center px-4 py-2 btn-success text-sm font-medium rounded-xl text-white">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                    View Run Details
+                </a>
             </div>
         </div>
     </div>
 
-    <!-- Plan Content -->
-    <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium text-gray-900">Plan Content</h3>
-            <p class="mt-1 text-sm text-gray-600">Last modified: {{ plan.modified[:19] }}</p>
+    <!-- Plan Content with modern card styling -->
+    <div class="bg-white shadow-lg overflow-hidden sm:rounded-2xl border border-gray-100 animate-fade-in-up" style="animation-delay: 0.2s;">
+        <div class="px-6 py-5 bg-gradient-to-r from-gray-50 to-white border-b border-gray-100">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-gray-100 rounded-lg">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Plan Content</h3>
+                </div>
+                <p class="text-xs text-gray-500 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Last modified: {{ plan.modified[:19] }}
+                </p>
+            </div>
         </div>
-        <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+        <div class="px-6 py-5">
             <div class="markdown-content prose max-w-none">
-                <pre class="whitespace-pre-wrap text-sm text-gray-800">{{ plan.content }}</pre>
+                <pre class="whitespace-pre-wrap text-sm text-gray-800 bg-gray-50 rounded-xl p-4 border border-gray-100">{{ plan.content }}</pre>
             </div>
         </div>
     </div>

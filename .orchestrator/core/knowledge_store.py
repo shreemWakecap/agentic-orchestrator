@@ -156,7 +156,7 @@ class KnowledgeStore:
 
     def __init__(self, project_root: Path):
         self.project_root = project_root.resolve()
-        self._repo = get_knowledge_repository(project_root)
+        self._repo = get_knowledge_repository()
 
     def exists(self) -> bool:
         """Check if codebase knowledge exists."""

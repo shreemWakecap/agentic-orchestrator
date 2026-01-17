@@ -52,9 +52,11 @@ class ScoutingWorkflow(Workflow):
         self,
         project_root: Path,
         scan_type: str = "full",  # full or quick
+        generate_experts: bool = False,
     ):
         self.project_root = project_root
         self.scan_type = scan_type
+        self.generate_experts = generate_experts
         self._config = get_agent_config(project_root)
 
         # Knowledge store
@@ -101,12 +103,12 @@ class ScoutingWorkflow(Workflow):
 
         return "\n".join(parts)
 
-    def execute(self, generate_experts: bool = False) -> WorkflowResult:
+    def execute(self, request: str) -> WorkflowResult:
         """
         Execute the scouting workflow.
 
         Args:
-            generate_experts: Whether to auto-generate missing experts after scan
+            request: Request string (unused, required by base class interface)
 
         Returns:
             WorkflowResult with the knowledge store populated
@@ -204,7 +206,7 @@ Explore deeply - read actual files, don't just guess from names.
 
         # Find missing experts
         missing_experts = []
-        if generate_experts:
+        if self.generate_experts:
             missing_experts = self._find_and_generate_experts(knowledge)
             meta.experts_generated = missing_experts
 
@@ -430,9 +432,10 @@ def run(args=None) -> int:
     workflow = ScoutingWorkflow(
         project_root=project_root,
         scan_type=scan_type,
+        generate_experts=parsed.generate_experts,
     )
 
-    result = workflow.run(generate_experts=parsed.generate_experts)
+    result = workflow.run("")
 
     return 0 if result.success else 1
 

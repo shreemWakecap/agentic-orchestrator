@@ -246,8 +246,8 @@ class BuildingWorkflow(Workflow):
         self.specs_dir = specs_dir or project_root / ".orchestrator" / "specs"
 
         # Database repositories
-        self._plan_repo = get_plan_repository(project_root)
-        self._build_state_repo = get_build_state_repository(project_root)
+        self._plan_repo = get_plan_repository()
+        self._build_state_repo = get_build_state_repository()
 
         # Ensure directory structure (for legacy file-based operations)
         self._ensure_specs_structure()
@@ -2205,17 +2205,16 @@ Ensure all features work together correctly.""",
             self.build_state.current_step = ""
             self._save_state()
 
-            # Archive to completed folder
+            # Update plan status to completed in database
             self._archive_plan(plan_id, "completed")
-            result.output_file = final_path
-            final_display = str(final_path).replace("\\", "/")
 
             completed, total = self.build_state.get_progress()
             self.console.print(f"\n[green]Build completed successfully![/green]")
+            self.console.print(f"  Plan ID: {plan_id}")
             self.console.print(f"  Steps: {completed}/{total}")
             self.console.print(f"  Files created: {len(self.build_state.files_created)}")
             self.console.print(f"  Files modified: {len(self.build_state.files_modified)}")
-            self.console.print(f"  Archived to: {final_display}")
+            self.console.print(f"  Status: completed")
         else:
             # Check if this is a pausable failure (can resume) or permanent failure
             is_paused = result.data and result.data.get("can_resume", False)

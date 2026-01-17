@@ -55,8 +55,8 @@ class PlanningWorkflow(Workflow):
         super().__init__(name="Planning Workflow", output_dir=output_dir)
 
         # Database repositories
-        self._plan_repo = get_plan_repository(project_root)
-        self._build_state_repo = get_build_state_repository(project_root)
+        self._plan_repo = get_plan_repository()
+        self._build_state_repo = get_build_state_repository()
 
         # Knowledge and expert systems
         self.knowledge_store = KnowledgeStore(project_root)
@@ -251,19 +251,19 @@ Status: pending
 
         # Save phases and steps to database
         if parse_result.plan:
-            for phase in parse_result.plan.phases:
+            for phase_number, phase in enumerate(parse_result.plan.phases):
                 self._plan_repo.add_phase(
                     plan_id=plan_id,
-                    phase_id=phase.phase_id,
+                    phase_id=phase.id,
                     name=phase.name,
-                    phase_number=phase.phase_number,
+                    phase_number=phase_number,
                     can_parallelize=phase.can_parallelize
                 )
 
                 for step_order, step in enumerate(phase.steps):
                     self._plan_repo.add_step(
                         plan_id=plan_id,
-                        phase_id=phase.phase_id,
+                        phase_id=phase.id,
                         step_id=step.id,
                         action=step.action.value,
                         description=step.description,

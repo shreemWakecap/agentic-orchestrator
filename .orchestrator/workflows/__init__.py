@@ -1,4 +1,4 @@
-"""Actions - CLI command implementations."""
+"""Workflows - orchestrated multi-step processes."""
 from .planning import PlanningWorkflow
 from .building import BuildingWorkflow
 from .syncing import SyncingWorkflow

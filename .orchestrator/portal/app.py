@@ -28,9 +28,9 @@ PROJECT_ROOT = ORCHESTRATOR_DIR.parent
 
 sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
-from actions.planning import PlanningWorkflow
-from actions.building import BuildingWorkflow
-from actions.syncing import SyncingWorkflow
+from workflows.planning import PlanningWorkflow
+from workflows.building import BuildingWorkflow
+from workflows.syncing import SyncingWorkflow
 from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
 
 # Portal startup time for health endpoint uptime calculation

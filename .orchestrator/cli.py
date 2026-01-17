@@ -1,38 +1,52 @@
 #!/usr/bin/env python3
-"""CLI - thin wrapper for actions."""
+"""CLI - dispatcher for workflows and commands."""
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-ACTIONS = {
+# Workflows: complex multi-step agent orchestration
+WORKFLOWS = {
     'plan': 'planning',
     'build': 'building',
     'sync': 'syncing',
-    'setup': 'setup',
-    'list': 'list',
-    'portal': 'portal',
+}
+
+# Commands: simple utilities
+COMMANDS = {
+    'list': 'list_plans',
+    'portal': 'run_portal',
+    'setup': 'run_setup',
 }
 
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ['-h', '--help']:
         print("Agentic Orchestrator\n")
-        print("Commands:")
+        print("Workflows:")
         print("  plan <request>   Create implementation plan from request")
         print("  build <path>     Execute plan and implement code")
-        print("  portal           Start web portal")
-        print("  list             List all plans")
         print("  sync             Sync changes: create PR, merge, and pull to local")
+        print("\nCommands:")
+        print("  list             List all plans")
+        print("  portal           Start web portal")
+        print("  setup            Initialize orchestrator environment")
         return 0
 
     cmd = sys.argv[1]
-    if cmd not in ACTIONS:
-        print(f"Unknown: {cmd}. Try: {', '.join(ACTIONS.keys())}")
-        return 1
+    args = sys.argv[2:]
 
-    module = __import__(f"actions.{ACTIONS[cmd]}", fromlist=['run'])
-    return module.run(sys.argv[2:])
+    if cmd in WORKFLOWS:
+        module = __import__(f"workflows.{WORKFLOWS[cmd]}", fromlist=['run'])
+        return module.run(args)
+
+    if cmd in COMMANDS:
+        import commands
+        return getattr(commands, COMMANDS[cmd])(args)
+
+    all_cmds = list(WORKFLOWS.keys()) + list(COMMANDS.keys())
+    print(f"Unknown: {cmd}. Try: {', '.join(all_cmds)}")
+    return 1
 
 
 if __name__ == "__main__":

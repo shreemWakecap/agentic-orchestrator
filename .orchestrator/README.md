@@ -142,7 +142,7 @@ Not 5 separate files. Simple is better.
 ### Planning Workflow
 
 ```python
-from actions.planning import PlanningWorkflow
+from workflows.planning import PlanningWorkflow
 
 workflow = PlanningWorkflow(project_root=Path("."))
 result = workflow.run("Add user authentication")
@@ -156,7 +156,7 @@ result = workflow.run("Add user authentication")
 ### Building Workflow
 
 ```python
-from actions.building import BuildingWorkflow
+from workflows.building import BuildingWorkflow
 
 workflow = BuildingWorkflow(project_root=Path("."))
 result = workflow.run("specs/pending/001_add-user")

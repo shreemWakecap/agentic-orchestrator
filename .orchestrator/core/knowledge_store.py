@@ -1,17 +1,18 @@
 """
 Knowledge Store: Persistent codebase understanding.
 
-Manages the knowledge/ directory containing:
-- codebase.json: Architecture, domains, patterns
-- expert_index.json: Query → Expert mappings
-- scan_meta.json: Last scan metadata
+Stores codebase knowledge in SQLite database:
+- Architecture, domains, patterns
+- Expert index for query → Expert mappings
+- Scan metadata
 """
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+from .database import get_knowledge_repository, KnowledgeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +138,7 @@ class ScanMeta:
 
 class KnowledgeStore:
     """
-    Manages persistent codebase knowledge.
+    Manages persistent codebase knowledge in SQLite database.
 
     Usage:
         store = KnowledgeStore(project_root)
@@ -155,87 +156,49 @@ class KnowledgeStore:
 
     def __init__(self, project_root: Path):
         self.project_root = project_root.resolve()
-        self.knowledge_dir = self.project_root / ".orchestrator" / "knowledge"
-
-        # File paths
-        self.codebase_file = self.knowledge_dir / "codebase.json"
-        self.index_file = self.knowledge_dir / "expert_index.json"
-        self.meta_file = self.knowledge_dir / "scan_meta.json"
-
-    def _ensure_dir(self) -> None:
-        """Ensure knowledge directory exists."""
-        self.knowledge_dir.mkdir(parents=True, exist_ok=True)
+        self._repo = get_knowledge_repository(project_root)
 
     def exists(self) -> bool:
         """Check if codebase knowledge exists."""
-        return self.codebase_file.exists()
+        return self._repo.exists()
 
     def has_index(self) -> bool:
         """Check if expert index exists."""
-        return self.index_file.exists()
+        return self._repo.has_expert_index()
 
     # --- Codebase Knowledge ---
 
     def load(self) -> Optional[CodebaseKnowledge]:
-        """Load codebase knowledge from JSON."""
-        if not self.codebase_file.exists():
+        """Load codebase knowledge from database."""
+        data = self._repo.load_knowledge()
+        if not data:
             return None
 
         try:
-            data = json.loads(self.codebase_file.read_text(encoding="utf-8"))
             return self._dict_to_knowledge(data)
-        except json.JSONDecodeError as e:
-            logger.warning(f"Invalid codebase.json: {e}")
-            return None
         except Exception as e:
-            logger.warning(f"Error loading codebase.json: {e}")
+            logger.warning(f"Error loading knowledge: {e}")
             return None
 
     def save(self, knowledge: CodebaseKnowledge) -> bool:
-        """Save codebase knowledge to JSON."""
-        self._ensure_dir()
-
+        """Save codebase knowledge to database."""
         try:
             knowledge.last_updated = datetime.now().isoformat()
-            data = self._knowledge_to_dict(knowledge)
-            self.codebase_file.write_text(
-                json.dumps(data, indent=2),
-                encoding="utf-8"
-            )
-            return True
-        except Exception as e:
-            logger.error(f"Error saving codebase.json: {e}")
-            return False
 
-    def _knowledge_to_dict(self, k: CodebaseKnowledge) -> dict:
-        """Convert CodebaseKnowledge to JSON-serializable dict."""
-        return {
-            "version": k.version,
-            "last_updated": k.last_updated,
-            "project": {
-                "name": k.project.name,
-                "type": k.project.type,
-                "primary_language": k.project.primary_language,
-            },
-            "technologies": {
-                "languages": [self._tech_to_dict(t) for t in k.technologies.languages],
-                "frameworks": [self._tech_to_dict(t) for t in k.technologies.frameworks],
-                "tools": [self._tech_to_dict(t) for t in k.technologies.tools],
-            },
-            "architecture": {
-                "pattern": k.architecture.pattern,
-                "modules": [
-                    {
-                        "name": m.name,
-                        "path": m.path,
-                        "purpose": m.purpose,
-                        "depends_on": m.depends_on,
-                    }
-                    for m in k.architecture.modules
-                ],
-                "entry_points": k.architecture.entry_points,
-            },
-            "domains": [
+            # Convert to flat structure for repository
+            languages = [self._tech_to_dict(t) for t in knowledge.technologies.languages]
+            frameworks = [self._tech_to_dict(t) for t in knowledge.technologies.frameworks]
+            tools = [self._tech_to_dict(t) for t in knowledge.technologies.tools]
+            modules = [
+                {
+                    "name": m.name,
+                    "path": m.path,
+                    "purpose": m.purpose,
+                    "depends_on": m.depends_on,
+                }
+                for m in knowledge.architecture.modules
+            ]
+            domains = [
                 {
                     "name": d.name,
                     "keywords": d.keywords,
@@ -243,15 +206,30 @@ class KnowledgeStore:
                     "models": d.models,
                     "routes": d.routes,
                 }
-                for d in k.domains
-            ],
-            "patterns": {
-                "naming": k.patterns.naming,
-                "structure": k.patterns.structure,
-                "conventions": k.patterns.conventions,
-            },
-            "statistics": k.statistics,
-        }
+                for d in knowledge.domains
+            ]
+
+            self._repo.save_knowledge(
+                project_name=knowledge.project.name,
+                project_type=knowledge.project.type,
+                primary_language=knowledge.project.primary_language,
+                languages=languages,
+                frameworks=frameworks,
+                tools=tools,
+                architecture_pattern=knowledge.architecture.pattern,
+                modules=modules,
+                entry_points=knowledge.architecture.entry_points,
+                domains=domains,
+                naming=knowledge.patterns.naming,
+                structure=knowledge.patterns.structure,
+                conventions=knowledge.patterns.conventions,
+                statistics=knowledge.statistics,
+                version=knowledge.version
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error saving knowledge: {e}")
+            return False
 
     def _tech_to_dict(self, t: TechInfo) -> dict:
         """Convert TechInfo to dict."""
@@ -328,39 +306,23 @@ class KnowledgeStore:
     # --- Expert Index ---
 
     def load_index(self) -> Optional[ExpertIndex]:
-        """Load expert index from JSON."""
-        if not self.index_file.exists():
+        """Load expert index from database."""
+        data = self._repo.load_expert_index()
+        if not data:
             return None
 
         try:
-            data = json.loads(self.index_file.read_text(encoding="utf-8"))
             return self._dict_to_index(data)
         except Exception as e:
-            logger.warning(f"Error loading expert_index.json: {e}")
+            logger.warning(f"Error loading expert index: {e}")
             return None
 
     def save_index(self, index: ExpertIndex) -> bool:
-        """Save expert index to JSON."""
-        self._ensure_dir()
-
+        """Save expert index to database."""
         try:
             index.last_updated = datetime.now().isoformat()
-            data = self._index_to_dict(index)
-            self.index_file.write_text(
-                json.dumps(data, indent=2),
-                encoding="utf-8"
-            )
-            return True
-        except Exception as e:
-            logger.error(f"Error saving expert_index.json: {e}")
-            return False
 
-    def _index_to_dict(self, idx: ExpertIndex) -> dict:
-        """Convert ExpertIndex to dict."""
-        return {
-            "version": idx.version,
-            "last_updated": idx.last_updated,
-            "experts": [
+            experts = [
                 {
                     "name": e.name,
                     "type": e.type,
@@ -372,11 +334,19 @@ class KnowledgeStore:
                     },
                     "weight": e.weight,
                 }
-                for e in idx.experts
-            ],
-            "keyword_map": idx.keyword_map,
-            "path_map": idx.path_map,
-        }
+                for e in index.experts
+            ]
+
+            self._repo.save_expert_index(
+                experts=experts,
+                keyword_map=index.keyword_map,
+                path_map=index.path_map,
+                version=index.version
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error saving expert index: {e}")
+            return False
 
     def _dict_to_index(self, data: dict) -> ExpertIndex:
         """Convert dict to ExpertIndex."""
@@ -404,12 +374,12 @@ class KnowledgeStore:
     # --- Scan Metadata ---
 
     def load_meta(self) -> Optional[ScanMeta]:
-        """Load scan metadata."""
-        if not self.meta_file.exists():
+        """Load scan metadata from database."""
+        data = self._repo.load_scan_meta()
+        if not data:
             return None
 
         try:
-            data = json.loads(self.meta_file.read_text(encoding="utf-8"))
             return ScanMeta(
                 scan_id=data.get("scan_id", ""),
                 started_at=data.get("started_at", ""),
@@ -417,35 +387,29 @@ class KnowledgeStore:
                 duration_seconds=data.get("duration_seconds", 0),
                 files_scanned=data.get("files_scanned", 0),
                 scan_type=data.get("scan_type", "full"),
-                trigger=data.get("trigger", "manual"),
+                trigger=data.get("trigger_type", "manual"),
                 experts_generated=data.get("experts_generated", []),
             )
         except Exception as e:
-            logger.warning(f"Error loading scan_meta.json: {e}")
+            logger.warning(f"Error loading scan metadata: {e}")
             return None
 
     def save_meta(self, meta: ScanMeta) -> bool:
-        """Save scan metadata."""
-        self._ensure_dir()
-
+        """Save scan metadata to database."""
         try:
-            data = {
-                "scan_id": meta.scan_id,
-                "started_at": meta.started_at,
-                "completed_at": meta.completed_at,
-                "duration_seconds": meta.duration_seconds,
-                "files_scanned": meta.files_scanned,
-                "scan_type": meta.scan_type,
-                "trigger": meta.trigger,
-                "experts_generated": meta.experts_generated,
-            }
-            self.meta_file.write_text(
-                json.dumps(data, indent=2),
-                encoding="utf-8"
+            self._repo.save_scan_meta(
+                scan_id=meta.scan_id,
+                started_at=meta.started_at,
+                completed_at=meta.completed_at,
+                duration_seconds=meta.duration_seconds,
+                files_scanned=meta.files_scanned,
+                scan_type=meta.scan_type,
+                trigger=meta.trigger,
+                experts_generated=meta.experts_generated
             )
             return True
         except Exception as e:
-            logger.error(f"Error saving scan_meta.json: {e}")
+            logger.error(f"Error saving scan metadata: {e}")
             return False
 
     # --- Context Helpers ---
@@ -535,7 +499,5 @@ class KnowledgeStore:
         return keywords
 
     def clear(self) -> None:
-        """Clear all knowledge files."""
-        for f in [self.codebase_file, self.index_file, self.meta_file]:
-            if f.exists():
-                f.unlink()
+        """Clear all knowledge data from database."""
+        self._repo.clear()

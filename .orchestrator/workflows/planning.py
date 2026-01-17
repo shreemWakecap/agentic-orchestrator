@@ -1,17 +1,17 @@
 """
 Knowledge-Enhanced Planning Workflow.
 
-Takes a user request and creates a plan.md file in specs/pending/.
+Takes a user request and creates a plan in the SQLite database.
 
 Flow:
-    User Request → Expert Selection → Planner Agent → specs/pending/NNN_feature-name/plan.md
+    User Request → Expert Selection → Planner Agent → Database (plans table)
 
 The planning workflow:
 1. Loads codebase knowledge (if available from scout)
 2. Selects relevant experts based on request keywords
 3. Gathers expert guidance for the planner
 4. Runs planner with enriched context
-5. Outputs a structured plan
+5. Saves structured plan to database
 
 Enhanced with:
 - Knowledge store integration for architecture context
@@ -27,6 +27,7 @@ from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.plan_parser import PlanParser, validate_plan_coverage
 from core.knowledge_store import KnowledgeStore
 from core.expert_selector import ExpertSelector
+from core.database import get_plan_repository, get_build_state_repository
 
 
 class PlanningWorkflow(Workflow):
@@ -47,11 +48,15 @@ class PlanningWorkflow(Workflow):
         self.project_root = project_root
         self._config = get_agent_config(project_root)
 
-        # Plans go to pending folder
+        # Output dir for any temporary files (kept for compatibility)
         output_dir = output_dir or project_root / ".orchestrator" / "specs" / "pending"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         super().__init__(name="Planning Workflow", output_dir=output_dir)
+
+        # Database repositories
+        self._plan_repo = get_plan_repository(project_root)
+        self._build_state_repo = get_build_state_repository(project_root)
 
         # Knowledge and expert systems
         self.knowledge_store = KnowledgeStore(project_root)
@@ -70,15 +75,8 @@ class PlanningWorkflow(Workflow):
 
     def _generate_plan_id(self, request: str) -> str:
         """Generate a unique plan ID from the request."""
-        # Get next number
-        existing = list(self.output_dir.glob("*"))
-        existing_nums = []
-        for p in existing:
-            match = re.match(r"(\d+)_", p.name)
-            if match:
-                existing_nums.append(int(match.group(1)))
-
-        next_num = max(existing_nums, default=0) + 1
+        # Get next number from database
+        next_num = self._plan_repo.get_next_plan_number()
 
         # Create slug from request
         words = re.sub(r"[^\w\s]", "", request.lower()).split()
@@ -127,11 +125,8 @@ class PlanningWorkflow(Workflow):
 
         # Generate plan ID
         plan_id = self._generate_plan_id(request)
-        plan_dir = self.output_dir / plan_id
-        plan_dir.mkdir(parents=True, exist_ok=True)
-        plan_file = plan_dir / "plan.md"
 
-        self.console.print(f"  [dim]Output: {plan_dir.name}/plan.md[/dim]")
+        self.console.print(f"  [dim]Plan ID: {plan_id}[/dim]")
 
         # Get codebase context (basic or from knowledge store)
         codebase_summary = self._get_codebase_summary()
@@ -228,7 +223,7 @@ Remember:
         if not coverage_ok:
             self.console.print(f"  [yellow]Warning: {coverage_msg}[/yellow]")
 
-        # Add metadata header
+        # Add metadata header for raw content
         full_content = f"""# Plan: {plan_id}
 
 Request: {request}
@@ -240,10 +235,52 @@ Status: pending
 {plan_content}
 """
 
-        # Write plan file
-        plan_file.write_text(full_content, encoding="utf-8")
+        # Save to database
+        goal = parse_result.plan.goal if parse_result.plan else ""
+        context = parse_result.plan.context if parse_result.plan else []
+        verify = parse_result.plan.verify if parse_result.plan else []
 
-        self.console.print(f"\n[green]{CHECK}[/green] Plan created: {plan_dir.name}/plan.md")
+        self._plan_repo.create(
+            plan_id=plan_id,
+            goal=goal,
+            request=request,
+            raw_content=full_content,
+            context=context,
+            verify=verify
+        )
+
+        # Save phases and steps to database
+        if parse_result.plan:
+            for phase in parse_result.plan.phases:
+                self._plan_repo.add_phase(
+                    plan_id=plan_id,
+                    phase_id=phase.phase_id,
+                    name=phase.name,
+                    phase_number=phase.phase_number,
+                    can_parallelize=phase.can_parallelize
+                )
+
+                for step_order, step in enumerate(phase.steps):
+                    self._plan_repo.add_step(
+                        plan_id=plan_id,
+                        phase_id=phase.phase_id,
+                        step_id=step.id,
+                        action=step.action.value,
+                        description=step.description,
+                        step_order=step_order,
+                        target=step.target,
+                        done=step.done,
+                        inputs=step.inputs,
+                        needs=step.needs
+                    )
+
+            # Create initial build state
+            self._build_state_repo.create(
+                plan_id=plan_id,
+                total_steps=parse_result.plan.total_steps
+            )
+
+        self.console.print(f"\n[green]{CHECK}[/green] Plan created: {plan_id}")
 
         if parse_result.plan:
             self.console.print(f"  Goal: [dim]{parse_result.plan.goal[:60]}...[/dim]" if len(parse_result.plan.goal) > 60 else f"  Goal: [dim]{parse_result.plan.goal}[/dim]")
@@ -251,10 +288,8 @@ Status: pending
 
         return WorkflowResult(
             success=True,
-            output_file=plan_file,
             data={
                 "plan_id": plan_id,
-                "plan_dir": str(plan_dir),
                 "steps": parse_result.plan.total_steps if parse_result.plan else 0,
                 "goal": parse_result.plan.goal if parse_result.plan else ""
             }

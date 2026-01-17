@@ -67,7 +67,7 @@ def _get_plan_repo() -> PlanRepository:
     """Get plan repository (lazy initialization)."""
     global _plan_repo
     if _plan_repo is None:
-        _plan_repo = get_plan_repository(PROJECT_ROOT)
+        _plan_repo = get_plan_repository()
     return _plan_repo
 
 
@@ -75,7 +75,7 @@ def _get_build_state_repo() -> BuildStateRepository:
     """Get build state repository (lazy initialization)."""
     global _build_state_repo
     if _build_state_repo is None:
-        _build_state_repo = get_build_state_repository(PROJECT_ROOT)
+        _build_state_repo = get_build_state_repository()
     return _build_state_repo
 
 
@@ -83,7 +83,7 @@ def _get_run_repo() -> RunRepository:
     """Get run repository (lazy initialization)."""
     global _run_repo
     if _run_repo is None:
-        _run_repo = get_run_repository(PROJECT_ROOT)
+        _run_repo = get_run_repository()
     return _run_repo
 
 

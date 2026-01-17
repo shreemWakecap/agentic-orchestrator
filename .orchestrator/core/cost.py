@@ -192,7 +192,7 @@ class CostEstimator:
         self.history: list[ActualCost] = []
 
         if project_root:
-            self._cost_repo = get_cost_repository(project_root)
+            self._cost_repo = get_cost_repository()
             self._load_history()
 
     def _load_history(self):

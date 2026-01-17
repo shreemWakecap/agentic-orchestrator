@@ -17,8 +17,13 @@ ACTIONS = {
 
 def main():
     if len(sys.argv) < 2 or sys.argv[1] in ['-h', '--help']:
-        print("SDLC Orchestrator\n")
-        print("Commands:", ", ".join(ACTIONS.keys()))
+        print("Agentic Orchestrator\n")
+        print("Commands:")
+        print("  plan <request>   Create implementation plan from request")
+        print("  build <path>     Execute plan and implement code")
+        print("  portal           Start web portal")
+        print("  list             List all plans")
+        print("  sync             Sync changes to remote")
         return 0
 
     cmd = sys.argv[1]

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 from core import Agent, Workflow, WorkflowResult, get_agent_config
+from core.plan_parser import PlanParser, ParseResult
 
 
 @dataclass
@@ -29,7 +30,8 @@ class BuildStep:
     action: str  # create, modify, delete, run
     target: str
     description: str
-    code_hint: str = ""
+    done: str = ""  # Verification criteria for this step
+    inputs: list[str] = field(default_factory=list)  # Input files
     dependencies: list[str] = field(default_factory=list)
     complexity: str = "simple"
     parallel_group: Optional[str] = None  # Group name for parallel execution
@@ -268,7 +270,8 @@ class BuildingWorkflow(Workflow):
 
     def _load_agents(self):
         """Load all agents needed for building."""
-        required = ["parser", "builder", "goal-verifier"]
+        # Note: parser agent removed - using deterministic core/plan_parser.py
+        required = ["builder", "goal-verifier"]
         optional = ["tester", "coordinator", "integrator"]
 
         for agent_name in required + optional:
@@ -978,33 +981,35 @@ STEPS:
 
 """
 
+        # Build input files section
+        inputs_section = ""
+        if step.inputs:
+            inputs_section = f"\nIN: {', '.join(step.inputs)}"
+
         full_context = f"""{goal_section}## Phase Context
 {phase_context[:1500]}
 
 ## Step Context
 {step_context}
-
-## Code Hint from Plan
-{step.code_hint[:1000] if step.code_hint else 'None provided'}
 """
 
         # Builder runs in agentic mode - it can actually write files
+        # Pass all step fields including DONE for verification
         result = self.run_agent(
             "builder",
             message=f"""Execute this build step:
 
-## CURRENT STEP
-**Action:** {step.action}
-**Target:** {step.target}
-**Description:** {step.description}
+STEP: {step.id} - {step.description[:60]}
+ACTION: {step.action}
+DO: {step.description}{inputs_section}
+OUT: {step.target}
+DONE: {step.done or 'Verify file exists and contains expected implementation'}
 
 IMPORTANT:
-1. Actually create/modify the files as specified using Write/Edit tools
-2. Verify the files were created with real content (not placeholders)
-3. Consider how this step contributes to the GOAL
-4. Flag any concerns about goal completion
-
-After completing, summarize what you did and how it helps achieve the goal.""",
+1. Read IN files first to understand patterns
+2. Create/modify files using Write/Edit tools
+3. After completing, verify the DONE criteria
+4. Report VERIFIED: yes|no based on your check""",
             context=full_context,
             show_progress=False
         )
@@ -2072,88 +2077,69 @@ Ensure all features work together correctly.""",
 
         self._save_state(plan_path)
 
-        # Phase 1: Parse the plan
+        # Phase 1: Parse the plan using DETERMINISTIC parser (no LLM)
         self.console.print("\n[bold]Phase 1:[/bold] Parsing plan...")
         plan_content = self._load_plan_content(plan_path)
 
-        # Validate plan has actual content (not just headers)
-        content_lines = [
-            line for line in plan_content.split('\n')
-            if line.strip() and not line.startswith('#') and not line.startswith('*') and not line.startswith('>')  and not line.startswith('---')
-        ]
-        if len(content_lines) < 5:
+        # Use deterministic regex-based parser (faster, more reliable than LLM)
+        parser = PlanParser()
+        parse_result = parser.parse(plan_content, plan_id=plan_path.stem)
+
+        if not parse_result.success:
+            error_msg = parse_result.error_summary()
             self.build_state.status = "failed"
-            self.build_state.last_error = "Plan is empty or incomplete"
+            self.build_state.last_error = f"Plan parsing failed: {error_msg}"
             self._save_state(plan_path)
             return WorkflowResult(
                 success=False,
-                error=f"Plan appears to be empty or incomplete. Expected implementation steps but found only {len(content_lines)} content lines. Please re-run the planning workflow to generate a complete plan."
+                error=f"Plan parsing failed: {error_msg}. Please check the plan format."
             )
 
-        parser_result = self.run_agent(
-            "parser",
-            message="Parse this implementation plan and extract structured build steps.",
-            context=f"## Plan File: {plan_path.name}\n\n{plan_content[:8000]}"
-        )
+        # Show warnings if any
+        if parse_result.warnings:
+            from core.symbols import WARNING
+            for warning in parse_result.warnings[:5]:
+                self.console.print(f"  [yellow]{WARNING}[/yellow] {warning}")
 
-        # Validate parser response (check for success AND placeholder detection)
-        valid, error = self._validate_agent_response("Parser", parser_result)
-        if not valid:
-            self.build_state.status = "failed"
-            self.build_state.last_error = error
-            self._save_state(plan_path)
-            return WorkflowResult(success=False, error=error)
-
-        parsed_data = self._parse_json_from_response(parser_result.content)
-
-        # Validate parser output structure
-        valid, error = self._validate_parsed_structure(parsed_data)
-        if not valid:
-            self.build_state.status = "failed"
-            self.build_state.last_error = error
-            self._save_state(plan_path)
-            return WorkflowResult(success=False, error=error)
-
-        # Build ParsedPlan from response
+        # Convert parsed plan to internal format
+        parsed_plan = parse_result.plan
         phases = []
-        for phase_data in parsed_data.get("phases", []):
+
+        for phase in parsed_plan.phases:
             steps = []
-            for step_data in phase_data.get("steps", []):
+            for step in phase.steps:
                 steps.append(BuildStep(
-                    id=step_data.get("id", f"step-{len(steps)}"),
-                    action=step_data.get("action", "create"),
-                    target=step_data.get("target", ""),
-                    description=step_data.get("description", ""),
-                    code_hint=step_data.get("code_hint", ""),
-                    dependencies=step_data.get("dependencies", []),
-                    complexity=step_data.get("estimated_complexity", "simple"),
-                    parallel_group=step_data.get("parallel_group"),
+                    id=step.id,
+                    action=step.action.value,  # Convert enum to string
+                    target=step.target,
+                    description=step.description,
+                    done=step.done,  # Pass DONE criteria
+                    inputs=step.inputs,  # Pass input files
+                    dependencies=step.needs,
+                    complexity="simple",
                 ))
 
             phases.append(BuildPhase(
-                id=phase_data.get("id", f"phase-{len(phases)}"),
-                name=phase_data.get("name", "Unknown Phase"),
+                id=phase.id,
+                name=phase.name,
                 steps=steps,
-                can_parallelize=phase_data.get("can_parallelize", False),
-                parallel_groups=phase_data.get("parallel_groups", [])
+                can_parallelize=len(steps) > 1,
             ))
 
         plan = ParsedPlan(
-            plan_id=parsed_data.get("plan_id", plan_path.stem),
-            plan_type=parsed_data.get("plan_type", "simple"),
+            plan_id=parsed_plan.plan_id,
+            plan_type="simple" if len(phases) <= 1 else "complex",
             source_file=plan_path,
             phases=phases,
-            validation_commands=parsed_data.get("validation_commands", []),
-            sub_features=parsed_data.get("sub_features", []),
+            validation_commands=parsed_plan.verify,
             raw_content=plan_content
         )
 
         total_steps = sum(len(p.steps) for p in phases)
         from core.symbols import CHECK
-        self.console.print(f"  [green]{CHECK}[/green] parser complete")
-        self.console.print(f"  Plan type: [cyan]{plan.plan_type}[/cyan]")
-        self.console.print(f"  Phases: [cyan]{len(phases)}[/cyan]")
-        self.console.print(f"  Total steps: [cyan]{total_steps}[/cyan]")
+        self.console.print(f"  [green]{CHECK}[/green] parsed (deterministic)")
+        self.console.print(f"  Goal: [dim]{parsed_plan.goal[:60]}...[/dim]" if len(parsed_plan.goal) > 60 else f"  Goal: [dim]{parsed_plan.goal}[/dim]")
+        self.console.print(f"  Steps: [cyan]{total_steps}[/cyan]")
 
         # Store total steps in build state for progress tracking
         self.build_state.total_steps = total_steps

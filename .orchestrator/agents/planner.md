@@ -21,11 +21,8 @@ STEPS:
    DO: [Plain English instruction]
    IN: [Input files, or "none"]
    OUT: [Output file path]
-   DONE: [How to verify success]
+   DONE: [How to verify this step worked]
    NEEDS: [Step numbers, or "none"]
-
-VERIFY:
-- [Final validation command]
 ```
 
 ## Critical Rule: Complete Coverage
@@ -60,3 +57,4 @@ If the request has numbered items like (1), (2), (3)... you MUST create a step f
 - Don't be vague ("update the code" is not a step)
 - Don't skip the DONE field
 - Don't assume - cover explicit requirements
+- Don't create "verify" or "test" steps - use DONE field instead

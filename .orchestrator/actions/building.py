@@ -268,12 +268,14 @@ class BuildingWorkflow(Workflow):
 
     def _load_agents(self):
         """Load all agents needed for building."""
-        agents = ["parser", "builder", "tester", "coordinator", "integrator", "goal-verifier"]
-        for agent_name in agents:
+        required = ["parser", "builder", "goal-verifier"]
+        optional = ["tester", "coordinator", "integrator"]
+
+        for agent_name in required + optional:
             try:
                 self.register_agent(Agent.load(agent_name, self.project_root))
             except FileNotFoundError:
-                if agent_name != "goal-verifier":  # goal-verifier is optional
+                if agent_name in required:
                     self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
 
     def _extract_goal_context(self, plan_content: str) -> GoalContext:
@@ -331,7 +333,25 @@ class BuildingWorkflow(Workflow):
 
         self.console.print("\n[bold]Goal Verification:[/bold] Checking if goal is achieved...")
 
+        # Collect all files affected from completed steps
+        all_files = set()
+        for step_id in self.build_state.completed_steps:
+            step_state = self.build_state.step_states.get(step_id)
+            if step_state:
+                # Handle both StepState objects and dicts
+                files = getattr(step_state, 'files_affected', None) or step_state.get('files_affected', [])
+                if files:
+                    all_files.update(files)
+
         # Build verification context
+        criteria_section = ""
+        if goal_context.verify_commands:
+            criteria_section = f"""
+## VERIFICATION CRITERIA
+{chr(10).join(f'- {cmd}' for cmd in goal_context.verify_commands)}
+"""
+
+        files_list = ', '.join(sorted(all_files)) if all_files else 'None'
         verification_prompt = f"""Analyze if the following GOAL has been fully achieved:
 
 ## GOAL
@@ -339,13 +359,9 @@ class BuildingWorkflow(Workflow):
 
 ## ORIGINAL REQUEST
 {goal_context.original_request}
-
-## VERIFICATION CRITERIA
-{chr(10).join(f'- {cmd}' for cmd in goal_context.verify_commands)}
-
-## FILES CREATED/MODIFIED
-Created: {', '.join(self.build_state.files_created) if self.build_state.files_created else 'None'}
-Modified: {', '.join(self.build_state.files_modified) if self.build_state.files_modified else 'None'}
+{criteria_section}
+## FILES AFFECTED
+{files_list}
 
 ## TASK
 1. Check if all numbered requirements from the request are implemented
@@ -1158,11 +1174,32 @@ After completing, summarize what you did and how it helps achieve the goal.""",
                     self.build_state.set_step_state(step_state)
                     self.build_state.failed_steps.append(step.id)
                     self.build_state.last_error = f"Step {step.id}: {result.error}"
-                    self.build_state.status = "paused"  # Paused, not failed - can resume
                     self._save_state(plan_path)
 
                     self.console.print(f"  [red]{CROSS}[/red] {result.error or 'Failed'}")
-                    self.console.print(f"\n[yellow]Build paused at step {step.id}[/yellow]")
+
+                    # Check if goal is achieved despite step failure
+                    self.console.print(f"\n[yellow]Step failed - checking if goal achieved...[/yellow]")
+                    goal_context = self._extract_goal_context(plan.raw_content)
+                    if goal_context.goal or goal_context.original_request:
+                        goal_achieved, _ = self._verify_goal_achieved(goal_context)
+
+                        if goal_achieved:
+                            self.console.print(f"\n[green]Goal achieved despite step failure![/green]")
+                            self.build_state.status = "completed"
+                            self._save_state(plan_path)
+
+                            final_path = self._archive_plan(plan_path, "completed")
+                            return WorkflowResult(
+                                success=True,
+                                steps_completed=steps_completed,
+                                data={"goal_achieved": True}
+                            )
+
+                    # Goal not achieved - pause for retry
+                    self.build_state.status = "paused"
+                    self._save_state(plan_path)
+
                     self.console.print(f"[dim]Run build again to retry from this step[/dim]")
 
                     return WorkflowResult(
@@ -1347,13 +1384,37 @@ After completing, summarize what you did and how it helps achieve the goal.""",
 
             self._save_state(plan_path)
 
-            # If any step in wave failed, pause build
+            # If any step in wave failed, check if GOAL is still achieved
             if wave_failed:
+                self.console.print(f"\n[yellow]Wave {wave_idx + 1} had failures - checking if goal achieved...[/yellow]")
+
+                # Check if goal is achieved despite failures
+                goal_context = self._extract_goal_context(plan.raw_content)
+                if goal_context.goal or goal_context.original_request:
+                    goal_achieved, _ = self._verify_goal_achieved(goal_context)
+
+                    if goal_achieved:
+                        # Goal achieved! Mark as completed despite step failures
+                        self.console.print(f"\n[green]Goal achieved despite step failures![/green]")
+                        self.build_state.status = "completed"
+                        self._save_state(plan_path)
+
+                        final_path = self._archive_plan(plan_path, "completed")
+                        return WorkflowResult(
+                            success=True,
+                            steps_completed=steps_completed,
+                            data={
+                                "completed_steps": len(self.build_state.completed_steps),
+                                "total_steps": self.build_state.total_steps,
+                                "goal_achieved": True,
+                            }
+                        )
+
+                # Goal not achieved - pause for retry
                 self.build_state.status = "paused"
                 self.build_state.last_error = f"Wave {wave_idx + 1} had failures"
                 self._save_state(plan_path)
 
-                self.console.print(f"\n[yellow]Build paused at wave {wave_idx + 1}[/yellow]")
                 self.console.print(f"[dim]Run build again to retry failed steps[/dim]")
 
                 return WorkflowResult(
@@ -1900,7 +1961,10 @@ After completing, summarize what you did and how it helps achieve the goal.""",
         return results
 
     def _run_phase_tests(self, plan: ParsedPlan, phase_idx: int) -> bool:
-        """Run tests after a phase."""
+        """Run tests after a phase. Skip if tester agent not available."""
+        if "tester" not in self.agents:
+            return True  # Skip tests if no tester agent
+
         commands = plan.validation_commands or ["echo 'No tests configured'"]
 
         result = self.run_agent(

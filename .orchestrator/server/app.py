@@ -144,6 +144,12 @@ async def run_detail(request: Request, run_id: str):
     })
 
 
+@app.get("/hello")
+async def hello():
+    """Return a simple Hello World message."""
+    return {"message": "Hello World"}
+
+
 # ============== API Routes ==============
 
 @app.get("/api/hello")

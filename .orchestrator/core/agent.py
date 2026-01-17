@@ -53,17 +53,16 @@ TRANSIENT_ERRORS = (
 # Expected output markers for each agent type - used to validate responses
 # If an agent's output doesn't contain these markers, it's likely a placeholder
 AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
-    # New simplified text formats
+    # All agents use KEY: VALUE text format
     "scout": ["PROJECT_TYPE:", "STRUCTURE:"],
     "architect": ["APPROACH:", "FILES_TO_"],
     "planner": ["GOAL:", "STEPS:", "DO:"],
     "synthesizer": ["GOAL:", "STEPS:"],
-    # JSON-output agents
-    "validator": ['"status"', '"score"'],
-    "analyzer": ['"complexity"', '"strategy"'],
-    "decomposer": ['"sub_features"', '"execution_order"'],
+    "validator": ["STATUS:", "SCORE:"],
+    "analyzer": ["COMPLEXITY:", "STRATEGY:"],
+    "decomposer": ["SUB_FEATURES:", "EXECUTION_ORDER:"],
     "parser": ['"phases"', '"steps"'],
-    "syncer": ['"commit_message"', '"pr_description"'],
+    "syncer": ["COMMIT:", "PR_SUMMARY:"],
     # Markdown-output agents
     "fixer": ["## Fix", "##"],
     "reviewer": ["## Goals", "## Summary"],
@@ -71,8 +70,8 @@ AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
     "builder": [],
     "tester": [],
     "integrator": [],
-    # Expert agents (JSON output for code review)
-    "python": ['"findings"', '"summary"', '"score"'],
+    # Expert agents (KEY: VALUE output for code review)
+    "python": ["FINDINGS:", "SUMMARY:", "SCORE:"],
 }
 
 # Placeholder patterns that indicate the agent didn't follow its role

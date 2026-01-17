@@ -26,11 +26,10 @@ WARNINGS:
 
 1. Every step has DO (clear instruction)
 2. Every step has OUT (output file/result)
-3. Every step has DONE (verification)
+3. Every step has DONE (verification for that step)
 4. NEEDS references valid steps only
 5. No circular dependencies
-6. VERIFY section exists
-7. Coverage: if request has (1), (2), (3)... plan must cover each
+6. Coverage: if request has (1), (2), (3)... plan must cover each
 
 ## Warning Checks (Non-blocking)
 

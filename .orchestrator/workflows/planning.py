@@ -27,7 +27,7 @@ from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.plan_parser import PlanParser, validate_plan_coverage
 from core.knowledge_store import KnowledgeStore
 from core.expert_selector import ExpertSelector
-from core.database import get_plan_repository, get_build_state_repository
+from db import get_plan_repository, get_build_state_repository
 
 
 class PlanningWorkflow(Workflow):

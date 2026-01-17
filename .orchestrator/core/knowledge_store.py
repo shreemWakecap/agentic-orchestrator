@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from .database import get_knowledge_repository, KnowledgeRepository
+from db import get_knowledge_repository, KnowledgeRepository
 
 logger = logging.getLogger(__name__)
 

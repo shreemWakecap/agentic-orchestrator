@@ -26,7 +26,7 @@ from .plan_parser import (
     parse_plan_file,
     validate_plan_coverage,
 )
-from .database import (
+from db import (
     Database,
     PlanRepository,
     BuildStateRepository,

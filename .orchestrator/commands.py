@@ -52,9 +52,9 @@ def run_setup(args=None) -> int:
 
     # Initialize SQLite database
     try:
-        from core.database import get_database
-        db = get_database(PROJECT_ROOT)
-        print(f"  [+] Database initialized: {db.db_path}")
+        from db import get_database, get_db_path
+        db = get_database()
+        print(f"  [+] Database initialized: {get_db_path()}")
     except Exception as e:
         print(f"  [!] Database error: {e}")
         ok = False

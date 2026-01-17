@@ -32,7 +32,7 @@ from workflows.planning import PlanningWorkflow
 from workflows.building import BuildingWorkflow
 from workflows.syncing import SyncingWorkflow
 from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
-from core.database import (
+from db import (
     get_plan_repository,
     get_build_state_repository,
     get_run_repository,

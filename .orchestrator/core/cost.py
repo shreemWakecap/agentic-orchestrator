@@ -8,7 +8,7 @@ from pathlib import Path
 import json
 import re
 
-from .database import get_cost_repository, CostRepository
+from db import get_cost_repository, CostRepository
 
 
 class Model(Enum):

@@ -2,124 +2,362 @@
 
 {% block title %}Run {{ run.id }} - SDLC Orchestrator{% endblock %}
 
+{% block head %}
+<style>
+    /* Animated Progress Bar */
+    .progress-bar-animated {
+        position: relative;
+        overflow: hidden;
+    }
+    .progress-bar-animated::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(
+            90deg,
+            transparent,
+            rgba(255, 255, 255, 0.4),
+            transparent
+        );
+        animation: progressShimmer 2s infinite;
+    }
+    @keyframes progressShimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+
+    /* Progress glow effect */
+    .progress-glow {
+        box-shadow: 0 0 10px rgba(59, 130, 246, 0.4), 0 0 20px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Event log item hover */
+    .event-item {
+        transition: all 0.2s ease;
+    }
+    .event-item:hover {
+        background: var(--bg-tertiary);
+        transform: translateX(4px);
+    }
+
+    /* Status pulse animation */
+    .status-pulse {
+        animation: statusPulse 2s ease-in-out infinite;
+    }
+    @keyframes statusPulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
+    /* Stagger animation for event items */
+    .event-item:nth-child(1) { animation-delay: 0.05s; }
+    .event-item:nth-child(2) { animation-delay: 0.1s; }
+    .event-item:nth-child(3) { animation-delay: 0.15s; }
+    .event-item:nth-child(4) { animation-delay: 0.2s; }
+    .event-item:nth-child(5) { animation-delay: 0.25s; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div id="run-detail-page" class="px-4 py-6 sm:px-0" data-run-status="{{ run.status }}" data-run-id="{{ run.id }}">
-    <!-- Header -->
-    <div class="mb-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-gray-900">{{ run.workflow|title }} Run</h1>
-                <p class="mt-1 text-sm text-gray-600">Run ID: {{ run.id }}</p>
+    <!-- Header with Gradient Background -->
+    <div class="mb-8 animate-fade-in-up">
+        <div class="glass-card p-6">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <!-- Workflow Icon -->
+                    <div class="w-14 h-14 rounded-xl gradient-primary flex items-center justify-center shadow-glow-primary">
+                        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-primary dark:text-primary">{{ run.workflow|title }} Run</h1>
+                        <p class="mt-1 text-sm text-tertiary font-mono">{{ run.id }}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <span id="status-badge" class="inline-flex items-center px-4 py-2 rounded-xl text-sm font-semibold shadow-soft transition-all
+                        {% if run.status == 'completed' %}bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400
+                        {% elif run.status == 'running' %}bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400 status-pulse
+                        {% elif run.status == 'pending' %}bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400
+                        {% else %}bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400{% endif %}">
+                        {% if run.status == 'completed' %}
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                        </svg>
+                        {% elif run.status == 'running' %}
+                        <svg class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {% elif run.status == 'pending' %}
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path>
+                        </svg>
+                        {% else %}
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+                        </svg>
+                        {% endif %}
+                        {{ run.status|title }}
+                    </span>
+                </div>
             </div>
-            <span id="status-badge" class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium
-                {% if run.status == 'completed' %}bg-green-100 text-green-800
-                {% elif run.status == 'running' %}bg-blue-100 text-blue-800
-                {% elif run.status == 'pending' %}bg-yellow-100 text-yellow-800
-                {% else %}bg-red-100 text-red-800{% endif %}">
-                {{ run.status }}
-            </span>
         </div>
     </div>
 
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <!-- Run Info -->
-        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6">
-                <h3 class="text-lg font-medium text-gray-900">Run Details</h3>
+        <!-- Run Info Card -->
+        <div class="glass-card overflow-hidden animate-fade-in-up" style="animation-delay: 0.1s;">
+            <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-secondary-50 to-transparent dark:from-secondary-800/30">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-primary dark:text-primary">Run Details</h3>
+                </div>
             </div>
-            <div class="border-t border-gray-200">
-                <dl>
-                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-600">Workflow</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.workflow|title }}</dd>
-                    </div>
-                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-600">Started</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.started_at[:19] }}</dd>
-                    </div>
-                    {% if run.completed_at %}
-                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-600">Completed</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.completed_at[:19] }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if run.description %}
-                    <div class="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-600">Description</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.description }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if run.output_file %}
-                    <div class="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-gray-600">Output</dt>
-                        <dd class="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{{ run.output_file }}</dd>
-                    </div>
-                    {% endif %}
-                    {% if run.error %}
-                    <div class="bg-red-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                        <dt class="text-sm font-medium text-red-500">Error</dt>
-                        <dd class="mt-1 text-sm text-red-900 sm:mt-0 sm:col-span-2">{{ run.error }}</dd>
-                    </div>
-                    {% endif %}
-                </dl>
+            <div class="divide-y divide-light">
+                <div class="px-6 py-4 flex items-center justify-between hover:bg-tertiary transition-colors">
+                    <dt class="text-sm font-medium text-tertiary flex items-center">
+                        <svg class="w-4 h-4 mr-2 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
+                        </svg>
+                        Workflow
+                    </dt>
+                    <dd class="text-sm font-semibold text-primary dark:text-primary">{{ run.workflow|title }}</dd>
+                </div>
+                <div class="px-6 py-4 flex items-center justify-between hover:bg-tertiary transition-colors">
+                    <dt class="text-sm font-medium text-tertiary flex items-center">
+                        <svg class="w-4 h-4 mr-2 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Started
+                    </dt>
+                    <dd class="text-sm font-mono text-primary dark:text-primary">{{ run.started_at[:19] }}</dd>
+                </div>
+                {% if run.completed_at %}
+                <div class="px-6 py-4 flex items-center justify-between hover:bg-tertiary transition-colors">
+                    <dt class="text-sm font-medium text-tertiary flex items-center">
+                        <svg class="w-4 h-4 mr-2 text-success-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        Completed
+                    </dt>
+                    <dd class="text-sm font-mono text-primary dark:text-primary">{{ run.completed_at[:19] }}</dd>
+                </div>
+                {% endif %}
+                {% if run.description %}
+                <div class="px-6 py-4 hover:bg-tertiary transition-colors">
+                    <dt class="text-sm font-medium text-tertiary flex items-center mb-2">
+                        <svg class="w-4 h-4 mr-2 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"></path>
+                        </svg>
+                        Description
+                    </dt>
+                    <dd class="text-sm text-primary dark:text-primary pl-6">{{ run.description }}</dd>
+                </div>
+                {% endif %}
+                {% if run.output_file %}
+                <div class="px-6 py-4 hover:bg-tertiary transition-colors">
+                    <dt class="text-sm font-medium text-tertiary flex items-center mb-2">
+                        <svg class="w-4 h-4 mr-2 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        Output
+                    </dt>
+                    <dd class="text-sm font-mono text-primary dark:text-primary pl-6 break-all">{{ run.output_file }}</dd>
+                </div>
+                {% endif %}
+                {% if run.error %}
+                <div class="px-6 py-4 bg-danger-50 dark:bg-danger-900/20">
+                    <dt class="text-sm font-medium text-danger-600 dark:text-danger-400 flex items-center mb-2">
+                        <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        Error
+                    </dt>
+                    <dd class="text-sm text-danger-700 dark:text-danger-300 pl-6">{{ run.error }}</dd>
+                </div>
+                {% endif %}
             </div>
         </div>
 
-        <!-- Progress -->
-        <div class="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div class="px-4 py-5 sm:px-6">
-                <h3 class="text-lg font-medium text-gray-900">Progress</h3>
-            </div>
-            <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
-                <div class="mb-4">
-                    <div class="flex justify-between text-sm text-gray-600 mb-1">
-                        <span>Progress</span>
-                        <span id="progress-percent">{{ run.progress }}%</span>
+        <!-- Progress Card -->
+        <div class="glass-card overflow-hidden animate-fade-in-up" style="animation-delay: 0.2s;">
+            <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-primary-50 to-transparent dark:from-primary-900/20">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div id="progress-bar" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: {{ run.progress }}%"></div>
+                    <h3 class="text-lg font-semibold text-primary dark:text-primary">Progress</h3>
+                </div>
+            </div>
+            <div class="px-6 py-6">
+                <!-- Progress Percentage Display -->
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm font-medium text-tertiary">Completion</span>
+                    <div class="flex items-center space-x-2">
+                        <span id="progress-percent" class="text-2xl font-bold text-gradient-primary">{{ run.progress }}%</span>
                     </div>
                 </div>
+
+                <!-- Animated Progress Bar -->
+                <div class="relative mb-6">
+                    <div class="w-full bg-secondary-200 dark:bg-secondary-700 rounded-full h-4 overflow-hidden">
+                        <div id="progress-bar"
+                             class="h-4 rounded-full transition-all duration-500 ease-out gradient-primary progress-bar-animated {% if run.status == 'running' %}progress-glow{% endif %}"
+                             style="width: {{ run.progress }}%">
+                        </div>
+                    </div>
+                    <!-- Progress markers -->
+                    <div class="flex justify-between mt-2 px-1">
+                        <span class="text-xs text-muted">0%</span>
+                        <span class="text-xs text-muted">25%</span>
+                        <span class="text-xs text-muted">50%</span>
+                        <span class="text-xs text-muted">75%</span>
+                        <span class="text-xs text-muted">100%</span>
+                    </div>
+                </div>
+
                 {% if run.current_step %}
-                <p class="text-sm text-gray-600">
-                    Current step: <span id="current-step" class="font-medium">{{ run.current_step }}</span>
-                </p>
+                <div class="p-4 rounded-xl bg-secondary-50 dark:bg-secondary-800/50 border border-light">
+                    <div class="flex items-center space-x-3">
+                        <div class="flex-shrink-0">
+                            <div class="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-primary-600 dark:text-primary-400 {% if run.status == 'running' %}animate-pulse{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs font-medium text-tertiary uppercase tracking-wide">Current Step</p>
+                            <p id="current-step" class="text-sm font-semibold text-primary dark:text-primary">{{ run.current_step }}</p>
+                        </div>
+                    </div>
+                </div>
                 {% endif %}
             </div>
         </div>
     </div>
 
-    <!-- Events Log -->
-    <div class="mt-6 bg-white shadow overflow-hidden sm:rounded-lg">
-        <div class="px-4 py-5 sm:px-6">
-            <h3 class="text-lg font-medium text-gray-900">Event Log</h3>
-        </div>
-        <div class="border-t border-gray-200">
-            <div id="events-log" class="divide-y divide-gray-200 max-h-96 overflow-y-auto">
-                {% for event in run.events %}
-                <div class="px-4 py-3 text-sm fade-in">
-                    <span class="text-gray-600">{{ event.timestamp[:19] if event.timestamp else '' }}</span>
-                    <span class="ml-2 px-2 py-0.5 rounded text-xs font-medium
-                        {% if event.type == 'error' %}bg-red-100 text-red-800
-                        {% elif event.type == 'complete' %}bg-green-100 text-green-800
-                        {% else %}bg-gray-100 text-gray-800{% endif %}">
-                        {{ event.type }}
-                    </span>
-                    {% if event.step %}
-                    <span class="ml-2 text-gray-700">{{ event.step }}</span>
-                    {% endif %}
-                    {% if event.message %}
-                    <span class="ml-2 text-gray-700">{{ event.message }}</span>
-                    {% endif %}
+    <!-- Events Log Card -->
+    <div class="mt-6 glass-card overflow-hidden animate-fade-in-up" style="animation-delay: 0.3s;">
+        <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-secondary-50 to-transparent dark:from-secondary-800/30">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 rounded-lg bg-secondary-100 dark:bg-secondary-700 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-secondary-600 dark:text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-primary dark:text-primary">Event Log</h3>
                 </div>
-                {% endfor %}
+                <span class="text-xs font-medium text-tertiary px-3 py-1 rounded-full bg-secondary-100 dark:bg-secondary-700">
+                    {{ run.events|length }} events
+                </span>
             </div>
+        </div>
+        <div id="events-log" class="divide-y divide-light max-h-96 overflow-y-auto scrollbar-modern">
+            {% for event in run.events %}
+            <div class="event-item px-6 py-4 animate-fade-in-up">
+                <div class="flex items-start space-x-4">
+                    <!-- Event Type Icon -->
+                    <div class="flex-shrink-0 mt-0.5">
+                        {% if event.type == 'error' %}
+                        <div class="w-8 h-8 rounded-lg bg-danger-100 dark:bg-danger-900/30 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-danger-600 dark:text-danger-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        {% elif event.type == 'complete' or event.type == 'completed' %}
+                        <div class="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-success-600 dark:text-success-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        {% elif event.type == 'warning' %}
+                        <div class="w-8 h-8 rounded-lg bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-warning-600 dark:text-warning-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        {% elif event.type == 'start' or event.type == 'started' %}
+                        <div class="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        {% else %}
+                        <div class="w-8 h-8 rounded-lg bg-secondary-100 dark:bg-secondary-700 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-secondary-600 dark:text-secondary-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                            </svg>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Event Content -->
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center flex-wrap gap-2 mb-1">
+                            <!-- Type Badge -->
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold
+                                {% if event.type == 'error' %}bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400
+                                {% elif event.type == 'complete' or event.type == 'completed' %}bg-success-100 text-success-700 dark:bg-success-900/30 dark:text-success-400
+                                {% elif event.type == 'warning' %}bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400
+                                {% elif event.type == 'start' or event.type == 'started' %}bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400
+                                {% else %}bg-secondary-100 text-secondary-700 dark:bg-secondary-700 dark:text-secondary-300{% endif %}">
+                                {{ event.type|upper }}
+                            </span>
+
+                            {% if event.step %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-secondary-100 text-secondary-600 dark:bg-secondary-700 dark:text-secondary-300">
+                                {{ event.step }}
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        {% if event.message %}
+                        <p class="text-sm text-primary dark:text-primary">{{ event.message }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Timestamp -->
+                    <div class="flex-shrink-0 text-right">
+                        <time class="text-xs font-mono text-muted whitespace-nowrap">
+                            {{ event.timestamp[:19] if event.timestamp else '' }}
+                        </time>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="px-6 py-12 text-center">
+                <div class="w-16 h-16 mx-auto rounded-full bg-secondary-100 dark:bg-secondary-700 flex items-center justify-center mb-4">
+                    <svg class="w-8 h-8 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                </div>
+                <p class="text-secondary-500 dark:text-secondary-400">No events recorded yet</p>
+            </div>
+            {% endfor %}
         </div>
     </div>
 
-    <div class="mt-6">
-        <a href="/runs" class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
-            &larr; Back to Runs
+    <!-- Back Button -->
+    <div class="mt-8 animate-fade-in-up" style="animation-delay: 0.4s;">
+        <a href="/runs" class="btn btn-secondary inline-flex items-center space-x-2 hover-lift">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            </svg>
+            <span>Back to Runs</span>
         </a>
     </div>
 </div>

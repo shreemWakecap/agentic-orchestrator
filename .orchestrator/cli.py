@@ -14,7 +14,6 @@ WORKFLOWS = {
 
 # Commands: simple utilities
 COMMANDS = {
-    'list': 'list_plans',
     'portal': 'run_portal',
     'setup': 'run_setup',
 }
@@ -28,7 +27,6 @@ def main():
         print("  build <path>     Execute plan and implement code")
         print("  sync             Sync changes: create PR, merge, and pull to local")
         print("\nCommands:")
-        print("  list             List all plans")
         print("  portal           Start web portal")
         print("  setup            Initialize orchestrator environment")
         return 0

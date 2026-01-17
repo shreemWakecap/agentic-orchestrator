@@ -10,12 +10,15 @@ WORKFLOWS = {
     'plan': 'planning',
     'build': 'building',
     'sync': 'syncing',
+    'scout': 'scouting',
 }
 
 # Commands: simple utilities
 COMMANDS = {
     'portal': 'run_portal',
     'setup': 'run_setup',
+    'experts': 'run_experts',
+    'knowledge': 'run_knowledge',
 }
 
 
@@ -26,9 +29,12 @@ def main():
         print("  plan <request>   Create implementation plan from request")
         print("  build <path>     Execute plan and implement code")
         print("  sync             Sync changes: create PR, merge, and pull to local")
+        print("  scout            Analyze codebase and build knowledge store")
         print("\nCommands:")
         print("  portal           Start web portal")
         print("  setup            Initialize orchestrator environment")
+        print("  experts          Manage expert agents (list, create, refresh)")
+        print("  knowledge        View knowledge store status")
         return 0
 
     cmd = sys.argv[1]

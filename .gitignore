@@ -21,6 +21,11 @@ Thumbs.db
 *.log
 logs/
 
+# SQLite temporary files
+*.db-shm
+*.db-wal
+*.db-journal
+
 # Environment
 .env
 .env.local

@@ -1,4 +1,4 @@
-"""Simple CLI command - utilities that don't require workflow orchestration."""
+"""Simple CLI commands - utilities that don't require workflow orchestration."""
 import shutil
 import socket
 from pathlib import Path

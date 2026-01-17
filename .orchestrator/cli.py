@@ -23,7 +23,7 @@ def main():
         print("  build <path>     Execute plan and implement code")
         print("  portal           Start web portal")
         print("  list             List all plans")
-        print("  sync             Sync changes to remote")
+        print("  sync             Sync changes: create PR, merge, and pull to local")
         return 0
 
     cmd = sys.argv[1]

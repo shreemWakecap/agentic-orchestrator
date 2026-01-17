@@ -3,191 +3,311 @@
 {% block title %}Dashboard - SDLC Orchestrator{% endblock %}
 
 {% block content %}
-<div class="px-4 py-6 sm:px-0">
+<div class="px-4 py-8 sm:px-0">
     <!-- Header -->
-    <div class="mb-8">
-        <h1 class="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p class="mt-1 text-sm text-gray-600">Overview of your SDLC orchestration status</p>
+    <div class="mb-10">
+        <h1 class="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p class="mt-2 text-base text-gray-600">Monitor your SDLC orchestration workflows and manage plans</p>
     </div>
 
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5 mb-8">
-        <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <svg class="h-6 w-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-600 truncate">Pending</dt>
-                            <dd class="text-lg font-medium text-gray-900">{{ counts.pending }}</dd>
-                        </dl>
-                    </div>
-                </div>
+    <!-- Stats Cards - 4 columns with improved design -->
+    <div class="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-4 mb-10">
+        <!-- Pending -->
+        <a href="/plans?state=pending" class="stat-card group">
+            <div class="stat-icon bg-amber-100 group-hover:bg-amber-200 transition-colors">
+                <svg class="h-6 w-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
             </div>
-        </div>
+            <div class="stat-value text-gray-900">{{ counts.pending }}</div>
+            <div class="stat-label">Pending Plans</div>
+        </a>
 
-        <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <svg class="h-6 w-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-600 truncate">In Progress</dt>
-                            <dd class="text-lg font-medium text-gray-900">{{ counts.in_progress }}</dd>
-                        </dl>
-                    </div>
-                </div>
+        <!-- In Progress -->
+        <a href="/plans?state=in-progress" class="stat-card group">
+            <div class="stat-icon bg-blue-100 group-hover:bg-blue-200 transition-colors">
+                <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
             </div>
-        </div>
+            <div class="stat-value text-gray-900">{{ counts.in_progress }}</div>
+            <div class="stat-label">In Progress</div>
+        </a>
 
-        <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <svg class="h-6 w-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-600 truncate">Completed</dt>
-                            <dd class="text-lg font-medium text-gray-900">{{ counts.completed }}</dd>
-                        </dl>
-                    </div>
-                </div>
+        <!-- Completed -->
+        <a href="/plans?state=completed" class="stat-card group">
+            <div class="stat-icon bg-emerald-100 group-hover:bg-emerald-200 transition-colors">
+                <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
             </div>
-        </div>
+            <div class="stat-value text-gray-900">{{ counts.completed }}</div>
+            <div class="stat-label">Completed</div>
+        </a>
 
-        <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <svg class="h-6 w-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-600 truncate">Failed</dt>
-                            <dd class="text-lg font-medium text-gray-900">{{ counts.failed }}</dd>
-                        </dl>
-                    </div>
-                </div>
+        <!-- Failed -->
+        <a href="/plans?state=failed" class="stat-card group">
+            <div class="stat-icon bg-red-100 group-hover:bg-red-200 transition-colors">
+                <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
             </div>
-        </div>
-
-        <div class="bg-white overflow-hidden shadow rounded-lg">
-            <div class="p-5">
-                <div class="flex items-center">
-                    <div class="flex-shrink-0">
-                        <svg class="h-6 w-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                        </svg>
-                    </div>
-                    <div class="ml-5 w-0 flex-1">
-                        <dl>
-                            <dt class="text-sm font-medium text-gray-600 truncate">Reviews</dt>
-                            <dd class="text-lg font-medium text-gray-900">{{ counts.reviews }}</dd>
-                        </dl>
-                    </div>
-                </div>
-            </div>
-        </div>
+            <div class="stat-value text-gray-900">{{ counts.failed }}</div>
+            <div class="stat-label">Failed</div>
+        </a>
     </div>
 
-    <!-- Quick Actions -->
-    <div class="bg-white shadow rounded-lg mb-8">
-        <div class="px-4 py-5 sm:p-6">
-            <h3 class="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-            <form id="plan-form" class="flex gap-4">
-                <input type="text" id="plan-description" name="description"
-                       class="flex-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                       placeholder="Enter feature description (e.g., Add user authentication)">
-                <button type="submit"
-                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+    <!-- Quick Actions - Two separate cards -->
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-10">
+        <!-- Create New Plan Card -->
+        <div class="card p-6">
+            <div class="flex items-start mb-4">
+                <div class="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Create New Plan</h3>
+                    <p class="text-sm text-gray-500">Generate an AI-powered implementation plan for a feature</p>
+                </div>
+            </div>
+            <form id="plan-form" class="space-y-4">
+                <div>
+                    <label for="plan-description" class="block text-sm font-medium text-gray-700 mb-1">
+                        Feature Description
+                    </label>
+                    <input type="text" id="plan-description" name="description"
+                           class="input"
+                           placeholder="e.g., Add user authentication with JWT tokens">
+                </div>
+                <button type="submit" class="btn btn-primary w-full sm:w-auto">
+                    <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
                     Create Plan
                 </button>
             </form>
         </div>
+
+        <!-- Sync Changes Card -->
+        <div class="card p-6">
+            <div class="flex items-start mb-4">
+                <div class="flex-shrink-0 w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <svg class="h-5 w-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Sync to Remote</h3>
+                    <p class="text-sm text-gray-500">Commit local changes and create a pull request</p>
+                </div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <div class="flex items-center text-sm text-gray-600">
+                    <svg class="h-4 w-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    This will create a new branch, commit changes, and open a PR
+                </div>
+            </div>
+            <button type="button" id="sync-remote-btn" class="btn btn-secondary">
+                <svg class="h-4 w-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                Sync Remote
+            </button>
+        </div>
     </div>
 
+    <!-- Live Builds Section -->
+    <div class="card mb-10" id="live-builds-section">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center">
+                    <h2 class="text-xl font-semibold text-gray-900">Live Builds</h2>
+                    <span id="live-builds-indicator" class="ml-3 flex items-center text-sm text-gray-500" style="display: {% if active_runs %}flex{% else %}none{% endif %};">
+                        <span class="relative flex h-2.5 w-2.5 mr-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                        </span>
+                        Active
+                    </span>
+                </div>
+                <button id="refresh-builds-btn" type="button" class="btn btn-secondary btn-sm">
+                    <svg class="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+
+            <div id="live-builds-container">
+                {% if active_runs %}
+                <div class="space-y-4" id="live-builds-list">
+                    {% for run in active_runs %}
+                    <div class="border border-gray-200 rounded-xl p-5 live-build-card hover:border-gray-300 transition-colors"
+                         data-run-id="{{ run.id }}"
+                         data-run-status="{{ run.status }}"
+                         data-started-at="{{ run.started_at }}">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center mr-3">
+                                    <svg class="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <a href="/runs/{{ run.id }}" class="text-base font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                                        {{ run.workflow|title }} Workflow
+                                    </a>
+                                    <div class="text-xs text-gray-500 mt-0.5">ID: {{ run.id[:8] }}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <span class="text-sm font-mono text-gray-500 elapsed-time" data-started="{{ run.started_at }}">--:--</span>
+                                <span class="status-badge inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold
+                                    {% if run.status == 'completed' %}bg-emerald-100 text-emerald-700
+                                    {% elif run.status == 'running' %}bg-blue-100 text-blue-700
+                                    {% elif run.status == 'pending' %}bg-amber-100 text-amber-700
+                                    {% else %}bg-red-100 text-red-700{% endif %}">
+                                    {{ run.status|title }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar - Improved -->
+                        <div>
+                            <div class="flex items-center justify-between text-sm mb-2">
+                                <span class="current-step text-gray-600 font-medium">{{ run.current_step|default('Initializing...', true) }}</span>
+                                <span class="progress-percent font-semibold text-gray-900">{{ run.progress|default(0, true) }}%</span>
+                            </div>
+                            <div class="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                                <div class="progress-bar h-3 rounded-full transition-all duration-500 ease-out
+                                    {% if run.status == 'completed' %}bg-emerald-500
+                                    {% elif run.status == 'failed' %}bg-red-500
+                                    {% else %}bg-blue-500{% endif %}"
+                                     style="width: {{ run.progress|default(0, true) }}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Step Details -->
+                        {% if run.total_steps %}
+                        <div class="mt-3 flex items-center text-sm text-gray-500">
+                            <svg class="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                            </svg>
+                            Step {{ run.current_step_num|default(0, true) }} of {{ run.total_steps }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div id="no-builds-message" class="text-center py-12">
+                    <div class="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                        <svg class="h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-base font-medium text-gray-900 mb-1">No Active Builds</h3>
+                    <p class="text-sm text-gray-500">Start a new plan to see build progress here</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Plans & Completed Grid -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <!-- Recent Plans -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Recent Plans</h3>
+        <div class="card">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-5">
+                    <h2 class="text-xl font-semibold text-gray-900">Recent Plans</h2>
+                    <a href="/plans" class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center">
+                        View all
+                        <svg class="h-4 w-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                </div>
                 {% if recent_plans %}
-                <ul class="divide-y divide-gray-200">
+                <ul class="divide-y divide-gray-100">
                     {% for plan in recent_plans %}
-                    <li class="py-3">
+                    <li class="py-4 first:pt-0 last:pb-0">
                         <div class="flex items-center justify-between">
-                            <div>
-                                <a href="/plans/{{ plan.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
+                            <div class="min-w-0 flex-1">
+                                <a href="/plans/{{ plan.id }}" class="text-base font-medium text-gray-900 hover:text-blue-600 transition-colors truncate block">
                                     {{ plan.name }}
                                 </a>
-                                <p class="text-sm text-gray-600">{{ plan.modified[:10] }}</p>
+                                <p class="text-sm text-gray-500 mt-0.5">{{ plan.modified[:10] }}</p>
                             </div>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if plan.state == 'completed' %}bg-green-100 text-green-800
-                                {% elif plan.state == 'pending' %}bg-yellow-100 text-yellow-800
-                                {% elif plan.state == 'in-progress' %}bg-blue-100 text-blue-800
-                                {% else %}bg-red-100 text-red-800{% endif %}">
+                            <span class="ml-4 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if plan.state == 'completed' %}bg-emerald-100 text-emerald-700
+                                {% elif plan.state == 'pending' %}bg-amber-100 text-amber-700
+                                {% elif plan.state == 'in-progress' %}bg-blue-100 text-blue-700
+                                {% else %}bg-red-100 text-red-700{% endif %}">
                                 {{ plan.state }}
                             </span>
                         </div>
                     </li>
                     {% endfor %}
                 </ul>
-                <a href="/plans" class="mt-4 inline-block text-sm text-blue-600 hover:text-blue-800">
-                    View all plans &rarr;
-                </a>
                 {% else %}
-                <p class="text-sm text-gray-600">No plans yet. Create your first plan above!</p>
+                <div class="text-center py-8">
+                    <div class="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-sm text-gray-500">No plans yet. Create your first plan above!</p>
+                </div>
                 {% endif %}
             </div>
         </div>
 
-        <!-- Active Runs -->
-        <div class="bg-white shadow rounded-lg">
-            <div class="px-4 py-5 sm:p-6">
-                <h3 class="text-lg font-medium text-gray-900 mb-4">Active Runs</h3>
-                {% if active_runs %}
-                <ul class="divide-y divide-gray-200" id="active-runs-list">
-                    {% for run in active_runs %}
-                    <li class="py-3">
+        <!-- Recent Completed Runs -->
+        <div class="card">
+            <div class="p-6">
+                <div class="flex items-center justify-between mb-5">
+                    <h2 class="text-xl font-semibold text-gray-900">Recent Completed</h2>
+                    <a href="/runs" class="text-sm font-medium text-blue-600 hover:text-blue-800 flex items-center">
+                        View all
+                        <svg class="h-4 w-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                        </svg>
+                    </a>
+                </div>
+                {% if completed_runs %}
+                <ul class="divide-y divide-gray-100" id="completed-runs-list">
+                    {% for run in completed_runs %}
+                    <li class="py-4 first:pt-0 last:pb-0">
                         <div class="flex items-center justify-between">
-                            <div>
-                                <a href="/runs/{{ run.id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">
-                                    {{ run.workflow|title }} - {{ run.id }}
+                            <div class="min-w-0 flex-1">
+                                <a href="/runs/{{ run.id }}" class="text-base font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                                    {{ run.workflow|title }}
                                 </a>
-                                <p class="text-sm text-gray-600">Started: {{ run.started_at[:19] }}</p>
+                                <p class="text-sm text-gray-500 mt-0.5">{{ run.completed_at[:19] if run.completed_at else run.started_at[:19] }}</p>
                             </div>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                {% if run.status == 'completed' %}bg-green-100 text-green-800
-                                {% elif run.status == 'running' %}bg-blue-100 text-blue-800
-                                {% elif run.status == 'pending' %}bg-yellow-100 text-yellow-800
-                                {% else %}bg-red-100 text-red-800{% endif %}">
-                                {{ run.status }}
+                            <span class="ml-4 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
+                                {% if run.status == 'completed' %}bg-emerald-100 text-emerald-700
+                                {% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ run.status|title }}
                             </span>
                         </div>
-                        {% if run.status == 'running' %}
-                        <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-blue-600 h-2 rounded-full" style="width: {{ run.progress }}%"></div>
-                        </div>
-                        {% endif %}
                     </li>
                     {% endfor %}
                 </ul>
                 {% else %}
-                <p class="text-sm text-gray-600">No active runs.</p>
+                <div class="text-center py-8">
+                    <div class="w-12 h-12 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-3">
+                        <svg class="h-6 w-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <p class="text-sm text-gray-500">No completed runs yet</p>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -197,4 +317,285 @@
 
 {% block scripts %}
 <script src="/static/js/dashboard.js"></script>
+<script src="/static/js/build-progress.js"></script>
+<script>
+/**
+ * Live Builds Dashboard Module
+ * Handles real-time build progress updates via SSE and polling
+ */
+(function() {
+    'use strict';
+
+    const POLL_INTERVAL = 3000;
+    const ELAPSED_UPDATE_INTERVAL = 1000;
+
+    let eventSources = {};
+    let pollTimer = null;
+    let elapsedTimer = null;
+
+    function init() {
+        const buildCards = document.querySelectorAll('.live-build-card');
+
+        if (buildCards.length === 0) {
+            hideIndicator();
+            return;
+        }
+
+        buildCards.forEach(function(card) {
+            const runId = card.dataset.runId;
+            const status = card.dataset.runStatus;
+
+            if (status === 'running' || status === 'pending') {
+                startSSE(runId, card);
+            }
+        });
+
+        startElapsedTimer();
+        setupRefreshButton();
+        startPolling();
+    }
+
+    function startSSE(runId, card) {
+        if (eventSources[runId]) {
+            eventSources[runId].close();
+        }
+
+        const url = '/api/runs/' + runId + '/events';
+        const es = new EventSource(url);
+
+        es.onmessage = function(e) {
+            try {
+                const event = JSON.parse(e.data);
+                updateBuildCard(card, event);
+            } catch (err) {
+                console.error('SSE parse error:', err);
+            }
+        };
+
+        es.onerror = function() {
+            console.log('SSE connection closed for run:', runId);
+            es.close();
+            delete eventSources[runId];
+        };
+
+        eventSources[runId] = es;
+    }
+
+    function updateBuildCard(card, event) {
+        if (event.progress !== undefined) {
+            const progressBar = card.querySelector('.progress-bar');
+            const progressPercent = card.querySelector('.progress-percent');
+
+            if (progressBar) {
+                progressBar.style.width = event.progress + '%';
+            }
+            if (progressPercent) {
+                progressPercent.textContent = event.progress + '%';
+            }
+        }
+
+        if (event.step) {
+            const stepEl = card.querySelector('.current-step');
+            if (stepEl) {
+                stepEl.textContent = event.step;
+            }
+        }
+
+        if (event.status) {
+            const badge = card.querySelector('.status-badge');
+            if (badge) {
+                badge.textContent = event.status.charAt(0).toUpperCase() + event.status.slice(1);
+                updateStatusBadgeClasses(badge, event.status);
+            }
+            card.dataset.runStatus = event.status;
+        }
+
+        if (event.type === 'done') {
+            const runId = card.dataset.runId;
+            if (eventSources[runId]) {
+                eventSources[runId].close();
+                delete eventSources[runId];
+            }
+
+            setTimeout(function() {
+                card.style.opacity = '0.6';
+                setTimeout(function() {
+                    refreshBuilds();
+                }, 2000);
+            }, 1000);
+        }
+    }
+
+    function updateStatusBadgeClasses(badge, status) {
+        const classes = {
+            completed: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
+            running: { bg: 'bg-blue-100', text: 'text-blue-700' },
+            pending: { bg: 'bg-amber-100', text: 'text-amber-700' },
+            failed: { bg: 'bg-red-100', text: 'text-red-700' },
+            error: { bg: 'bg-red-100', text: 'text-red-700' }
+        };
+
+        badge.className = badge.className.replace(/bg-\w+-100|text-\w+-700/g, '').trim();
+
+        const config = classes[status] || classes.pending;
+        badge.classList.add(config.bg, config.text);
+    }
+
+    function startElapsedTimer() {
+        if (elapsedTimer) {
+            clearInterval(elapsedTimer);
+        }
+
+        updateAllElapsedTimes();
+        elapsedTimer = setInterval(updateAllElapsedTimes, ELAPSED_UPDATE_INTERVAL);
+    }
+
+    function updateAllElapsedTimes() {
+        const elapsedElements = document.querySelectorAll('.elapsed-time');
+
+        elapsedElements.forEach(function(el) {
+            const startedAt = el.dataset.started;
+            if (!startedAt) return;
+
+            const started = new Date(startedAt);
+            const now = new Date();
+            const elapsed = Math.floor((now - started) / 1000);
+
+            el.textContent = formatElapsed(elapsed);
+        });
+    }
+
+    function formatElapsed(seconds) {
+        if (seconds < 0) seconds = 0;
+
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = seconds % 60;
+
+        if (hours > 0) {
+            return hours + ':' + pad(minutes) + ':' + pad(secs);
+        }
+        return pad(minutes) + ':' + pad(secs);
+    }
+
+    function pad(num) {
+        return num < 10 ? '0' + num : '' + num;
+    }
+
+    function startPolling() {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+        }
+
+        pollTimer = setInterval(function() {
+            if (Object.keys(eventSources).length === 0) {
+                const activeCards = document.querySelectorAll('.live-build-card[data-run-status="running"], .live-build-card[data-run-status="pending"]');
+                if (activeCards.length > 0) {
+                    refreshBuilds();
+                }
+            }
+        }, POLL_INTERVAL);
+    }
+
+    function refreshBuilds() {
+        fetch('/api/runs?status=running,pending&limit=10')
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.runs) {
+                    updateBuildsList(data.runs);
+                }
+            })
+            .catch(function(err) {
+                console.error('Failed to refresh builds:', err);
+            });
+    }
+
+    function updateBuildsList(runs) {
+        const container = document.getElementById('live-builds-container');
+        const noBuildsMsg = document.getElementById('no-builds-message');
+
+        if (!runs || runs.length === 0) {
+            if (noBuildsMsg) {
+                noBuildsMsg.style.display = 'block';
+            }
+            const list = document.getElementById('live-builds-list');
+            if (list) {
+                list.innerHTML = '';
+            }
+            hideIndicator();
+            return;
+        }
+
+        showIndicator();
+
+        runs.forEach(function(run) {
+            let card = document.querySelector('.live-build-card[data-run-id="' + run.id + '"]');
+
+            if (card) {
+                updateBuildCard(card, {
+                    progress: run.progress || 0,
+                    step: run.current_step,
+                    status: run.status
+                });
+            } else {
+                window.location.reload();
+            }
+        });
+    }
+
+    function setupRefreshButton() {
+        const btn = document.getElementById('refresh-builds-btn');
+        if (!btn) return;
+
+        btn.addEventListener('click', function() {
+            const icon = btn.querySelector('svg');
+            if (icon) {
+                icon.classList.add('animate-spin');
+            }
+
+            refreshBuilds();
+
+            setTimeout(function() {
+                if (icon) {
+                    icon.classList.remove('animate-spin');
+                }
+            }, 1000);
+        });
+    }
+
+    function hideIndicator() {
+        const indicator = document.getElementById('live-builds-indicator');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+    }
+
+    function showIndicator() {
+        const indicator = document.getElementById('live-builds-indicator');
+        if (indicator) {
+            indicator.style.display = 'flex';
+        }
+    }
+
+    function cleanup() {
+        Object.keys(eventSources).forEach(function(runId) {
+            eventSources[runId].close();
+        });
+        eventSources = {};
+
+        if (pollTimer) {
+            clearInterval(pollTimer);
+        }
+        if (elapsedTimer) {
+            clearInterval(elapsedTimer);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+    window.addEventListener('beforeunload', cleanup);
+
+})();
+</script>
 {% endblock %}

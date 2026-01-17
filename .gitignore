@@ -26,6 +26,9 @@ logs/
 *.db-wal
 *.db-journal
 
+# SQLite database files (local-only data)
+.orchestrator/db/*.db
+
 # Environment
 .env
 .env.local

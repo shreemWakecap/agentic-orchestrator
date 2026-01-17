@@ -1,4 +1,4 @@
-"""Web UI backend for SDLC Orchestrator.
+"""Web Portal for Agentic Orchestrator.
 
 Provides a browser-based dashboard for:
 - Viewing and managing plans
@@ -22,8 +22,8 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 # Add parent directory to path for imports
-SERVER_DIR = Path(__file__).parent
-ORCHESTRATOR_DIR = SERVER_DIR.parent
+PORTAL_DIR = Path(__file__).parent
+ORCHESTRATOR_DIR = PORTAL_DIR.parent
 PROJECT_ROOT = ORCHESTRATOR_DIR.parent
 
 sys.path.insert(0, str(ORCHESTRATOR_DIR))
@@ -33,19 +33,19 @@ from actions.building import BuildingWorkflow
 from actions.syncing import SyncingWorkflow
 from core.cost import CostEstimator, CostReporter, BudgetManager, Budget
 
-# Server startup time for health endpoint uptime calculation
+# Portal startup time for health endpoint uptime calculation
 START_TIME = datetime.now()
 
 # FastAPI app
 app = FastAPI(
-    title="SDLC Orchestrator",
-    description="Web UI for managing software development workflows",
+    title="Agentic Orchestrator Portal",
+    description="Web portal for managing planning and building workflows",
     version="1.0.0"
 )
 
 # Setup templates and static files
-templates = Jinja2Templates(directory=SERVER_DIR / "templates")
-STATIC_DIR = SERVER_DIR / "static"
+templates = Jinja2Templates(directory=PORTAL_DIR / "templates")
+STATIC_DIR = PORTAL_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
@@ -641,10 +641,14 @@ async def _run_syncing_workflow(run_id: str):
 
 # ============== App Entry Point ==============
 
-def run_server(host: str = "127.0.0.1", port: int = 8000):
-    """Run the web server."""
+def run_portal(host: str = "127.0.0.1", port: int = 8000):
+    """Run the web portal."""
     import uvicorn
     uvicorn.run(app, host=host, port=port)
+
+
+# Alias for backward compatibility
+run_server = run_portal
 
 
 if __name__ == "__main__":

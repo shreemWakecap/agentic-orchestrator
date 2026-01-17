@@ -17,8 +17,8 @@ def run(args=None) -> int:
     print("Press Ctrl+C to stop\n")
 
     try:
-        from server.app import run_server
-        run_server(host="127.0.0.1", port=port)
+        from portal.app import run_portal
+        run_portal(host="127.0.0.1", port=port)
     except ImportError:
         print("Install dependencies: uv pip install fastapi uvicorn jinja2")
         return 1

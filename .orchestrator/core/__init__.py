@@ -15,6 +15,17 @@ from .config import (
     get_budget_config,
 )
 from .system_explorer import TechDetection, detect_technologies, find_missing_experts
+from .plan_parser import (
+    PlanParser,
+    ParseResult,
+    ParsedPlan,
+    PlanStep,
+    PlanPhase,
+    StepAction,
+    parse_plan,
+    parse_plan_file,
+    validate_plan_coverage,
+)
 
 __all__ = [
     "Agent",
@@ -41,4 +52,14 @@ __all__ = [
     "TechDetection",
     "detect_technologies",
     "find_missing_experts",
+    # Plan parser (deterministic)
+    "PlanParser",
+    "ParseResult",
+    "ParsedPlan",
+    "PlanStep",
+    "PlanPhase",
+    "StepAction",
+    "parse_plan",
+    "parse_plan_file",
+    "validate_plan_coverage",
 ]

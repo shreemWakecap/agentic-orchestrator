@@ -9,7 +9,7 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Step 1: Check UV
-Write-Host "[1/5] Checking UV package manager..." -ForegroundColor Cyan
+Write-Host "[1/4] Checking UV package manager..." -ForegroundColor Cyan
 if (-not (Get-Command "uv" -ErrorAction SilentlyContinue)) {
     Write-Host "  Installing UV..." -ForegroundColor Yellow
     irm https://astral.sh/uv/install.ps1 | iex
@@ -20,7 +20,7 @@ if (-not (Get-Command "uv" -ErrorAction SilentlyContinue)) {
 
 # Step 2: Check Node.js/npm (required for Claude Code CLI)
 Write-Host ""
-Write-Host "[2/5] Checking Node.js/npm..." -ForegroundColor Cyan
+Write-Host "[2/4] Checking Node.js/npm..." -ForegroundColor Cyan
 if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
     Write-Host ""
     Write-Host "  Node.js/npm not found!" -ForegroundColor Red
@@ -37,7 +37,7 @@ if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
 
 # Step 3: Check Claude Code CLI
 Write-Host ""
-Write-Host "[3/5] Checking Claude Code CLI..." -ForegroundColor Cyan
+Write-Host "[3/4] Checking Claude Code CLI..." -ForegroundColor Cyan
 $claudeInstalled = $false
 try {
     $claudeVersion = & claude --version 2>&1
@@ -60,51 +60,9 @@ if (-not $claudeInstalled) {
     Write-Host "  Claude Code CLI installed successfully" -ForegroundColor Green
 }
 
-# Step 4: Check Claude Code authentication
+# Step 4: Sync Python dependencies and run setup
 Write-Host ""
-Write-Host "[4/5] Checking Claude Code authentication..." -ForegroundColor Cyan
-$needsAuth = $false
-try {
-    # Try a simple command to check if authenticated
-    $authTest = & claude --print -p "hi" 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        $needsAuth = $true
-    } elseif ($authTest -match "unauthorized|not authenticated|login|API key|error") {
-        $needsAuth = $true
-    }
-} catch {
-    $needsAuth = $true
-}
-
-if ($needsAuth) {
-    Write-Host ""
-    Write-Host "  Claude Code CLI requires authentication!" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "  This will open a browser to authenticate with your Anthropic account." -ForegroundColor White
-    Write-Host ""
-
-    $response = Read-Host "  Would you like to authenticate now? (Y/n)"
-    if ($response -ne "n" -and $response -ne "N") {
-        Write-Host ""
-        Write-Host "  Starting authentication..." -ForegroundColor Cyan
-        Write-Host "  (Follow the prompts in the browser)" -ForegroundColor White
-        Write-Host ""
-        & claude
-        Write-Host ""
-        Write-Host "  Authentication complete!" -ForegroundColor Green
-    } else {
-        Write-Host ""
-        Write-Host "  Skipping authentication." -ForegroundColor Yellow
-        Write-Host "  Note: Workflows will fail until you authenticate." -ForegroundColor Yellow
-        Write-Host "  Run 'claude' anytime to authenticate." -ForegroundColor White
-    }
-} else {
-    Write-Host "  Claude Code CLI is authenticated" -ForegroundColor Green
-}
-
-# Step 5: Sync Python dependencies and run setup
-Write-Host ""
-Write-Host "[5/5] Setting up Python environment..." -ForegroundColor Cyan
+Write-Host "[4/4] Setting up Python environment..." -ForegroundColor Cyan
 Push-Location $scriptDir
 Write-Host "  Syncing dependencies..." -ForegroundColor White
 
@@ -130,4 +88,6 @@ Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "  You can now use the orchestrator:" -ForegroundColor White
 Write-Host "    uv run python cli.py --help" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "  Note: Claude Code will prompt for authentication on first use." -ForegroundColor Gray
 Write-Host ""

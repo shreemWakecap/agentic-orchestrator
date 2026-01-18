@@ -77,13 +77,20 @@ class BuildStepProgress(BaseModel):
 
 
 class BuildProgressResponse(BaseModel):
-    """Real-time build progress response for SSE streaming."""
+    """Real-time build progress response - single source of truth for polling-based UI."""
     plan_id: str = Field(..., description="Unique identifier for the plan being built")
     run_id: Optional[str] = Field(None, description="Unique identifier for the current build run")
     status: str = Field("pending", description="Overall build status: pending, running, completed, failed, cancelled")
     progress_percentage: float = Field(0.0, description="Overall progress percentage (0.0 to 100.0)")
     current_step: Optional[str] = Field(None, description="ID of the currently executing step")
     steps: List[BuildStepProgress] = Field(default_factory=list, description="Progress information for all steps")
+
+    # Server-side stuck detection fields (for polling-based UI)
+    updated_at: Optional[str] = Field(None, description="Last server update timestamp (ISO format)")
+    is_stuck: bool = Field(False, description="Server-determined stuck status (no updates in 5+ minutes while running)")
+    minutes_since_update: Optional[float] = Field(None, description="Minutes since last update")
+    can_resume: bool = Field(False, description="Whether build can be resumed from current state")
+    last_error: Optional[str] = Field(None, description="Last error message if any")
 
     class Config:
         from_attributes = True
@@ -302,3 +309,16 @@ class CancelBuildResponse(BaseModel):
     message: str = "Build cancelled successfully"
     steps_completed: int = 0
     steps_remaining: int = 0
+
+
+class RemoteConfigResponse(BaseModel):
+    """Response for remote repository configuration status."""
+    is_configured: bool = Field(..., description="Whether a remote is properly configured")
+    remote_name: str = Field(..., description="Name of the remote (e.g., 'origin')")
+    fetch_url: Optional[str] = Field(None, description="URL used for fetching")
+    push_url: Optional[str] = Field(None, description="URL used for pushing")
+    url_valid: bool = Field(False, description="Whether the remote URL format is valid and accessible")
+    format_error: Optional[str] = Field(None, description="Description of URL format issue if url_valid is False")
+    error: Optional[str] = Field(None, description="Error message if not configured")
+    configuration_help: Optional[str] = Field(None, description="Guidance text on how to configure the remote when not configured")
+    setup_instructions: List[str] = Field(default_factory=list, description="Step-by-step instructions for configuring the git remote")

@@ -1,6 +1,6 @@
 """Plan-related API routes."""
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
@@ -435,6 +435,7 @@ async def get_build_progress(
     plan_repo: PlanRepository = Depends(get_plan_repo),
     build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
     run_repo: RunRepository = Depends(get_run_repo),
+    recovery_service: RecoveryService = Depends(get_recovery_service),
 ) -> BuildProgressResponse:
     """Get real-time build progress for a plan including step-level details.
 
@@ -472,7 +473,7 @@ async def get_build_progress(
 
     # Get the run_id from the most recent run for this plan
     run_id = None
-    runs = run_repo.list_all()
+    runs = run_repo.list_active()
     for run in runs:
         if run.get("plan_id") == plan_id and run.get("workflow") == "building":
             run_id = run.get("run_id")
@@ -519,6 +520,49 @@ async def get_build_progress(
     }
     status = status_map.get(build_status, build_status)
 
+    # Calculate server-side stuck detection fields
+    is_stuck = False
+    minutes_since_update = None
+    updated_at = build_state.get("updated_at") if build_state else None
+
+    # Calculate minutes since last update
+    if updated_at:
+        try:
+            # Handle both string and datetime objects
+            if isinstance(updated_at, str):
+                # Handle ISO format with or without timezone
+                updated_at_str = updated_at.replace('Z', '+00:00')
+                updated_time = datetime.fromisoformat(updated_at_str)
+            else:
+                updated_time = updated_at
+
+            # Ensure timezone-aware comparison
+            now = datetime.now(timezone.utc)
+            if updated_time.tzinfo is None:
+                updated_time = updated_time.replace(tzinfo=timezone.utc)
+
+            delta = now - updated_time
+            minutes_since_update = round(delta.total_seconds() / 60, 1)
+        except (ValueError, TypeError):
+            pass  # Keep minutes_since_update as None on parse errors
+
+    # Use recovery service for consistent stuck detection (5 minute threshold)
+    if build_state and status in ["running", "in_progress", "building"]:
+        try:
+            is_stuck = recovery_service.is_build_stale(plan_id, threshold_minutes=5)
+        except Exception:
+            # Fallback: if service fails, use minutes_since_update
+            is_stuck = minutes_since_update is not None and minutes_since_update > 5
+
+    # Determine if build can be resumed
+    can_resume = bool(
+        (current_step or completed_steps) and
+        build_status in ["building", "in_progress", "failed", "paused"]
+    )
+
+    # Get last error from build state
+    last_error = build_state.get("last_error") if build_state else None
+
     return BuildProgressResponse(
         plan_id=plan_id,
         run_id=run_id,
@@ -526,6 +570,12 @@ async def get_build_progress(
         progress_percentage=progress_percentage,
         current_step=current_step,
         steps=steps,
+        # Server-side stuck detection fields
+        updated_at=updated_at,
+        is_stuck=is_stuck,
+        minutes_since_update=minutes_since_update,
+        can_resume=can_resume,
+        last_error=last_error,
     )
 
 

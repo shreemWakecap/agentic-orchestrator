@@ -801,21 +801,19 @@ document.addEventListener('orchestrator:planManager:listRefreshed', function() {
 
 <script>
 /**
- * Stuck Plan Detection and Recovery Module
- * Handles detection of stuck plans and provides inline recovery actions
+ * Elapsed Time Update Module
+ * Updates elapsed time displays for plans.
+ * NOTE: Stuck detection is now SERVER-SIDE via the is_stuck field in API responses.
+ * The server determines if a plan is stuck, not the client.
  */
 (function() {
     'use strict';
 
-    // Configuration
-    const STUCK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes = stuck
-    const WARNING_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes = warning
     const UPDATE_INTERVAL_MS = 1000; // Update every second
-
     let updateInterval = null;
 
     /**
-     * Initialize stuck detection for all plans
+     * Initialize elapsed time updates
      */
     window.initStuckDetection = function() {
         // Clear existing interval
@@ -825,17 +823,13 @@ document.addEventListener('orchestrator:planManager:listRefreshed', function() {
 
         // Run immediately
         updateAllElapsedTimes();
-        checkAllStuckPlans();
 
         // Then update every second
-        updateInterval = setInterval(function() {
-            updateAllElapsedTimes();
-            checkAllStuckPlans();
-        }, UPDATE_INTERVAL_MS);
+        updateInterval = setInterval(updateAllElapsedTimes, UPDATE_INTERVAL_MS);
     };
 
     /**
-     * Update all elapsed time displays
+     * Update all elapsed time displays (no stuck detection - that's server-side now)
      */
     function updateAllElapsedTimes() {
         document.querySelectorAll('.elapsed-time-item').forEach(function(el) {
@@ -847,57 +841,6 @@ document.addEventListener('orchestrator:planManager:listRefreshed', function() {
             var textEl = el.querySelector('.elapsed-text');
             if (textEl) {
                 textEl.textContent = text + ' ago';
-            }
-
-            // Add warning class if elapsed time is high
-            if (elapsed > STUCK_THRESHOLD_MS) {
-                el.classList.add('text-red-500', 'dark:text-red-400');
-                el.classList.remove('text-yellow-600', 'dark:text-yellow-400');
-            } else if (elapsed > WARNING_THRESHOLD_MS) {
-                el.classList.add('text-yellow-600', 'dark:text-yellow-400');
-                el.classList.remove('text-red-500', 'dark:text-red-400');
-            }
-        });
-    }
-
-    /**
-     * Check all potentially stuck plans and show/hide badges
-     */
-    function checkAllStuckPlans() {
-        document.querySelectorAll('.plan-item[data-plan-state]').forEach(function(card) {
-            var state = card.dataset.planState;
-            var updated = card.dataset.updated || card.dataset.created;
-            var planId = card.dataset.planId;
-
-            // Only check in-progress/building/failed plans
-            if (!['in-progress', 'building', 'failed'].includes(state)) {
-                return;
-            }
-
-            var elapsed = updated ? Date.now() - new Date(updated).getTime() : 0;
-            var isStuck = elapsed > STUCK_THRESHOLD_MS;
-            var isFailed = state === 'failed';
-
-            // Show/hide stuck badge
-            var stuckBadge = document.getElementById('stuck-badge-' + planId);
-            if (stuckBadge) {
-                if (isStuck && !isFailed) {
-                    stuckBadge.classList.remove('hidden');
-                    card.classList.add('stuck');
-                } else {
-                    stuckBadge.classList.add('hidden');
-                    card.classList.remove('stuck');
-                }
-            }
-
-            // Show/hide recovery actions
-            var recoveryActions = document.getElementById('recovery-actions-' + planId);
-            if (recoveryActions) {
-                if (isStuck || isFailed) {
-                    recoveryActions.classList.remove('hidden');
-                } else {
-                    recoveryActions.classList.add('hidden');
-                }
             }
         });
     }

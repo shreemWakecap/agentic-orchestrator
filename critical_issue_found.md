@@ -303,3 +303,8 @@ Critical Issues Found
      - Database: Uses ALTER TABLE ADD COLUMN with defaults
      - Config: ThinkingConfig.enabled defaults to False
      - API: New parameters have defaults, existing code unchanged
+
+
+
+
+https://github.com/davila7/claude-code-templates

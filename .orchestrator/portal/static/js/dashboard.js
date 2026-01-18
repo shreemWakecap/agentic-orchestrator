@@ -87,6 +87,151 @@ function initSyncRemote() {
             button.textContent = originalText;
         }
     });
+
+    // Setup refresh sync status button
+    const refreshBtn = document.getElementById('refresh-sync-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            fetchSyncStatus();
+        });
+    }
+}
+
+/**
+ * Sync Status Module
+ * Fetches and displays git sync status information
+ */
+async function fetchSyncStatus() {
+    const syncSection = document.getElementById('sync-status-section');
+    const syncButton = document.getElementById('sync-remote-btn');
+    const fileCountEl = document.getElementById('sync-file-count');
+    const fileListEl = document.getElementById('sync-file-list');
+    const branchInfoEl = document.getElementById('sync-branch-info');
+    const loadingEl = document.getElementById('sync-loading');
+    const contentEl = document.getElementById('sync-content');
+    const noChangesEl = document.getElementById('sync-no-changes');
+
+    if (!syncSection) return;
+
+    // Show loading state
+    if (loadingEl) loadingEl.style.display = 'block';
+    if (contentEl) contentEl.style.display = 'none';
+    if (noChangesEl) noChangesEl.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/workflows/sync-status');
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        // Hide loading
+        if (loadingEl) loadingEl.style.display = 'none';
+
+        // Check if there are changes to sync
+        const totalFiles = (data.staged_files?.length || 0) +
+                          (data.modified_files?.length || 0) +
+                          (data.untracked_files?.length || 0);
+
+        if (totalFiles === 0) {
+            // No changes to sync
+            if (noChangesEl) noChangesEl.style.display = 'block';
+            if (contentEl) contentEl.style.display = 'none';
+            if (syncButton) {
+                syncButton.disabled = true;
+                syncButton.title = 'No changes to sync';
+            }
+        } else {
+            // Show content
+            if (contentEl) contentEl.style.display = 'block';
+            if (noChangesEl) noChangesEl.style.display = 'none';
+            if (syncButton) {
+                syncButton.disabled = false;
+                syncButton.title = '';
+            }
+
+            // Update file count
+            if (fileCountEl) {
+                fileCountEl.textContent = totalFiles + ' file' + (totalFiles !== 1 ? 's' : '') + ' to sync';
+            }
+
+            // Update branch info
+            if (branchInfoEl) {
+                let branchHtml = '';
+                if (data.current_branch) {
+                    branchHtml += '<span class="text-gray-600">Branch:</span> <span class="font-medium">' + escapeHtml(data.current_branch) + '</span>';
+                }
+                if (data.remote_branch) {
+                    branchHtml += ' <span class="text-gray-400">→</span> <span class="text-gray-600">' + escapeHtml(data.remote_branch) + '</span>';
+                }
+                if (data.ahead !== undefined && data.behind !== undefined) {
+                    if (data.ahead > 0 || data.behind > 0) {
+                        branchHtml += ' <span class="text-xs text-gray-500">(';
+                        if (data.ahead > 0) branchHtml += '↑' + data.ahead;
+                        if (data.ahead > 0 && data.behind > 0) branchHtml += ' ';
+                        if (data.behind > 0) branchHtml += '↓' + data.behind;
+                        branchHtml += ')</span>';
+                    }
+                }
+                branchInfoEl.innerHTML = branchHtml;
+            }
+
+            // Update file list (collapsible)
+            if (fileListEl) {
+                let listHtml = '';
+
+                if (data.staged_files && data.staged_files.length > 0) {
+                    listHtml += '<div class="mb-2">';
+                    listHtml += '<div class="text-xs font-medium text-green-700 mb-1">Staged (' + data.staged_files.length + ')</div>';
+                    listHtml += '<ul class="text-xs text-gray-600 space-y-0.5">';
+                    data.staged_files.forEach(function(file) {
+                        listHtml += '<li class="flex items-center"><span class="w-4 text-green-600">A</span><span class="truncate">' + escapeHtml(file) + '</span></li>';
+                    });
+                    listHtml += '</ul></div>';
+                }
+
+                if (data.modified_files && data.modified_files.length > 0) {
+                    listHtml += '<div class="mb-2">';
+                    listHtml += '<div class="text-xs font-medium text-yellow-700 mb-1">Modified (' + data.modified_files.length + ')</div>';
+                    listHtml += '<ul class="text-xs text-gray-600 space-y-0.5">';
+                    data.modified_files.forEach(function(file) {
+                        listHtml += '<li class="flex items-center"><span class="w-4 text-yellow-600">M</span><span class="truncate">' + escapeHtml(file) + '</span></li>';
+                    });
+                    listHtml += '</ul></div>';
+                }
+
+                if (data.untracked_files && data.untracked_files.length > 0) {
+                    listHtml += '<div class="mb-2">';
+                    listHtml += '<div class="text-xs font-medium text-gray-700 mb-1">Untracked (' + data.untracked_files.length + ')</div>';
+                    listHtml += '<ul class="text-xs text-gray-600 space-y-0.5">';
+                    data.untracked_files.forEach(function(file) {
+                        listHtml += '<li class="flex items-center"><span class="w-4 text-gray-400">?</span><span class="truncate">' + escapeHtml(file) + '</span></li>';
+                    });
+                    listHtml += '</ul></div>';
+                }
+
+                fileListEl.innerHTML = listHtml;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching sync status:', error);
+        if (loadingEl) loadingEl.style.display = 'none';
+        if (noChangesEl) {
+            noChangesEl.style.display = 'block';
+            noChangesEl.textContent = 'Failed to load sync status';
+        }
+    }
+}
+
+function toggleSyncFileList() {
+    const fileListEl = document.getElementById('sync-file-list');
+    const toggleBtn = document.getElementById('sync-toggle-btn');
+    if (!fileListEl || !toggleBtn) return;
+
+    const isHidden = fileListEl.style.display === 'none';
+    fileListEl.style.display = isHidden ? 'block' : 'none';
+    toggleBtn.textContent = isHidden ? 'Hide files' : 'Show files';
 }
 
 /**
@@ -446,6 +591,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initDashboard();
     initSyncRemote();
     initLiveBuilds();
+    fetchSyncStatus();
 });
 
 // Cleanup on page unload

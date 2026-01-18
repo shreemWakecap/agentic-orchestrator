@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks
 from db import RunRepository
 from portal.dependencies import get_run_repo
 from portal.schemas.requests import PlanRequest, BuildRequest
-from portal.schemas.responses import WorkflowStartResponse
+from portal.schemas.responses import WorkflowStartResponse, SyncStatusResponse
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
@@ -68,3 +68,45 @@ async def sync_remote(
     background_tasks.add_task(run_syncing_workflow, run_id)
 
     return WorkflowStartResponse(run_id=run_id, status="started")
+
+
+@router.get("/sync-status", response_model=SyncStatusResponse)
+async def get_sync_status() -> SyncStatusResponse:
+    """Get current git sync status information.
+
+    Returns readonly information about files that need to be synced,
+    including counts, file lists, and diff summary.
+    """
+    from portal.services.git_service import GitStatusService
+
+    git_service = GitStatusService()
+    status = git_service.get_sync_status()
+
+    # Count staged and unstaged files
+    staged_count = sum(1 for f in status.get("files", []) if status.get("has_staged", False))
+    unstaged_count = sum(1 for f in status.get("files", []) if status.get("has_unstaged", False))
+
+    # If both staged and unstaged, the count reflects the state flags
+    # Simplified: if has_staged, all files count as staged-relevant; same for unstaged
+    if status.get("has_staged", False) and status.get("has_unstaged", False):
+        staged_count = status.get("file_count", 0)
+        unstaged_count = status.get("file_count", 0)
+    elif status.get("has_staged", False):
+        staged_count = status.get("file_count", 0)
+        unstaged_count = 0
+    elif status.get("has_unstaged", False):
+        staged_count = 0
+        unstaged_count = status.get("file_count", 0)
+    else:
+        staged_count = 0
+        unstaged_count = 0
+
+    return SyncStatusResponse(
+        file_count=status.get("file_count", 0),
+        files=status.get("files", []),
+        branch=status.get("branch", ""),
+        has_changes=status.get("has_changes", False),
+        diff_summary=status.get("diff_summary", ""),
+        staged_count=staged_count,
+        unstaged_count=unstaged_count,
+    )

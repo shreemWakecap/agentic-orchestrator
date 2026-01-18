@@ -5,10 +5,12 @@ from .workflow_runner import (
     run_building_workflow,
     run_syncing_workflow,
 )
+from .git_service import GitStatusService
 
 __all__ = [
     "PlanService",
     "run_planning_workflow",
     "run_building_workflow",
     "run_syncing_workflow",
+    "GitStatusService",
 ]

@@ -126,6 +126,10 @@ class RecoveryService:
                 - failed_steps: List of failed step IDs
                 - total_steps: Total number of steps
                 - progress_percent: Percentage of steps completed
+                - execution_mode: 'sequential', 'parallel', or 'coordinated'
+                - current_wave_index: Current wave for parallel execution
+                - goal_context: Goal verification state (if available)
+                - retry_count: Number of retry attempts for current step
         """
         threshold = threshold_minutes or self.stale_threshold_minutes
         recoverable = []
@@ -133,8 +137,16 @@ class RecoveryService:
         stale_builds = self.get_stale_builds(threshold)
 
         for build in stale_builds:
+            plan_id = build.get('plan_id')
+
+            # Load goal context if available
+            goal_context = self._repo.get_goal_context(plan_id)
+
+            # Get retry count for current step
+            retry_count = self._get_current_step_retry_count(plan_id, build.get('current_step'))
+
             plan_info = {
-                'plan_id': build.get('plan_id'),
+                'plan_id': plan_id,
                 'status': build.get('status'),
                 'last_update': build.get('updated_at'),
                 'minutes_stale': build.get('minutes_stale', 0),
@@ -147,10 +159,145 @@ class RecoveryService:
                 'progress_percent': self._calculate_progress(build),
                 'started_at': build.get('started_at'),
                 'can_resume': self._can_resume(build),
+                # Extended state fields
+                'execution_mode': build.get('execution_mode', 'sequential'),
+                'current_wave_index': build.get('current_wave_index', 0),
+                'goal_context': goal_context,
+                'retry_count': retry_count,
             }
             recoverable.append(plan_info)
 
         return recoverable
+
+    def _get_current_step_retry_count(
+        self,
+        plan_id: str,
+        current_step: Optional[str]
+    ) -> int:
+        """Get retry count for the current step.
+
+        Args:
+            plan_id: The plan identifier
+            current_step: Current step ID (if any)
+
+        Returns:
+            Number of retry attempts for the current step
+        """
+        if not current_step:
+            return 0
+
+        step_state = self._repo.get_step_state(plan_id, current_step)
+        if step_state:
+            return step_state.get('retry_count', 0)
+        return 0
+
+    def get_retry_history(
+        self,
+        plan_id: str,
+        step_id: str
+    ) -> List[Dict]:
+        """Get retry history for a specific step.
+
+        Args:
+            plan_id: The plan identifier
+            step_id: The step identifier
+
+        Returns:
+            List of retry history entries with timestamp, error, duration_ms
+        """
+        return self._repo.get_step_retry_history(plan_id, step_id)
+
+    def is_in_backoff(
+        self,
+        plan_id: str,
+        step_id: str,
+        base_backoff_seconds: int = 30,
+        max_backoff_seconds: int = 300
+    ) -> bool:
+        """Check if a step is currently in retry backoff period.
+
+        Uses exponential backoff based on retry count:
+        backoff = min(base * 2^retry_count, max_backoff)
+
+        Args:
+            plan_id: The plan identifier
+            step_id: The step identifier
+            base_backoff_seconds: Base backoff duration (default 30s)
+            max_backoff_seconds: Maximum backoff duration (default 5 min)
+
+        Returns:
+            True if the step should not be retried yet due to backoff
+        """
+        retry_history = self.get_retry_history(plan_id, step_id)
+        if not retry_history:
+            return False
+
+        # Get the last retry attempt
+        last_retry = retry_history[-1]
+        last_timestamp_str = last_retry.get('timestamp')
+
+        if not last_timestamp_str:
+            return False
+
+        try:
+            last_time = datetime.fromisoformat(last_timestamp_str)
+            retry_count = len(retry_history)
+
+            # Exponential backoff: base * 2^(retry_count-1), capped at max
+            backoff_seconds = min(
+                base_backoff_seconds * (2 ** (retry_count - 1)),
+                max_backoff_seconds
+            )
+
+            # Check if we're still in backoff period
+            backoff_expires = last_time + timedelta(seconds=backoff_seconds)
+            return datetime.now() < backoff_expires
+        except (ValueError, TypeError) as e:
+            logger.warning(f"Error checking backoff for {plan_id}/{step_id}: {e}")
+            return False
+
+    def get_backoff_remaining(
+        self,
+        plan_id: str,
+        step_id: str,
+        base_backoff_seconds: int = 30,
+        max_backoff_seconds: int = 300
+    ) -> int:
+        """Get remaining backoff time in seconds.
+
+        Args:
+            plan_id: The plan identifier
+            step_id: The step identifier
+            base_backoff_seconds: Base backoff duration
+            max_backoff_seconds: Maximum backoff duration
+
+        Returns:
+            Seconds remaining in backoff, or 0 if not in backoff
+        """
+        retry_history = self.get_retry_history(plan_id, step_id)
+        if not retry_history:
+            return 0
+
+        last_retry = retry_history[-1]
+        last_timestamp_str = last_retry.get('timestamp')
+
+        if not last_timestamp_str:
+            return 0
+
+        try:
+            last_time = datetime.fromisoformat(last_timestamp_str)
+            retry_count = len(retry_history)
+
+            backoff_seconds = min(
+                base_backoff_seconds * (2 ** (retry_count - 1)),
+                max_backoff_seconds
+            )
+
+            backoff_expires = last_time + timedelta(seconds=backoff_seconds)
+            remaining = (backoff_expires - datetime.now()).total_seconds()
+            return max(0, int(remaining))
+        except (ValueError, TypeError):
+            return 0
 
     def get_recovery_summary(self) -> Dict:
         """Get a summary of all recoverable builds.

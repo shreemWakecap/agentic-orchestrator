@@ -93,7 +93,9 @@ class Workflow(ABC):
         agent_name: str,
         message: str,
         context: Optional[str] = None,
-        show_progress: bool = True
+        show_progress: bool = True,
+        thinking_enabled: Optional[bool] = None,
+        thinking_budget: Optional[int] = None,
     ) -> AgentResult:
         """
         Run a registered agent and store the result.
@@ -103,6 +105,8 @@ class Workflow(ABC):
             message: Message to send to the agent
             context: Optional context from previous steps
             show_progress: Whether to show a spinner
+            thinking_enabled: Enable extended thinking (default from config)
+            thinking_budget: Token budget for thinking (default from config)
 
         Returns:
             AgentResult from the agent
@@ -126,9 +130,17 @@ class Workflow(ABC):
                 transient=True
             ) as progress:
                 progress.add_task("", total=None)
-                result = agent.run(message, context)
+                result = agent.run(
+                    message, context,
+                    thinking_enabled=thinking_enabled,
+                    thinking_budget=thinking_budget
+                )
         else:
-            result = agent.run(message, context)
+            result = agent.run(
+                message, context,
+                thinking_enabled=thinking_enabled,
+                thinking_budget=thinking_budget
+            )
 
         self.results[agent_name] = result
 

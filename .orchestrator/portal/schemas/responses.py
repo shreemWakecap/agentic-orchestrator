@@ -135,3 +135,14 @@ class MoveResponse(BaseModel):
     previous_state: Optional[str] = None
     new_state: Optional[str] = None
     message: Optional[str] = None
+
+
+class SyncStatusResponse(BaseModel):
+    """Response for sync to remote status information."""
+    file_count: int
+    files: List[str] = Field(default_factory=list)
+    branch: str
+    has_changes: bool
+    diff_summary: str
+    staged_count: int
+    unstaged_count: int

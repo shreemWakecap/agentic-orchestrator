@@ -116,19 +116,91 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                     </svg>
                 </div>
-                <div class="ml-5">
-                    <h3 class="text-xl font-semibold text-primary dark:text-primary">Sync to Remote</h3>
+                <div class="ml-5 flex-1">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xl font-semibold text-primary dark:text-primary">Sync to Remote</h3>
+                        <button type="button" id="sync-refresh-btn" class="btn btn-sm btn-secondary btn-modern group" title="Refresh sync status">
+                            <svg class="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                        </button>
+                    </div>
                     <p class="text-sm text-secondary dark:text-secondary mt-1">Commit local changes and create a pull request</p>
                 </div>
             </div>
-            <div class="glass rounded-xl p-4 mb-5">
-                <div class="flex items-center text-sm text-secondary dark:text-secondary">
-                    <svg class="h-5 w-5 mr-3 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+
+            <!-- Loading State -->
+            <div id="sync-status-loading" class="glass rounded-xl p-4 mb-5">
+                <div class="flex items-center justify-center text-sm text-secondary dark:text-secondary">
+                    <svg class="animate-spin h-5 w-5 mr-3 text-violet-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    This will create a new branch, commit changes, and open a PR
+                    Loading sync status...
                 </div>
             </div>
+
+            <!-- Sync Status Content (hidden initially, shown after loading) -->
+            <div id="sync-status-content" class="hidden">
+                <!-- Branch Info -->
+                <div class="glass rounded-xl p-4 mb-4">
+                    <div class="flex items-center text-sm text-secondary dark:text-secondary">
+                        <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        <span class="font-medium mr-2">Branch:</span>
+                        <span id="sync-branch" class="font-mono text-primary dark:text-primary bg-tertiary dark:bg-tertiary px-2 py-0.5 rounded">--</span>
+                    </div>
+                </div>
+
+                <!-- File Count Badge and Status -->
+                <div class="glass rounded-xl p-4 mb-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center text-sm text-secondary dark:text-secondary">
+                            <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <span class="font-medium">Files to sync:</span>
+                        </div>
+                        <span id="sync-file-count" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-sm">0</span>
+                    </div>
+                    <!-- Staged/Unstaged counts -->
+                    <div class="mt-3 flex items-center gap-4 text-xs text-tertiary dark:text-tertiary">
+                        <div class="flex items-center">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+                            <span>Staged: <span id="sync-staged-count" class="font-semibold text-emerald-600 dark:text-emerald-400">0</span></span>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
+                            <span>Unstaged: <span id="sync-unstaged-count" class="font-semibold text-amber-600 dark:text-amber-400">0</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Expandable File List -->
+                <div class="glass rounded-xl mb-5 overflow-hidden">
+                    <button type="button" id="sync-file-list-toggle" class="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-secondary dark:text-secondary hover:bg-tertiary/50 dark:hover:bg-tertiary/50 transition-colors">
+                        <span class="flex items-center">
+                            <svg class="h-4 w-4 mr-2 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                            </svg>
+                            View changed files
+                        </span>
+                        <svg id="sync-file-list-chevron" class="h-4 w-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="sync-file-list" class="hidden border-t border-primary/10 dark:border-primary/10 max-h-48 overflow-y-auto">
+                        <ul class="divide-y divide-primary/5 dark:divide-primary/5 text-sm font-mono">
+                            <!-- Files populated by JS -->
+                        </ul>
+                        <div id="sync-file-list-empty" class="px-4 py-3 text-center text-tertiary dark:text-tertiary text-sm">
+                            No files to sync
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <button type="button" id="sync-remote-btn" class="btn btn-secondary btn-modern group">
                 <svg class="h-4 w-4 mr-2 group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>

@@ -46,12 +46,12 @@ class PlanService:
         plan_data = {
             "id": plan_id,
             "name": plan_id.replace("-", " ").replace("_", " ").title(),
-            "state": db_plan.get("status", "pending"),
+            "state": db_plan.get("status") or "pending",
             "files": ["plan.md"],
-            "created": db_plan.get("created_at", ""),
-            "modified": db_plan.get("updated_at", db_plan.get("created_at", "")),
-            "request": db_plan.get("request", ""),
-            "goal": db_plan.get("goal", ""),
+            "created": db_plan.get("created_at") or "",
+            "modified": db_plan.get("updated_at") or db_plan.get("created_at") or "",
+            "request": db_plan.get("request") or "",
+            "goal": db_plan.get("goal") or "",
         }
 
         if include_content:

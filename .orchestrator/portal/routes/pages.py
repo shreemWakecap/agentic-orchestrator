@@ -5,8 +5,8 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from db import PlanRepository, RunRepository, KnowledgeRepository
-from portal.dependencies import get_plan_repo, get_run_repo, get_knowledge_repo
+from db import PlanRepository, RunRepository, KnowledgeRepository, BuildStateRepository
+from portal.dependencies import get_plan_repo, get_run_repo, get_knowledge_repo, get_build_state_repo
 from portal.services.plan_service import PlanService
 from portal.services.knowledge_service import KnowledgeService
 
@@ -42,9 +42,10 @@ def _transform_runs_for_template(runs: List[Dict]) -> List[Dict]:
 
 def _get_plan_service(
     plan_repo: PlanRepository = Depends(get_plan_repo),
+    build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
 ) -> PlanService:
     """Get plan service with injected dependencies."""
-    return PlanService(plan_repo)
+    return PlanService(plan_repo, build_state_repo)
 
 
 def _get_knowledge_service(

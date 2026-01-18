@@ -113,3 +113,23 @@ class BuildStateRepository:
             "SELECT 1 FROM build_states WHERE plan_id = ?", (plan_id,)
         )
         return row is not None
+
+    def clear(self, plan_id: str) -> bool:
+        """Clear all build state and step states for a plan.
+
+        This removes:
+        - The build state record
+        - All associated step state records
+
+        Returns True if any records were deleted.
+        """
+        with self.db.transaction() as conn:
+            # Delete step states first (child records)
+            conn.execute(
+                "DELETE FROM step_states WHERE plan_id = ?", (plan_id,)
+            )
+            # Delete build state
+            cursor = conn.execute(
+                "DELETE FROM build_states WHERE plan_id = ?", (plan_id,)
+            )
+            return cursor.rowcount > 0

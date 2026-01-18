@@ -202,6 +202,70 @@ def run_building_workflow(run_id: str, plan_id: str):
         _cleanup_thread_local()
 
 
+def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[str] = None):
+    """Execute building workflow in resume mode.
+
+    This function runs in a ThreadPoolExecutor worker thread.
+    Thread-safe execution with proper cleanup on completion or error.
+
+    Unlike run_building_workflow, this function:
+    - Sets resume=True on the workflow to continue from last state
+    - Optionally accepts from_step to resume from a specific step
+    - Preserves completed step states instead of starting fresh
+
+    Args:
+        run_id: Unique identifier for this run
+        plan_id: ID of the plan to resume building
+        from_step: Optional step ID to resume from (if None, resumes from last incomplete)
+    """
+    from workflows.building import BuildingWorkflow
+
+    run_repo = _get_run_repo()
+
+    try:
+        run_repo.update(run_id, status="running")
+        _add_event(run_id, "start", {
+            "workflow": "building",
+            "plan_id": plan_id,
+            "resume": True,
+            "from_step": from_step,
+        })
+
+        try:
+            workflow = BuildingWorkflow(project_root=PROJECT_ROOT, resume=True)
+            result = workflow.run(plan_id, from_step=from_step)
+
+            status = "completed" if result.success else "failed"
+            run_repo.update(
+                run_id,
+                status=status,
+                completed_at=datetime.now().isoformat(),
+                progress=100,
+                data={
+                    "steps_completed": result.steps_completed,
+                    "resumed": True,
+                    "from_step": from_step,
+                },
+            )
+
+            _add_event(
+                run_id,
+                "complete",
+                {
+                    "success": result.success,
+                    "steps_completed": result.steps_completed,
+                    "resumed": True,
+                },
+            )
+
+        except Exception as e:
+            logger.exception(f"Building workflow resume failed: {e}")
+            _mark_run_failed(run_id, e)
+
+    finally:
+        _cleanup_thread_local()
+
+
 def run_syncing_workflow(run_id: str, auto_merge: bool = True):
     """Execute syncing workflow to commit changes and create PR.
 
@@ -338,5 +402,6 @@ def run_scouting_workflow(
 # Aliases for backward compatibility (functions are now directly sync)
 run_planning_workflow_sync = run_planning_workflow
 run_building_workflow_sync = run_building_workflow
+run_building_workflow_resume_sync = run_building_workflow_resume
 run_syncing_workflow_sync = run_syncing_workflow
 run_scouting_workflow_sync = run_scouting_workflow

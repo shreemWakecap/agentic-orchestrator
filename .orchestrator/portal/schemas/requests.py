@@ -72,3 +72,11 @@ class SyncRemoteRequest(BaseModel):
 class ImproveRequestRequest(BaseModel):
     """Request to improve a draft feature request using AI."""
     draft: str = Field(..., min_length=1, max_length=5000, description="Draft request text to improve")
+
+
+class ResumeBuildRequest(BaseModel):
+    """Request to resume a build workflow from a specific step."""
+    from_step: Optional[str] = Field(
+        None,
+        description="Step ID to resume from. If not provided, resumes from last incomplete step."
+    )

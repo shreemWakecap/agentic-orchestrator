@@ -19,6 +19,7 @@ COMMANDS = {
     'setup': 'run_setup',
     'experts': 'run_experts',
     'knowledge': 'run_knowledge',
+    'git-status': 'run_git_status',
 }
 
 
@@ -35,6 +36,7 @@ def main():
         print("  setup            Initialize orchestrator environment")
         print("  experts          Manage expert agents (list, create, refresh)")
         print("  knowledge        View knowledge store status")
+        print("  git-status       Show git statistics (--json, --verbose)")
         return 0
 
     cmd = sys.argv[1]

@@ -59,3 +59,11 @@ class PathScoutRequest(BaseModel):
 class KeywordScoutRequest(BaseModel):
     """Request to scout based on keywords for knowledge extraction."""
     keywords: str = Field(..., min_length=1, description="Keywords to search for during scouting")
+
+
+class SyncRemoteRequest(BaseModel):
+    """Request to sync with remote repository."""
+    auto_merge: Optional[bool] = Field(
+        True,
+        description="Whether to automatically merge after fetching (default True)"
+    )

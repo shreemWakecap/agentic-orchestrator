@@ -67,3 +67,8 @@ class SyncRemoteRequest(BaseModel):
         True,
         description="Whether to automatically merge after fetching (default True)"
     )
+
+
+class ImproveRequestRequest(BaseModel):
+    """Request to improve a draft feature request using AI."""
+    draft: str = Field(..., min_length=1, max_length=5000, description="Draft request text to improve")

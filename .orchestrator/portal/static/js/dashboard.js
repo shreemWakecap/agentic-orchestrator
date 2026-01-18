@@ -7,6 +7,40 @@ function initDashboard() {
     const form = document.getElementById('plan-form');
     if (!form) return;
 
+    // Setup "Improve with AI" button
+    const improveBtn = document.getElementById('improve-request-btn');
+    const descriptionInput = document.getElementById('plan-description');
+
+    if (improveBtn && descriptionInput) {
+        improveBtn.addEventListener('click', async function() {
+            const draftText = descriptionInput.value.trim();
+
+            if (!draftText) {
+                descriptionInput.focus();
+                descriptionInput.style.borderColor = '#EF4444';
+                setTimeout(function() {
+                    descriptionInput.style.borderColor = '';
+                }, 2000);
+                return;
+            }
+
+            // Show improvement dialog
+            try {
+                const result = await RequestImproverDialog.showImproveDialog(draftText);
+                if (result.accepted && result.text) {
+                    descriptionInput.value = result.text;
+                    // Add visual feedback that text was updated
+                    descriptionInput.style.borderColor = '#8B5CF6';
+                    setTimeout(function() {
+                        descriptionInput.style.borderColor = '';
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Error improving request:', error);
+            }
+        });
+    }
+
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
         const input = document.getElementById('plan-description');

@@ -159,3 +159,10 @@ class GitStatisticsResponse(BaseModel):
     pr_number: Optional[int] = None
     last_commit_hash: Optional[str] = None
     last_commit_message: Optional[str] = None
+
+
+class ImproveRequestResponse(BaseModel):
+    """Response for AI request improvement."""
+    improved: str = Field(..., description="The AI-improved request text")
+    original: str = Field(..., description="The original draft text")
+    success: bool = Field(True, description="Whether improvement succeeded")

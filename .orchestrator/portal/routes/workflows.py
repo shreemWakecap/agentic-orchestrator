@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, BackgroundTasks
 
 from db import RunRepository
 from portal.dependencies import get_run_repo
-from portal.schemas.requests import PlanRequest, BuildRequest, SyncRemoteRequest
-from portal.schemas.responses import WorkflowStartResponse, SyncStatusResponse, GitStatisticsResponse
+from portal.schemas.requests import PlanRequest, BuildRequest, SyncRemoteRequest, ImproveRequestRequest
+from portal.schemas.responses import WorkflowStartResponse, SyncStatusResponse, GitStatisticsResponse, ImproveRequestResponse
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
@@ -356,3 +356,70 @@ async def pull_latest():
             return {"success": False, "error": pull_result.stderr.strip()}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+@router.post("/improve-request", response_model=ImproveRequestResponse)
+async def improve_request(request: ImproveRequestRequest) -> ImproveRequestResponse:
+    """Use AI to improve a draft feature request.
+
+    Takes a rough draft request and returns an improved, more detailed version
+    using the request-improver agent.
+    """
+    import re
+    from pathlib import Path
+    from core import Agent
+
+    # Get project root (go up from portal/routes to .orchestrator to project root)
+    project_root = Path(__file__).parent.parent.parent.parent
+
+    try:
+        # Load the request-improver agent
+        agent = Agent.load("request-improver", project_root)
+
+        # Run the agent with the draft
+        result = agent.run(request.draft)
+
+        if not result.success or not result.content:
+            return ImproveRequestResponse(
+                improved=request.draft,
+                original=request.draft,
+                success=False,
+            )
+
+        # Extract improved text from response
+        # Agent should respond with "IMPROVED: ..." format
+        content = result.content.strip()
+
+        # Try to extract from IMPROVED: format
+        improved_match = re.search(r'IMPROVED:\s*(.+)', content, re.DOTALL | re.IGNORECASE)
+        if improved_match:
+            improved = improved_match.group(1).strip()
+        else:
+            # If no IMPROVED: prefix, use the whole response
+            improved = content
+
+        # Clean up any trailing ``` or markdown artifacts
+        improved = re.sub(r'```\s*$', '', improved).strip()
+
+        return ImproveRequestResponse(
+            improved=improved,
+            original=request.draft,
+            success=True,
+        )
+
+    except FileNotFoundError:
+        # Agent not found - return original
+        return ImproveRequestResponse(
+            improved=request.draft,
+            original=request.draft,
+            success=False,
+        )
+    except Exception as e:
+        # Log error but don't expose internals
+        import logging
+        logging.getLogger(__name__).exception(f"Request improvement failed: {e}")
+        return ImproveRequestResponse(
+            improved=request.draft,
+            original=request.draft,
+            success=False,
+        )

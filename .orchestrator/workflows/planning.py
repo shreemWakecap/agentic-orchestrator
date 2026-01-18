@@ -21,7 +21,6 @@ Enhanced with:
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.plan_parser import PlanParser, validate_plan_coverage
@@ -40,19 +39,11 @@ class PlanningWorkflow(Workflow):
     - Expert guidance injected into planner context
     """
 
-    def __init__(
-        self,
-        project_root: Path,
-        output_dir: Optional[Path] = None,
-    ):
+    def __init__(self, project_root: Path):
         self.project_root = project_root
         self._config = get_agent_config(project_root)
 
-        # Output dir for any temporary files (kept for compatibility)
-        output_dir = output_dir or project_root / ".orchestrator" / "specs" / "pending"
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        super().__init__(name="Planning Workflow", output_dir=output_dir)
+        super().__init__(name="Planning Workflow")
 
         # Database repositories
         self._plan_repo = get_plan_repository()

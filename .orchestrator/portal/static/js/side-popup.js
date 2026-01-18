@@ -1,6 +1,8 @@
 /**
  * Side Popup Component
  * A reusable slide-in panel for displaying content
+ *
+ * Uses centralized KeyboardShortcuts for ESC handling with proper priority
  */
 
 const SidePopup = {
@@ -8,6 +10,7 @@ const SidePopup = {
     popup: null,
     titleEl: null,
     contentEl: null,
+    escShortcutId: null,
 
     init() {
         this.overlay = document.getElementById('side-popup-overlay');
@@ -15,10 +18,53 @@ const SidePopup = {
         this.titleEl = document.getElementById('side-popup-title');
         this.contentEl = document.getElementById('side-popup-content');
 
-        // Close on Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') this.close();
-        });
+        // ESC handler is now registered/unregistered dynamically when popup opens/closes
+        // This ensures proper priority handling through the centralized KeyboardShortcuts module
+    },
+
+    /**
+     * Register ESC shortcut with centralized keyboard manager
+     * Uses PAGE priority (10) - will yield to MODAL priority (100) dialogs
+     */
+    _registerEscHandler() {
+        if (this.escShortcutId) {
+            // Already registered
+            return;
+        }
+
+        // Use PAGE priority - confirm dialogs use MODAL priority so they take precedence
+        this.escShortcutId = KeyboardShortcuts.registerShortcut('esc', (event) => {
+            // Only handle if popup is actually open
+            if (!this.isOpen()) {
+                return false; // Pass to next handler
+            }
+
+            // Check if PlanManager's confirm dialog is visible (extra safety check)
+            const confirmDialog = document.getElementById('confirm-dialog-overlay');
+            if (confirmDialog && confirmDialog.classList.contains('active')) {
+                return false; // Let confirm dialog handle it
+            }
+
+            this.close();
+            return true; // Handled - prevent default and stop propagation
+        }, KeyboardShortcuts.PRIORITY.PAGE);
+    },
+
+    /**
+     * Unregister ESC shortcut from centralized keyboard manager
+     */
+    _unregisterEscHandler() {
+        if (this.escShortcutId) {
+            KeyboardShortcuts.unregisterShortcut(this.escShortcutId);
+            this.escShortcutId = null;
+        }
+    },
+
+    /**
+     * Check if the popup is currently open
+     */
+    isOpen() {
+        return this.overlay && this.overlay.classList.contains('active');
     },
 
     open(title, content, options = {}) {
@@ -41,12 +87,18 @@ const SidePopup = {
         this.overlay.classList.add('active');
         this.popup.classList.add('active');
         document.body.style.overflow = 'hidden';
+
+        // Register ESC handler when popup opens
+        this._registerEscHandler();
     },
 
     close() {
         this.overlay.classList.remove('active');
         this.popup.classList.remove('active');
         document.body.style.overflow = '';
+
+        // Unregister ESC handler when popup closes
+        this._unregisterEscHandler();
     },
 
     async loadUrl(title, url, options = {}) {

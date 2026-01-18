@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional, TypeVar
 
-from .config import get_agent_config, RetryConfig
+from .config import get_agent_config, RetryConfig, ThinkingConfig
 
 
 def _get_claude_executable() -> str:
@@ -409,6 +409,8 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
         max_retries: Optional[int] = None,
         retry_delay: Optional[float] = None,
         timeout: Optional[int] = None,
+        thinking_enabled: Optional[bool] = None,
+        thinking_budget: Optional[int] = None,
     ) -> AgentResult:
         """
         Run the agent in print mode (read-only, no tool execution).
@@ -421,13 +423,18 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
             max_retries: Maximum retry attempts (default from config)
             retry_delay: Base delay between retries (default from config)
             timeout: Timeout in seconds (default from config)
+            thinking_enabled: Enable extended thinking (default from config)
+            thinking_budget: Token budget for thinking (default from config)
 
         Returns:
             AgentResult with the agent's response
         """
         # Auto-detect if this agent should run in agentic mode
         if self.name in self.AGENTIC_AGENTS:
-            return self.run_agentic(message, context, max_retries=max_retries)
+            return self.run_agentic(
+                message, context, max_retries=max_retries,
+                thinking_enabled=thinking_enabled, thinking_budget=thinking_budget
+            )
 
         # Build retry config with overrides
         retry_config = RetryConfig(
@@ -436,7 +443,15 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
             backoff_multiplier=self._config.retry.backoff_multiplier,
             max_delay=self._config.retry.max_delay,
         )
+
+        # Determine thinking settings
+        use_thinking = thinking_enabled if thinking_enabled is not None else self._config.thinking.enabled
+        effective_thinking_budget = thinking_budget or self._config.thinking.budget
+
+        # Calculate timeout (multiply if thinking enabled)
         effective_timeout = timeout or self._config.timeouts.print_mode
+        if use_thinking:
+            effective_timeout = int(effective_timeout * self._config.thinking.timeout_multiplier)
 
         # Track placeholder retries separately
         placeholder_retries = 0
@@ -476,6 +491,10 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
                     "--print",
                     "--append-system-prompt", short_system,
                 ]
+
+                # Add extended thinking flags if enabled
+                if use_thinking:
+                    cmd.extend(["--thinking", "--thinking-budget", str(effective_thinking_budget)])
 
                 result = subprocess.run(
                     cmd,
@@ -572,6 +591,8 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
         timeout: Optional[int] = None,
         max_retries: Optional[int] = None,
         retry_delay: Optional[float] = None,
+        thinking_enabled: Optional[bool] = None,
+        thinking_budget: Optional[int] = None,
     ) -> AgentResult:
         """
         Run the agent in agentic mode (can execute tools, write files).
@@ -585,6 +606,8 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
             timeout: Timeout in seconds (default from config)
             max_retries: Maximum retry attempts (default from config)
             retry_delay: Base delay between retries (default from config)
+            thinking_enabled: Enable extended thinking (default from config)
+            thinking_budget: Token budget for thinking (default from config)
 
         Returns:
             AgentResult with the agent's response and file changes
@@ -596,7 +619,16 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
             backoff_multiplier=self._config.retry.backoff_multiplier,
             max_delay=self._config.retry.max_delay,
         )
+
+        # Determine thinking settings
+        use_thinking = thinking_enabled if thinking_enabled is not None else self._config.thinking.enabled
+        effective_thinking_budget = thinking_budget or self._config.thinking.budget
+
+        # Calculate timeout (multiply if thinking enabled)
         effective_timeout = timeout or self._config.timeouts.agentic_mode
+        if use_thinking:
+            effective_timeout = int(effective_timeout * self._config.thinking.timeout_multiplier)
+
         tools = allowed_tools or self.ALLOWED_TOOLS
 
         def execute(state: RetryState) -> AgentResult:
@@ -628,6 +660,10 @@ This is a RETRY - you MUST output the structured format NOW, starting with the f
                     "--allowedTools", ",".join(tools),
                     "--append-system-prompt", short_system,
                 ]
+
+                # Add extended thinking flags if enabled
+                if use_thinking:
+                    cmd.extend(["--thinking", "--thinking-budget", str(effective_thinking_budget)])
 
                 result = subprocess.run(
                     cmd,

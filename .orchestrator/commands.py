@@ -1,4 +1,6 @@
 """Simple CLI commands - utilities that don't require workflow orchestration."""
+import argparse
+import json
 import shutil
 import socket
 from pathlib import Path
@@ -267,5 +269,155 @@ def run_knowledge(args=None) -> int:
     if meta:
         print(f"  Scan type: {meta.scan_type}")
         print(f"  Duration: {meta.duration_seconds:.1f}s")
+
+    return 0
+
+
+def run_git_status(args=None) -> int:
+    """Display git statistics using git commands only (no AI dependencies).
+
+    Supports --json for JSON output and --verbose for detailed information.
+    """
+    parser = argparse.ArgumentParser(
+        description="Show git repository statistics using git commands"
+    )
+    parser.add_argument(
+        "--json", "-j",
+        action="store_true",
+        dest="json_output",
+        help="Output in JSON format"
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show detailed information"
+    )
+    parser.add_argument(
+        "--remote", "-r",
+        default="origin",
+        help="Remote name to compare against (default: origin)"
+    )
+    parser.add_argument(
+        "--target", "-t",
+        default="main",
+        help="Target branch for merge status (default: main)"
+    )
+
+    parsed = parser.parse_args(args or [])
+
+    from portal.services.git_statistics_service import GitStatisticsService
+
+    service = GitStatisticsService(PROJECT_ROOT)
+
+    # Check if we're in a git repository
+    if not service.is_git_repository():
+        if parsed.json_output:
+            print(json.dumps({"error": "Not a git repository"}, indent=2))
+        else:
+            print("Error: Not a git repository")
+        return 1
+
+    # Get all statistics
+    stats = service.get_all_statistics(
+        remote=parsed.remote,
+        target_branch=parsed.target
+    )
+
+    if parsed.json_output:
+        # JSON output
+        print(json.dumps(service.to_dict(stats), indent=2))
+        return 0
+
+    # Formatted console output
+    print("Git Statistics\n" + "=" * 50)
+
+    # Branch info
+    branch = stats.branch_info
+    print(f"\nBranch: {branch.name}")
+    if branch.tracking_branch:
+        print(f"  Tracking: {branch.tracking_branch}")
+    if branch.is_detached:
+        print("  (detached HEAD)")
+
+    # Commit counts
+    commits = stats.commit_count
+    if not commits.error:
+        print(f"\nCommits:")
+        print(f"  Ahead of {commits.remote_branch}: {commits.ahead}")
+        print(f"  Behind {commits.remote_branch}: {commits.behind}")
+        if parsed.verbose:
+            print(f"  Total local commits: {commits.total_local}")
+    elif parsed.verbose:
+        print(f"\nCommits: {commits.error}")
+
+    # File statistics
+    files = stats.file_statistics
+    if not files.error:
+        print(f"\nFiles:")
+        print(f"  Tracked: {files.tracked_files}")
+        if files.modified_files:
+            print(f"  Modified: {files.modified_files}")
+        if files.staged_files:
+            print(f"  Staged: {files.staged_files}")
+        if files.untracked_files:
+            print(f"  Untracked: {files.untracked_files}")
+        if parsed.verbose:
+            if files.added_files:
+                print(f"  Added: {files.added_files}")
+            if files.deleted_files:
+                print(f"  Deleted: {files.deleted_files}")
+            if files.renamed_files:
+                print(f"  Renamed: {files.renamed_files}")
+            if files.ignored_files:
+                print(f"  Ignored: {files.ignored_files}")
+
+    # PR status
+    pr = stats.pr_status
+    if pr and not pr.error:
+        print(f"\nPull Request: #{pr.number}")
+        print(f"  Title: {pr.title}")
+        print(f"  State: {pr.state}")
+        print(f"  {pr.head_branch} -> {pr.base_branch}")
+        if pr.mergeable:
+            print(f"  Mergeable: {pr.mergeable}")
+        if pr.checks_status:
+            print(f"  Checks: {pr.checks_status}")
+        if parsed.verbose:
+            print(f"  Changes: +{pr.additions} -{pr.deletions} ({pr.changed_files} files)")
+            if pr.review_decision:
+                print(f"  Review: {pr.review_decision}")
+            print(f"  URL: {pr.url}")
+    elif parsed.verbose and pr and pr.error:
+        print(f"\nPull Request: {pr.error}")
+
+    # Merge status
+    merge = stats.merge_status
+    if not merge.error:
+        print(f"\nMerge Status (vs {parsed.target}):")
+        if merge.can_merge:
+            print("  Can merge: Yes")
+        elif merge.has_conflicts:
+            print("  Can merge: No (conflicts)")
+            if parsed.verbose and merge.conflict_files:
+                print("  Conflict files:")
+                for f in merge.conflict_files[:5]:
+                    print(f"    - {f}")
+                if len(merge.conflict_files) > 5:
+                    print(f"    ... and {len(merge.conflict_files) - 5} more")
+        if parsed.verbose and merge.merge_base:
+            print(f"  Merge base: {merge.merge_base}")
+    elif parsed.verbose:
+        print(f"\nMerge Status: {merge.error}")
+
+    # Remote info (verbose only)
+    if parsed.verbose:
+        remote = stats.remote_info
+        if not remote.error:
+            print(f"\nRemote ({remote.name}):")
+            print(f"  URL: {remote.fetch_url}")
+            if remote.head_branch:
+                print(f"  Default branch: {remote.head_branch}")
+            if remote.branches:
+                print(f"  Branches: {len(remote.branches)}")
 
     return 0

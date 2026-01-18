@@ -128,11 +128,11 @@ const PlanDetail = (function() {
             disableButton(elements.resumeBuildBtn, 'Resuming...');
             Toast.info('Resuming build...');
 
-            const response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/start-build', {
+            // Use /resume-build endpoint for plans that are in building/paused/failed state
+            const response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/resume-build', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    resume: true,
                     from_step: window.PLAN_DATA.failedStep || window.PLAN_DATA.currentStep
                 })
             });
@@ -198,8 +198,6 @@ const PlanDetail = (function() {
      */
     async function startReview(planId) {
         try {
-            Toast.info('Starting review...');
-
             const response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/review', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
@@ -210,6 +208,9 @@ const PlanDetail = (function() {
             if (!response.ok) {
                 throw new Error(data.detail || 'Failed to start review');
             }
+
+            // Show toast only after successful API call
+            Toast.info('Starting review...');
 
             if (data.run_id) {
                 window.location.href = '/runs/' + data.run_id;

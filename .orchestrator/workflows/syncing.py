@@ -47,9 +47,11 @@ class SyncingWorkflow(Workflow):
         self,
         project_root: Path,
         output_dir: Optional[Path] = None,
+        auto_merge: bool = True,
     ):
         self.project_root = project_root
         self._config = get_agent_config(project_root)
+        self.auto_merge = auto_merge
         output_dir = output_dir or project_root / ".orchestrator" / "sync-logs"
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -340,23 +342,29 @@ Head: {branch_info.get('head', '')}
 
         return pr_desc
 
-    def execute(self, request: str = "") -> WorkflowResult:
+    def execute(self, request: str = "", auto_merge: Optional[bool] = None) -> WorkflowResult:
         """
         Execute the sync workflow.
 
         Args:
             request: Optional context/description (unused but required by base class)
+            auto_merge: Override auto_merge setting (if None, uses instance setting)
 
         Returns:
             WorkflowResult with pr_url, branch_name, commit_hash in data
         """
+        # Use parameter override or instance setting
+        should_auto_merge = auto_merge if auto_merge is not None else self.auto_merge
+        total_steps = 8 if should_auto_merge else 6
         steps_completed = []
 
         self.console.print("\n[bold cyan]SYNC WORKFLOW[/bold cyan]")
         self.console.print("=" * 50)
+        if not should_auto_merge:
+            self.console.print("[dim]Mode: Create PR only (no auto-merge)[/dim]")
 
         # Step 1: Check prerequisites
-        self.console.print("\n[bold]Step 1/8:[/bold] Checking prerequisites...")
+        self.console.print(f"\n[bold]Step 1/{total_steps}:[/bold] Checking prerequisites...")
         ok, error = self._check_prerequisites()
         if not ok:
             self.console.print(f"  [red]{CROSS}[/red] {error}")
@@ -365,7 +373,7 @@ Head: {branch_info.get('head', '')}
         steps_completed.append("prerequisites")
 
         # Step 2: Check for changes
-        self.console.print("\n[bold]Step 2/8:[/bold] Checking for changes...")
+        self.console.print(f"\n[bold]Step 2/{total_steps}:[/bold] Checking for changes...")
         changed_files, diff_stats, diff_content = self._get_changes()
         if not changed_files:
             self.console.print(f"  [yellow]{WARNING}[/yellow] No changes to commit")
@@ -378,7 +386,7 @@ Head: {branch_info.get('head', '')}
         steps_completed.append("check_changes")
 
         # Step 3: Get current branch and create feature branch
-        self.console.print("\n[bold]Step 3/8:[/bold] Creating feature branch...")
+        self.console.print(f"\n[bold]Step 3/{total_steps}:[/bold] Creating feature branch...")
         base_branch = self._run_git(["rev-parse", "--abbrev-ref", "HEAD"])
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         new_branch = f"sync/{base_branch}/{timestamp}"
@@ -387,7 +395,7 @@ Head: {branch_info.get('head', '')}
         steps_completed.append("create_branch")
 
         # Step 4: Generate commit message and commit
-        self.console.print("\n[bold]Step 4/8:[/bold] Generating commit message...")
+        self.console.print(f"\n[bold]Step 4/{total_steps}:[/bold] Generating commit message...")
         self._run_git(["add", "-A"])
         commit_message = self._generate_commit_message(diff_stats, diff_content, changed_files)
         self._run_git(["commit", "-m", commit_message])
@@ -396,13 +404,13 @@ Head: {branch_info.get('head', '')}
         steps_completed.append("commit")
 
         # Step 5: Push to remote
-        self.console.print("\n[bold]Step 5/8:[/bold] Pushing to remote...")
+        self.console.print(f"\n[bold]Step 5/{total_steps}:[/bold] Pushing to remote...")
         self._run_git(["push", "-u", "origin", new_branch])
         self.console.print(f"  [green]{CHECK}[/green] Pushed to origin/{new_branch}")
         steps_completed.append("push")
 
         # Step 6: Create PR
-        self.console.print("\n[bold]Step 6/8:[/bold] Creating pull request...")
+        self.console.print(f"\n[bold]Step 6/{total_steps}:[/bold] Creating pull request...")
         branch_info = {"base": base_branch, "head": new_branch}
         pr_description = self._generate_pr_description(commit_message, diff_stats, branch_info)
         pr_title = commit_message.split("\n")[0]
@@ -443,8 +451,32 @@ Head: {branch_info.get('head', '')}
                 }
             )
 
+        # Skip merge steps if auto_merge is disabled
+        if not should_auto_merge:
+            # Return to base branch without merging
+            self._run_git(["checkout", base_branch])
+            self.console.print("\n" + "=" * 50)
+            self.console.print("[bold green]SYNC COMPLETE (PR created for manual merge)[/bold green]")
+            self.console.print(f"[bold]PR URL:[/bold] {pr_url}")
+            self.console.print(f"[dim]To merge: gh pr merge {pr_number} --merge --delete-branch[/dim]")
+
+            return WorkflowResult(
+                success=True,
+                steps_completed=steps_completed,
+                total_tokens=self.total_tokens,
+                data={
+                    "pr_url": pr_url,
+                    "pr_number": pr_number,
+                    "branch_name": new_branch,
+                    "commit_hash": commit_hash,
+                    "commit_message": commit_message,
+                    "files_changed": changed_files,
+                    "auto_merged": False,
+                }
+            )
+
         # Step 7: Merge PR
-        self.console.print("\n[bold]Step 7/8:[/bold] Merging pull request...")
+        self.console.print(f"\n[bold]Step 7/{total_steps}:[/bold] Merging pull request...")
         try:
             self._merge_pr(pr_number)
             self.console.print(f"  [green]{CHECK}[/green] PR #{pr_number} merged and branch deleted")
@@ -470,7 +502,7 @@ Head: {branch_info.get('head', '')}
             )
 
         # Step 8: Pull changes to base branch
-        self.console.print("\n[bold]Step 8/8:[/bold] Pulling changes to base branch...")
+        self.console.print(f"\n[bold]Step 8/{total_steps}:[/bold] Pulling changes to base branch...")
         # Return to base branch
         self._run_git(["checkout", base_branch])
         try:
@@ -496,18 +528,41 @@ Head: {branch_info.get('head', '')}
                 "commit_hash": commit_hash,
                 "commit_message": commit_message,
                 "files_changed": changed_files,
+                "auto_merged": True,
             }
         )
 
 
 def run(args=None) -> int:
-    """Run syncing action."""
-    project_root = Path(__file__).parent.parent.parent
+    """Run syncing action.
 
-    workflow = SyncingWorkflow(project_root=project_root)
+    Args:
+        args: Command line arguments. Supports:
+            --no-merge: Create PR without auto-merging
+
+    Returns:
+        0 on success, 1 on failure
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Sync workflow: commit changes and create PRs")
+    parser.add_argument(
+        "--no-merge",
+        action="store_true",
+        help="Create PR without auto-merging (leaves PR open for manual merge)"
+    )
+
+    parsed_args = parser.parse_args(args)
+
+    project_root = Path(__file__).parent.parent.parent
+    auto_merge = not parsed_args.no_merge
+
+    workflow = SyncingWorkflow(project_root=project_root, auto_merge=auto_merge)
     result = workflow.run("")
     if result.success:
         print(f"\nPR: {result.data.get('pr_url')}")
+        if not auto_merge:
+            print(f"PR #{result.data.get('pr_number')} created (manual merge required)")
     return 0 if result.success else 1
 
 

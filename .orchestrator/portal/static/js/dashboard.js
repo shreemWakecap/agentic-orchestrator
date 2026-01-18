@@ -1,56 +1,41 @@
 /**
  * Dashboard page functionality
- * Handles plan creation form submission
+ * Handles plan creation form submission using unified AI-enhanced dialog
  */
 
 function initDashboard() {
     const form = document.getElementById('plan-form');
     if (!form) return;
 
+    const descriptionInput = document.getElementById('plan-description');
+
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        const input = document.getElementById('plan-description');
-        const description = input.value;
-        const button = this.querySelector('button[type="submit"]');
+        const description = descriptionInput ? descriptionInput.value.trim() : '';
 
-        if (!description.trim()) {
-            input.focus();
-            input.style.borderColor = '#EF4444';
-            setTimeout(() => input.style.borderColor = '', 2000);
+        if (!description) {
+            if (descriptionInput) {
+                descriptionInput.focus();
+                descriptionInput.style.borderColor = '#EF4444';
+                setTimeout(function() {
+                    descriptionInput.style.borderColor = '';
+                }, 2000);
+            }
             return;
         }
 
-        // Show confirmation dialog before proceeding
-        const confirmed = await PlanConfirmDialog.showPlanConfirmDialog(description);
-        if (!confirmed) {
-            return;
-        }
-
-        button.disabled = true;
-        button.textContent = 'Creating...';
-
-        try {
-            const response = await fetch('/api/workflows/plan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description: description })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Use unified dialog which handles AI improvement and plan creation
+        if (typeof UnifiedPlanDialog !== 'undefined' && UnifiedPlanDialog.showCreatePlanDialog) {
+            var result = await UnifiedPlanDialog.showCreatePlanDialog(description);
+            if (result.created) {
+                // Dialog handles redirect, but clear input as backup
+                if (descriptionInput) {
+                    descriptionInput.value = '';
+                }
             }
-
-            const data = await response.json();
-            if (data.run_id) {
-                window.location.href = '/runs/' + data.run_id;
-            } else {
-                throw new Error('No run_id in response');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to create plan: ' + error.message);
-            button.disabled = false;
-            button.textContent = 'Create Plan';
+        } else {
+            console.error('UnifiedPlanDialog not available');
+            alert('Plan creation dialog is not available. Please refresh the page.');
         }
     });
 }
@@ -64,10 +49,15 @@ function initSyncRemote() {
         button.disabled = true;
         button.textContent = 'Syncing...';
 
+        // Get auto-merge setting
+        const autoMergeCheckbox = document.getElementById('sync-auto-merge');
+        const autoMerge = autoMergeCheckbox ? autoMergeCheckbox.checked : true;
+
         try {
             const response = await fetch('/api/workflows/sync-remote', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ auto_merge: autoMerge })
             });
 
             if (!response.ok) {
@@ -89,11 +79,184 @@ function initSyncRemote() {
     });
 
     // Setup refresh sync status button
-    const refreshBtn = document.getElementById('refresh-sync-btn');
+    const refreshBtn = document.getElementById('sync-refresh-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
-            fetchSyncStatus();
+            const icon = refreshBtn.querySelector('svg');
+            if (icon) icon.classList.add('animate-spin');
+            fetchSyncStatus().finally(function() {
+                setTimeout(function() {
+                    if (icon) icon.classList.remove('animate-spin');
+                }, 500);
+            });
         });
+    }
+
+    // Setup pull latest button
+    const pullLatestBtn = document.getElementById('pull-latest-btn');
+    if (pullLatestBtn) {
+        pullLatestBtn.addEventListener('click', async function() {
+            pullLatestBtn.disabled = true;
+            const icon = pullLatestBtn.querySelector('svg');
+            if (icon) icon.classList.add('animate-bounce');
+
+            try {
+                const response = await fetch('/api/workflows/pull-latest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // Refresh sync status after pull
+                    fetchSyncStatus();
+                    fetchBranchesAndPRs();
+                } else {
+                    alert('Pull failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error pulling latest:', error);
+                alert('Failed to pull latest: ' + error.message);
+            } finally {
+                pullLatestBtn.disabled = false;
+                if (icon) icon.classList.remove('animate-bounce');
+            }
+        });
+    }
+
+    // Initial fetch of branches and PRs
+    fetchBranchesAndPRs();
+}
+
+/**
+ * Fetch and display local sync branches and open PRs
+ */
+async function fetchBranchesAndPRs() {
+    // Fetch branches
+    try {
+        const branchResponse = await fetch('/api/workflows/branches');
+        const branchData = await branchResponse.json();
+        updateBranchList(branchData.branches || []);
+    } catch (error) {
+        console.error('Error fetching branches:', error);
+    }
+
+    // Fetch PRs
+    try {
+        const prResponse = await fetch('/api/workflows/prs');
+        const prData = await prResponse.json();
+        updatePRList(prData.prs || []);
+    } catch (error) {
+        console.error('Error fetching PRs:', error);
+    }
+}
+
+function updateBranchList(branches) {
+    const container = document.getElementById('sync-local-branches');
+    const listEl = document.getElementById('sync-branch-list');
+    const countEl = document.getElementById('sync-branch-count');
+
+    if (!container || !listEl) return;
+
+    if (branches.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    if (countEl) countEl.textContent = branches.length;
+
+    var html = '';
+    branches.forEach(function(branch) {
+        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30 dark:hover:bg-tertiary/30">';
+        html += '<div class="min-w-0 flex-1">';
+        html += '<div class="text-sm font-mono text-primary dark:text-primary truncate">' + escapeHtml(branch.name) + '</div>';
+        html += '<div class="text-xs text-tertiary dark:text-tertiary truncate">' + escapeHtml(branch.message || '') + '</div>';
+        html += '</div>';
+        html += '<button type="button" class="ml-3 btn btn-xs text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20" onclick="deleteBranch(\'' + escapeHtml(branch.name) + '\')" title="Delete branch">';
+        html += '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
+        html += '</button>';
+        html += '</li>';
+    });
+    listEl.innerHTML = html;
+}
+
+function updatePRList(prs) {
+    const container = document.getElementById('sync-open-prs');
+    const listEl = document.getElementById('sync-pr-list');
+    const countEl = document.getElementById('sync-pr-count');
+
+    if (!container || !listEl) return;
+
+    if (prs.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    if (countEl) countEl.textContent = prs.length;
+
+    var html = '';
+    prs.forEach(function(pr) {
+        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30 dark:hover:bg-tertiary/30">';
+        html += '<div class="min-w-0 flex-1">';
+        html += '<a href="' + escapeHtml(pr.url) + '" target="_blank" class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">';
+        html += '#' + pr.number + ' ' + escapeHtml(pr.title);
+        html += '</a>';
+        html += '<div class="text-xs text-tertiary dark:text-tertiary">' + escapeHtml(pr.head_branch) + ' → ' + escapeHtml(pr.base_branch) + '</div>';
+        html += '</div>';
+        html += '<button type="button" class="ml-3 btn btn-xs btn-primary" onclick="mergePR(' + pr.number + ')" title="Merge PR">';
+        html += '<svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>';
+        html += 'Merge';
+        html += '</button>';
+        html += '</li>';
+    });
+    listEl.innerHTML = html;
+}
+
+async function deleteBranch(branchName) {
+    if (!confirm('Delete branch "' + branchName + '"? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/workflows/branches/' + encodeURIComponent(branchName), {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+        if (data.success) {
+            fetchBranchesAndPRs();
+        } else {
+            alert('Failed to delete branch: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting branch:', error);
+        alert('Failed to delete branch: ' + error.message);
+    }
+}
+
+async function mergePR(prNumber) {
+    if (!confirm('Merge PR #' + prNumber + '? This will merge and delete the remote branch.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/workflows/prs/' + prNumber + '/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.success) {
+            // Pull latest after merge
+            await fetch('/api/workflows/pull-latest', { method: 'POST' });
+            fetchBranchesAndPRs();
+            fetchSyncStatus();
+        } else {
+            alert('Failed to merge PR: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error merging PR:', error);
+        alert('Failed to merge PR: ' + error.message);
     }
 }
 
@@ -102,16 +265,15 @@ function initSyncRemote() {
  * Fetches and displays git sync status information
  */
 async function fetchSyncStatus() {
-    const syncSection = document.getElementById('sync-status-section');
     const syncButton = document.getElementById('sync-remote-btn');
     const fileCountEl = document.getElementById('sync-file-count');
     const fileListEl = document.getElementById('sync-file-list');
-    const branchInfoEl = document.getElementById('sync-branch-info');
-    const loadingEl = document.getElementById('sync-loading');
-    const contentEl = document.getElementById('sync-content');
+    const branchInfoEl = document.getElementById('sync-branch');
+    const loadingEl = document.getElementById('sync-status-loading');
+    const contentEl = document.getElementById('sync-status-content');
     const noChangesEl = document.getElementById('sync-no-changes');
-
-    if (!syncSection) return;
+    const stagedCountEl = document.getElementById('sync-staged-count');
+    const unstagedCountEl = document.getElementById('sync-unstaged-count');
 
     // Show loading state
     if (loadingEl) loadingEl.style.display = 'block';
@@ -130,11 +292,9 @@ async function fetchSyncStatus() {
         if (loadingEl) loadingEl.style.display = 'none';
 
         // Check if there are changes to sync
-        const totalFiles = (data.staged_files?.length || 0) +
-                          (data.modified_files?.length || 0) +
-                          (data.untracked_files?.length || 0);
+        const totalFiles = data.file_count || 0;
 
-        if (totalFiles === 0) {
+        if (totalFiles === 0 || !data.has_changes) {
             // No changes to sync
             if (noChangesEl) noChangesEl.style.display = 'block';
             if (contentEl) contentEl.style.display = 'none';
@@ -151,67 +311,46 @@ async function fetchSyncStatus() {
                 syncButton.title = '';
             }
 
-            // Update file count
+            // Update file count badge
             if (fileCountEl) {
-                fileCountEl.textContent = totalFiles + ' file' + (totalFiles !== 1 ? 's' : '') + ' to sync';
+                fileCountEl.textContent = totalFiles;
             }
 
             // Update branch info
             if (branchInfoEl) {
-                let branchHtml = '';
-                if (data.current_branch) {
-                    branchHtml += '<span class="text-gray-600">Branch:</span> <span class="font-medium">' + escapeHtml(data.current_branch) + '</span>';
-                }
-                if (data.remote_branch) {
-                    branchHtml += ' <span class="text-gray-400">→</span> <span class="text-gray-600">' + escapeHtml(data.remote_branch) + '</span>';
-                }
-                if (data.ahead !== undefined && data.behind !== undefined) {
-                    if (data.ahead > 0 || data.behind > 0) {
-                        branchHtml += ' <span class="text-xs text-gray-500">(';
-                        if (data.ahead > 0) branchHtml += '↑' + data.ahead;
-                        if (data.ahead > 0 && data.behind > 0) branchHtml += ' ';
-                        if (data.behind > 0) branchHtml += '↓' + data.behind;
-                        branchHtml += ')</span>';
-                    }
-                }
-                branchInfoEl.innerHTML = branchHtml;
+                branchInfoEl.textContent = data.branch || '--';
+            }
+
+            // Update staged/unstaged counts
+            if (stagedCountEl) {
+                stagedCountEl.textContent = data.staged_count || 0;
+            }
+            if (unstagedCountEl) {
+                unstagedCountEl.textContent = data.unstaged_count || 0;
             }
 
             // Update file list (collapsible)
             if (fileListEl) {
-                let listHtml = '';
+                var listContainer = fileListEl.querySelector('ul');
+                var emptyMsg = document.getElementById('sync-file-list-empty');
 
-                if (data.staged_files && data.staged_files.length > 0) {
-                    listHtml += '<div class="mb-2">';
-                    listHtml += '<div class="text-xs font-medium text-green-700 mb-1">Staged (' + data.staged_files.length + ')</div>';
-                    listHtml += '<ul class="text-xs text-gray-600 space-y-0.5">';
-                    data.staged_files.forEach(function(file) {
-                        listHtml += '<li class="flex items-center"><span class="w-4 text-green-600">A</span><span class="truncate">' + escapeHtml(file) + '</span></li>';
-                    });
-                    listHtml += '</ul></div>';
+                if (data.files && data.files.length > 0) {
+                    if (emptyMsg) emptyMsg.style.display = 'none';
+                    if (listContainer) {
+                        var listHtml = '';
+                        data.files.forEach(function(file) {
+                            listHtml += '<li class="px-4 py-2 flex items-center text-sm text-secondary dark:text-secondary">';
+                            listHtml += '<svg class="h-4 w-4 mr-2 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+                            listHtml += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>';
+                            listHtml += '</svg>';
+                            listHtml += '<span class="truncate">' + escapeHtml(file) + '</span></li>';
+                        });
+                        listContainer.innerHTML = listHtml;
+                    }
+                } else {
+                    if (emptyMsg) emptyMsg.style.display = 'block';
+                    if (listContainer) listContainer.innerHTML = '';
                 }
-
-                if (data.modified_files && data.modified_files.length > 0) {
-                    listHtml += '<div class="mb-2">';
-                    listHtml += '<div class="text-xs font-medium text-yellow-700 mb-1">Modified (' + data.modified_files.length + ')</div>';
-                    listHtml += '<ul class="text-xs text-gray-600 space-y-0.5">';
-                    data.modified_files.forEach(function(file) {
-                        listHtml += '<li class="flex items-center"><span class="w-4 text-yellow-600">M</span><span class="truncate">' + escapeHtml(file) + '</span></li>';
-                    });
-                    listHtml += '</ul></div>';
-                }
-
-                if (data.untracked_files && data.untracked_files.length > 0) {
-                    listHtml += '<div class="mb-2">';
-                    listHtml += '<div class="text-xs font-medium text-gray-700 mb-1">Untracked (' + data.untracked_files.length + ')</div>';
-                    listHtml += '<ul class="text-xs text-gray-600 space-y-0.5">';
-                    data.untracked_files.forEach(function(file) {
-                        listHtml += '<li class="flex items-center"><span class="w-4 text-gray-400">?</span><span class="truncate">' + escapeHtml(file) + '</span></li>';
-                    });
-                    listHtml += '</ul></div>';
-                }
-
-                fileListEl.innerHTML = listHtml;
             }
         }
     } catch (error) {
@@ -226,12 +365,25 @@ async function fetchSyncStatus() {
 
 function toggleSyncFileList() {
     const fileListEl = document.getElementById('sync-file-list');
-    const toggleBtn = document.getElementById('sync-toggle-btn');
-    if (!fileListEl || !toggleBtn) return;
+    const toggleBtn = document.getElementById('sync-file-list-toggle');
+    const chevron = document.getElementById('sync-file-list-chevron');
+    if (!fileListEl) return;
 
-    const isHidden = fileListEl.style.display === 'none';
-    fileListEl.style.display = isHidden ? 'block' : 'none';
-    toggleBtn.textContent = isHidden ? 'Hide files' : 'Show files';
+    const isHidden = fileListEl.classList.contains('hidden');
+    if (isHidden) {
+        fileListEl.classList.remove('hidden');
+        if (chevron) chevron.style.transform = 'rotate(180deg)';
+    } else {
+        fileListEl.classList.add('hidden');
+        if (chevron) chevron.style.transform = 'rotate(0deg)';
+    }
+}
+
+function initSyncFileListToggle() {
+    const toggleBtn = document.getElementById('sync-file-list-toggle');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', toggleSyncFileList);
+    }
 }
 
 /**
@@ -574,6 +726,102 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+/**
+ * Poll a task until it completes or fails
+ * @param {string} taskId - The task ID to poll
+ * @param {string} taskType - The task type for indicator updates
+ * @param {number} maxAttempts - Maximum poll attempts (default 120 = 2 minutes at 1s interval)
+ * @param {number} interval - Poll interval in ms (default 1000)
+ * @returns {Promise<Object>} The task result
+ */
+async function pollTaskUntilComplete(taskId, taskType, maxAttempts, interval) {
+    maxAttempts = maxAttempts || 120;
+    interval = interval || 1000;
+
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+        attempts++;
+
+        try {
+            const response = await fetch('/api/background-tasks/' + encodeURIComponent(taskId));
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch task status: HTTP ' + response.status);
+            }
+
+            const task = await response.json();
+
+            // Update background indicator with progress
+            if (typeof BackgroundTasksIndicator !== 'undefined' && BackgroundTasksIndicator.updateTask) {
+                try {
+                    BackgroundTasksIndicator.updateTask(taskId, {
+                        status: task.status,
+                        progress: task.progress || 0,
+                        message: task.message || task.current_step || 'Processing...'
+                    });
+                } catch (e) {
+                    console.warn('BackgroundTasksIndicator.updateTask error:', e);
+                }
+            }
+
+            // Check if task is complete
+            if (task.status === 'completed') {
+                // Mark as completed in indicator
+                if (typeof BackgroundTasksIndicator !== 'undefined' && BackgroundTasksIndicator.updateTask) {
+                    try {
+                        BackgroundTasksIndicator.updateTask(taskId, {
+                            status: 'completed',
+                            progress: 100,
+                            message: 'Completed'
+                        });
+                    } catch (e) {
+                        console.warn('BackgroundTasksIndicator.updateTask error:', e);
+                    }
+                }
+                console.log('Task completed, result:', task.result);
+                return task.result || task;
+            }
+
+            // Check if task failed
+            if (task.status === 'failed' || task.status === 'error') {
+                // Mark as failed in indicator
+                if (typeof BackgroundTasksIndicator !== 'undefined' && BackgroundTasksIndicator.updateTask) {
+                    try {
+                        BackgroundTasksIndicator.updateTask(taskId, {
+                            status: 'failed',
+                            message: task.error || 'Task failed'
+                        });
+                    } catch (e) {
+                        console.warn('BackgroundTasksIndicator.updateTask error:', e);
+                    }
+                }
+                throw new Error(task.error || 'Task failed');
+            }
+
+            // Wait before next poll
+            await new Promise(function(resolve) { setTimeout(resolve, interval); });
+
+        } catch (error) {
+            // On network error, wait and retry
+            if (attempts < maxAttempts) {
+                await new Promise(function(resolve) { setTimeout(resolve, interval * 2); });
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    // Timeout reached
+    if (typeof BackgroundTasksIndicator !== 'undefined') {
+        BackgroundTasksIndicator.updateTask(taskId, {
+            status: 'failed',
+            message: 'Task timed out'
+        });
+    }
+    throw new Error('Task polling timed out after ' + maxAttempts + ' attempts');
+}
+
 // Cleanup function for page unload
 function cleanupLiveBuilds() {
     stopLivePolling();
@@ -586,13 +834,309 @@ function cleanupLiveBuilds() {
     liveBuildsState.eventSources = {};
 }
 
+/**
+ * Stuck Plans Recovery Module
+ * Handles detection and recovery of stuck/stale builds
+ */
+let stuckPlansState = {
+    pollTimer: null,
+    POLL_INTERVAL: 30000 // 30 seconds
+};
+
+function initStuckPlans() {
+    const section = document.getElementById('stuck-plans-section');
+    if (!section) return;
+
+    // Initial fetch
+    fetchStuckPlans();
+
+    // Start polling for stuck plans
+    startStuckPlanPolling();
+
+    // Setup refresh button
+    const refreshBtn = document.getElementById('refresh-stuck-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function() {
+            const icon = refreshBtn.querySelector('svg');
+            if (icon) icon.classList.add('animate-spin');
+            fetchStuckPlans().finally(function() {
+                setTimeout(function() {
+                    if (icon) icon.classList.remove('animate-spin');
+                }, 500);
+            });
+        });
+    }
+}
+
+function startStuckPlanPolling() {
+    if (stuckPlansState.pollTimer) {
+        clearInterval(stuckPlansState.pollTimer);
+    }
+    stuckPlansState.pollTimer = setInterval(fetchStuckPlans, stuckPlansState.POLL_INTERVAL);
+}
+
+async function fetchStuckPlans() {
+    try {
+        const response = await fetch('/api/plans/recovery/stuck');
+        if (!response.ok) {
+            throw new Error('Failed to fetch stuck plans');
+        }
+        const data = await response.json();
+        updateStuckPlansUI(data.plans || []);
+        return data;
+    } catch (error) {
+        console.error('Error fetching stuck plans:', error);
+        // Hide section on error
+        const section = document.getElementById('stuck-plans-section');
+        if (section) section.classList.add('hidden');
+        return null;
+    }
+}
+
+function updateStuckPlansUI(plans) {
+    const section = document.getElementById('stuck-plans-section');
+    const listEl = document.getElementById('stuck-plans-list');
+
+    if (!section || !listEl) return;
+
+    if (!plans || plans.length === 0) {
+        section.classList.add('hidden');
+        return;
+    }
+
+    // Show section
+    section.classList.remove('hidden');
+
+    // Build cards HTML
+    var html = '';
+    plans.forEach(function(plan) {
+        html += createStuckPlanCard(plan);
+    });
+
+    listEl.innerHTML = html;
+
+    // Attach event handlers
+    plans.forEach(function(plan) {
+        attachRecoveryHandlers(plan.plan_id);
+    });
+}
+
+function createStuckPlanCard(plan) {
+    var statusBadgeClass = plan.status === 'building'
+        ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
+        : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white';
+
+    var timeStale = formatStaleTime(plan.minutes_stale || 0);
+    var progressPercent = plan.progress_percent || 0;
+    var currentStep = plan.current_step || 'Unknown step';
+    var planName = plan.plan_name || plan.plan_id.substring(0, 8);
+
+    var html = '';
+    html += '<div class="glass rounded-2xl p-6 stuck-plan-card group hover:shadow-lg transition-all duration-300" data-plan-id="' + escapeHtml(plan.plan_id) + '">';
+
+    // Header row
+    html += '<div class="flex items-center justify-between mb-4">';
+    html += '<div class="flex items-center">';
+    html += '<div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center mr-4 shadow-md group-hover:scale-105 transition-transform">';
+    html += '<svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+    html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+    html += '</svg>';
+    html += '</div>';
+    html += '<div>';
+    html += '<a href="/plans/' + escapeHtml(plan.plan_id) + '" class="text-lg font-semibold text-primary dark:text-primary hover:text-blue-600 dark:hover:text-blue-400 transition-colors">';
+    html += escapeHtml(planName);
+    html += '</a>';
+    html += '<div class="text-xs text-tertiary dark:text-tertiary mt-0.5">Stuck for <span class="font-semibold text-amber-600 dark:text-amber-400">' + timeStale + '</span></div>';
+    html += '</div>';
+    html += '</div>';
+
+    // Status badge
+    html += '<span class="inline-flex items-center px-4 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase shadow-sm ' + statusBadgeClass + '">';
+    html += escapeHtml(plan.status);
+    html += '</span>';
+    html += '</div>';
+
+    // Progress info
+    html += '<div class="mb-4">';
+    html += '<div class="flex items-center justify-between text-sm mb-2">';
+    html += '<span class="text-secondary dark:text-secondary font-medium">' + escapeHtml(currentStep) + '</span>';
+    html += '<span class="font-bold text-primary dark:text-primary">' + progressPercent + '%</span>';
+    html += '</div>';
+    html += '<div class="relative w-full h-3 bg-tertiary dark:bg-tertiary rounded-full overflow-hidden">';
+    html += '<div class="h-full rounded-full bg-gradient-to-r from-amber-500 to-red-500" style="width: ' + progressPercent + '%"></div>';
+    html += '</div>';
+    html += '</div>';
+
+    // Additional info
+    if (plan.last_error) {
+        html += '<div class="glass rounded-lg p-3 mb-4 text-sm">';
+        html += '<div class="flex items-start">';
+        html += '<svg class="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+        html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+        html += '</svg>';
+        html += '<span class="text-red-600 dark:text-red-400">' + escapeHtml(plan.last_error) + '</span>';
+        html += '</div>';
+        html += '</div>';
+    }
+
+    // Recovery actions
+    html += '<div class="flex items-center gap-3">';
+    if (plan.can_resume) {
+        html += '<button type="button" class="resume-btn btn btn-primary btn-modern group flex-1" data-plan-id="' + escapeHtml(plan.plan_id) + '">';
+        html += '<svg class="h-4 w-4 mr-2 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+        html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>';
+        html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
+        html += '</svg>';
+        html += 'Resume Build';
+        html += '</button>';
+    }
+    html += '<button type="button" class="restart-btn btn btn-secondary btn-modern group" data-plan-id="' + escapeHtml(plan.plan_id) + '">';
+    html += '<svg class="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+    html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>';
+    html += '</svg>';
+    html += 'Restart';
+    html += '</button>';
+    html += '<button type="button" class="cancel-btn btn btn-sm text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20" data-plan-id="' + escapeHtml(plan.plan_id) + '" title="Cancel build">';
+    html += '<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+    html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
+    html += '</svg>';
+    html += '</button>';
+    html += '</div>';
+
+    html += '</div>';
+
+    return html;
+}
+
+function attachRecoveryHandlers(planId) {
+    var card = document.querySelector('.stuck-plan-card[data-plan-id="' + planId + '"]');
+    if (!card) return;
+
+    var resumeBtn = card.querySelector('.resume-btn');
+    var restartBtn = card.querySelector('.restart-btn');
+    var cancelBtn = card.querySelector('.cancel-btn');
+
+    if (resumeBtn) {
+        resumeBtn.addEventListener('click', function() {
+            recoverPlan(planId, 'resume');
+        });
+    }
+
+    if (restartBtn) {
+        restartBtn.addEventListener('click', function() {
+            recoverPlan(planId, 'restart');
+        });
+    }
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+            if (confirm('Cancel the build for this plan? You can resume or restart later.')) {
+                cancelBuild(planId);
+            }
+        });
+    }
+}
+
+async function recoverPlan(planId, action) {
+    var card = document.querySelector('.stuck-plan-card[data-plan-id="' + planId + '"]');
+    var button = card ? card.querySelector('.' + action + '-btn') : null;
+    var originalText = '';
+
+    if (button) {
+        originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>' +
+            (action === 'resume' ? 'Resuming...' : 'Restarting...');
+    }
+
+    try {
+        var response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/recover', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: action })
+        });
+
+        if (!response.ok) {
+            var errorData = await response.json();
+            throw new Error(errorData.detail || errorData.error || 'Recovery failed');
+        }
+
+        var data = await response.json();
+
+        if (data.run_id) {
+            // Redirect to the run page
+            window.location.href = '/runs/' + data.run_id;
+        } else {
+            // Refresh stuck plans list
+            fetchStuckPlans();
+        }
+    } catch (error) {
+        console.error('Error recovering plan:', error);
+        alert('Failed to ' + action + ' plan: ' + error.message);
+
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    }
+}
+
+async function cancelBuild(planId) {
+    try {
+        var response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/cancel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            var errorData = await response.json();
+            throw new Error(errorData.detail || errorData.error || 'Cancel failed');
+        }
+
+        // Refresh stuck plans list
+        fetchStuckPlans();
+    } catch (error) {
+        console.error('Error canceling build:', error);
+        alert('Failed to cancel build: ' + error.message);
+    }
+}
+
+function formatStaleTime(minutes) {
+    if (minutes < 1) {
+        return 'less than a minute';
+    } else if (minutes === 1) {
+        return '1 minute';
+    } else if (minutes < 60) {
+        return minutes + ' minutes';
+    } else {
+        var hours = Math.floor(minutes / 60);
+        var remainingMinutes = minutes % 60;
+        if (hours === 1) {
+            return remainingMinutes > 0 ? '1 hour ' + remainingMinutes + ' min' : '1 hour';
+        }
+        return remainingMinutes > 0 ? hours + ' hours ' + remainingMinutes + ' min' : hours + ' hours';
+    }
+}
+
+function cleanupStuckPlans() {
+    if (stuckPlansState.pollTimer) {
+        clearInterval(stuckPlansState.pollTimer);
+        stuckPlansState.pollTimer = null;
+    }
+}
+
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', function() {
     initDashboard();
     initSyncRemote();
+    initSyncFileListToggle();
     initLiveBuilds();
+    initStuckPlans();
     fetchSyncStatus();
 });
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', cleanupLiveBuilds);
+window.addEventListener('beforeunload', function() {
+    cleanupLiveBuilds();
+    cleanupStuckPlans();
+});

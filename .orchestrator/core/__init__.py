@@ -23,7 +23,6 @@ from .plan_parser import (
     PlanPhase,
     StepAction,
     parse_plan,
-    parse_plan_file,
     validate_plan_coverage,
 )
 from db import (
@@ -74,7 +73,6 @@ __all__ = [
     "PlanPhase",
     "StepAction",
     "parse_plan",
-    "parse_plan_file",
     "validate_plan_coverage",
     # Database
     "Database",

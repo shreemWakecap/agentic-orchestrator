@@ -10,6 +10,7 @@ from .cost import router as cost_router
 from .pages import router as pages_router
 from .health import router as health_router
 from .knowledge import router as knowledge_router
+from .background_tasks import router as background_tasks_router
 
 __all__ = [
     "plans_router",
@@ -19,4 +20,5 @@ __all__ = [
     "pages_router",
     "health_router",
     "knowledge_router",
+    "background_tasks_router",
 ]

@@ -9,7 +9,6 @@ This replaces the LLM-based parser agent for faster, more reliable parsing.
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -242,19 +241,6 @@ class PlanParser:
                 errors=[ParseError(str(e))],
                 warnings=self.warnings
             )
-
-    def parse_file(self, path: Path) -> ParseResult:
-        """Parse a plan file."""
-        if not path.exists():
-            return ParseResult(
-                success=False,
-                errors=[ParseError(f"File not found: {path}")]
-            )
-
-        content = path.read_text(encoding="utf-8")
-        plan_id = path.stem  # Use filename as plan_id
-
-        return self.parse(content, plan_id)
 
     def _extract_goal(self, content: str) -> str:
         """Extract GOAL section."""
@@ -498,12 +484,6 @@ def parse_plan(content: str, plan_id: Optional[str] = None) -> ParseResult:
     """Parse plan content. Convenience function."""
     parser = PlanParser()
     return parser.parse(content, plan_id)
-
-
-def parse_plan_file(path: Path) -> ParseResult:
-    """Parse a plan file. Convenience function."""
-    parser = PlanParser()
-    return parser.parse_file(path)
 
 
 def validate_plan_coverage(request: str, plan: ParsedPlan) -> tuple[bool, str]:

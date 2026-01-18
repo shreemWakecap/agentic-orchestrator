@@ -42,7 +42,7 @@ class Workflow(ABC):
     Supports cancellation via `cancel()` method and tracks total token usage.
     """
 
-    def __init__(self, name: str, output_dir: Path):
+    def __init__(self, name: str, output_dir: Optional[Path] = None):
         self.name = name
         self.output_dir = output_dir
         self.console = Console()
@@ -93,7 +93,9 @@ class Workflow(ABC):
         agent_name: str,
         message: str,
         context: Optional[str] = None,
-        show_progress: bool = True
+        show_progress: bool = True,
+        thinking_enabled: Optional[bool] = None,
+        thinking_budget: Optional[int] = None,
     ) -> AgentResult:
         """
         Run a registered agent and store the result.
@@ -103,6 +105,8 @@ class Workflow(ABC):
             message: Message to send to the agent
             context: Optional context from previous steps
             show_progress: Whether to show a spinner
+            thinking_enabled: Enable extended thinking (default from config)
+            thinking_budget: Token budget for thinking (default from config)
 
         Returns:
             AgentResult from the agent
@@ -126,9 +130,17 @@ class Workflow(ABC):
                 transient=True
             ) as progress:
                 progress.add_task("", total=None)
-                result = agent.run(message, context)
+                result = agent.run(
+                    message, context,
+                    thinking_enabled=thinking_enabled,
+                    thinking_budget=thinking_budget
+                )
         else:
-            result = agent.run(message, context)
+            result = agent.run(
+                message, context,
+                thinking_enabled=thinking_enabled,
+                thinking_budget=thinking_budget
+            )
 
         self.results[agent_name] = result
 
@@ -154,6 +166,8 @@ class Workflow(ABC):
 
     def save_output(self, filename: str, content: str) -> Path:
         """Save workflow output to a file."""
+        if self.output_dir is None:
+            raise ValueError("Cannot save output: output_dir is not configured")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         output_path = self.output_dir / filename
         output_path.write_text(content, encoding="utf-8")

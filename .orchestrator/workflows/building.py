@@ -13,6 +13,7 @@ Features:
 import json
 import re
 import shutil
+import threading
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -150,6 +151,10 @@ class BuildState:
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
     last_error: Optional[str] = None
+    # Extended state fields
+    execution_mode: str = "sequential"  # sequential, parallel, coordinated
+    current_wave_index: int = 0  # For parallel execution wave tracking
+    thinking_enabled: bool = False  # Whether extended thinking was used
 
     def to_dict(self) -> dict:
         return {
@@ -168,6 +173,9 @@ class BuildState:
             "files_created": self.files_created,
             "files_modified": self.files_modified,
             "last_error": self.last_error,
+            "execution_mode": self.execution_mode,
+            "current_wave_index": self.current_wave_index,
+            "thinking_enabled": self.thinking_enabled,
         }
 
     @classmethod
@@ -229,30 +237,25 @@ class BuildingWorkflow(Workflow):
 
     Features:
     - Incremental building with progress tracking
-    - Resume from failure (state saved in specs/state/)
+    - Resume from failure (state saved in SQLite database)
     - Parallel step execution
-    - Automatic plan file organization
+    - Goal-oriented verification loop
     """
 
     def __init__(
         self,
         project_root: Path,
-        specs_dir: Optional[Path] = None,
         max_parallel: Optional[int] = None,
     ):
         self.project_root = project_root
         self._config = get_agent_config(project_root)
         self.max_parallel = max_parallel or self._config.parallel.max_sub_features
-        self.specs_dir = specs_dir or project_root / ".orchestrator" / "specs"
 
         # Database repositories
         self._plan_repo = get_plan_repository()
         self._build_state_repo = get_build_state_repository()
 
-        # Ensure directory structure (for legacy file-based operations)
-        self._ensure_specs_structure()
-
-        super().__init__(name="Smart Building Workflow", output_dir=self.specs_dir)
+        super().__init__(name="Smart Building Workflow")
 
         # Load all agents
         self._load_agents()
@@ -261,18 +264,15 @@ class BuildingWorkflow(Workflow):
         self.build_state: Optional[BuildState] = None
         self._current_plan_id: Optional[str] = None
 
+        # Goal context cache for persistence across pauses
+        self._goal_context: Optional[GoalContext] = None
+
+        # Thread safety for parallel execution
+        self._save_state_lock = threading.Lock()
+
         # Async test execution
         self._test_executor: Optional[ThreadPoolExecutor] = None
         self._test_futures: list[Future] = []
-
-    def _ensure_specs_structure(self):
-        """Create the specs directory structure."""
-        # Main plan directories
-        dirs = ["pending", "completed", "failed", "state"]
-        for d in dirs:
-            (self.specs_dir / d).mkdir(parents=True, exist_ok=True)
-        # Note: "in-progress" is no longer used - plans stay in pending during build
-        # State is tracked in specs/state/{plan_id}.state.json
 
     def _load_agents(self):
         """Load all agents needed for building."""
@@ -728,49 +728,108 @@ STEPS:
 
         return True, ""
 
+    def _check_build_should_stop(self) -> tuple[bool, str]:
+        """
+        Check if the build should stop due to cancellation or external pause.
+
+        Queries the database to check if the build status has been changed
+        to 'cancelled' or 'paused' by an external process (e.g., user action
+        through the portal or CLI).
+
+        Returns:
+            Tuple of (should_stop, reason) where should_stop is True if the
+            build should exit gracefully, and reason is the status that caused it.
+        """
+        if not self._current_plan_id:
+            return False, ""
+
+        # Query the database for current status
+        state_data = self._build_state_repo.get(self._current_plan_id)
+        if not state_data:
+            return False, ""
+
+        db_status = state_data.get('status', '')
+
+        # Check for stop conditions
+        if db_status == 'cancelled':
+            return True, 'cancelled'
+        elif db_status == 'paused':
+            # Check if this is an external pause (not set by us during normal operation)
+            # If our in-memory status is 'building' but DB shows 'paused', it's external
+            if self.build_state and self.build_state.status == 'building':
+                return True, 'paused'
+
+        return False, ""
+
     def _save_state(self, plan_path: Path = None):
-        """Save current build state to database."""
-        if not self.build_state or not self._current_plan_id:
-            return
+        """Save current build state to database with thread safety."""
+        with self._save_state_lock:
+            if not self.build_state or not self._current_plan_id:
+                return
 
-        self.build_state.updated_at = datetime.now().isoformat()
+            self.build_state.updated_at = datetime.now().isoformat()
 
-        # Update build state in database
-        self._build_state_repo.update(
-            plan_id=self._current_plan_id,
-            status=self.build_state.status,
-            current_phase=self.build_state.current_phase,
-            current_step=self.build_state.current_step,
-            total_steps=self.build_state.total_steps,
-            completed_steps=self.build_state.completed_steps,
-            failed_steps=self.build_state.failed_steps,
-            skipped_steps=self.build_state.skipped_steps,
-            files_created=self.build_state.files_created,
-            files_modified=self.build_state.files_modified,
-            last_error=self.build_state.last_error
-        )
-
-        # Update individual step states
-        for step_id, step_data in self.build_state.step_states.items():
-            self._build_state_repo.set_step_state(
+            # Update build state in database (including extended fields)
+            self._build_state_repo.update(
                 plan_id=self._current_plan_id,
-                step_id=step_id,
-                status=step_data.get('status', 'pending'),
-                started_at=step_data.get('started_at'),
-                completed_at=step_data.get('completed_at'),
-                retry_count=step_data.get('retry_count', 0),
-                error=step_data.get('error'),
-                files_affected=step_data.get('files_affected', []),
-                summary=step_data.get('summary', '')
+                status=self.build_state.status,
+                current_phase=self.build_state.current_phase,
+                current_step=self.build_state.current_step,
+                total_steps=self.build_state.total_steps,
+                completed_steps=self.build_state.completed_steps,
+                failed_steps=self.build_state.failed_steps,
+                skipped_steps=self.build_state.skipped_steps,
+                files_created=self.build_state.files_created,
+                files_modified=self.build_state.files_modified,
+                last_error=self.build_state.last_error,
+                execution_mode=self.build_state.execution_mode,
+                current_wave_index=self.build_state.current_wave_index,
+                thinking_enabled=1 if self.build_state.thinking_enabled else 0,
             )
 
+            # Save goal context if available
+            if self._goal_context:
+                self._build_state_repo.save_goal_context(
+                    self._current_plan_id,
+                    self._goal_context.to_dict()
+                )
+
+            # Update individual step states
+            for step_id, step_data in self.build_state.step_states.items():
+                self._build_state_repo.set_step_state(
+                    plan_id=self._current_plan_id,
+                    step_id=step_id,
+                    status=step_data.get('status', 'pending'),
+                    started_at=step_data.get('started_at'),
+                    completed_at=step_data.get('completed_at'),
+                    retry_count=step_data.get('retry_count', 0),
+                    error=step_data.get('error'),
+                    files_affected=step_data.get('files_affected', []),
+                    summary=step_data.get('summary', '')
+                )
+
     def _load_state(self, plan_id: str) -> Optional[BuildState]:
-        """Load existing build state from database."""
+        """Load existing build state from database including goal context."""
         state_data = self._build_state_repo.get(plan_id)
         if not state_data:
             return None
 
         try:
+            # Load goal context from database
+            goal_data = self._build_state_repo.get_goal_context(plan_id)
+            if goal_data:
+                self._goal_context = GoalContext(
+                    goal=goal_data.get('goal', ''),
+                    original_request=goal_data.get('original_request', ''),
+                    verify_commands=goal_data.get('verify_commands', []),
+                    context_notes=goal_data.get('context_notes', []),
+                    goal_achieved=goal_data.get('goal_achieved', False),
+                    verification_attempts=goal_data.get('verification_attempts', 0),
+                    missing_items=goal_data.get('missing_items', []),
+                    completion_percentage=goal_data.get('completion_percentage', 0),
+                )
+                self.console.print(f"  [dim]Goal context restored from database[/dim]")
+
             # Get step states
             step_states_data = self._build_state_repo.get_step_states(plan_id)
             step_states = {
@@ -802,7 +861,11 @@ STEPS:
                 step_states=step_states,
                 files_created=state_data.get('files_created', []),
                 files_modified=state_data.get('files_modified', []),
-                last_error=state_data.get('last_error')
+                last_error=state_data.get('last_error'),
+                # Extended fields
+                execution_mode=state_data.get('execution_mode', 'sequential'),
+                current_wave_index=state_data.get('current_wave_index', 0),
+                thinking_enabled=bool(state_data.get('thinking_enabled', 0)),
             )
         except Exception as e:
             self.console.print(f"[yellow]Warning: Could not load state: {e}[/yellow]")
@@ -826,7 +889,10 @@ STEPS:
 
     def _archive_plan(self, plan_id: str, destination: str):
         """
-        Update plan status in database to completed or failed.
+        Update plan status through aggregate root pattern.
+
+        Plan is the aggregate root - status updates flow through Plan first,
+        then cascade to build_states to ensure consistency.
 
         Args:
             plan_id: The plan ID to update
@@ -835,12 +901,13 @@ STEPS:
         if destination not in ("completed", "failed"):
             raise ValueError(f"Invalid archive destination: {destination}")
 
-        # Update plan status in database
+        # 1. Update Plan (authoritative source of truth)
         self._plan_repo.update_status(plan_id, destination)
 
-        # Update build state status
+        # 2. Update in-memory state
         if self.build_state:
             self.build_state.status = destination
+            # Save full state to persist all fields (current_step, etc.)
             self._save_state()
 
     def _get_plan_status(self, plan_id: str) -> str:
@@ -983,6 +1050,18 @@ STEPS:
         goal_context: Optional[GoalContext] = None
     ) -> StepResult:
         """Execute a single build step using goal-aware agentic builder."""
+        # Check if build should stop (cancelled or externally paused)
+        should_stop, stop_reason = self._check_build_should_stop()
+        if should_stop:
+            return StepResult(
+                step_id=step.id,
+                status="skipped",
+                action_taken="none",
+                target=step.target,
+                summary=f"Build {stop_reason} - step skipped",
+                error=f"Build was {stop_reason} by external request"
+            )
+
         step_context = self._get_relevant_context(step)
 
         # Build goal-aware context for the builder
@@ -1133,6 +1212,30 @@ IMPORTANT:
             phase_context = f"Building phase: {phase.name}\nDescription: {phase.name}"
 
             for step in phase.steps:
+                # Check if build should stop (cancelled or externally paused)
+                should_stop, stop_reason = self._check_build_should_stop()
+                if should_stop:
+                    # Save state before exiting
+                    self.build_state.status = stop_reason
+                    self.build_state.last_error = f"Build {stop_reason} by external request"
+                    self._save_state()
+
+                    from core.symbols import WARNING
+                    self.console.print(f"\n[yellow]{WARNING} Build {stop_reason} - exiting gracefully[/yellow]")
+
+                    return WorkflowResult(
+                        success=False,
+                        error=f"Build {stop_reason} by external request",
+                        steps_completed=steps_completed,
+                        data={
+                            "stopped_at": step.id,
+                            "stop_reason": stop_reason,
+                            "can_resume": stop_reason == "paused",
+                            "completed_steps": len(self.build_state.completed_steps),
+                            "total_steps": self.build_state.total_steps,
+                        }
+                    )
+
                 # Check step state for resume capability
                 existing_step_state = self.build_state.get_step_state(step.id)
 
@@ -1206,9 +1309,7 @@ IMPORTANT:
 
                         if goal_achieved:
                             self.console.print(f"\n[green]Goal achieved despite step failure![/green]")
-                            self.build_state.status = "completed"
-                            self._save_state()
-
+                            # Archive plan - this updates both Plan and build_states atomically
                             self._archive_plan(plan_id, "completed")
                             return WorkflowResult(
                                 success=True,
@@ -1335,6 +1436,29 @@ IMPORTANT:
         self.console.print(f"\n[bold]Parallel Build:[/bold] {len(steps_only)} steps in {total_waves} waves")
 
         for wave_idx, wave in enumerate(waves):
+            # Check if build should stop (cancelled or externally paused)
+            should_stop, stop_reason = self._check_build_should_stop()
+            if should_stop:
+                # Save state before exiting
+                self.build_state.status = stop_reason
+                self.build_state.last_error = f"Build {stop_reason} by external request"
+                self._save_state()
+
+                self.console.print(f"\n[yellow]{WARNING} Build {stop_reason} - exiting gracefully[/yellow]")
+
+                return WorkflowResult(
+                    success=False,
+                    error=f"Build {stop_reason} by external request",
+                    steps_completed=steps_completed,
+                    data={
+                        "stopped_at": f"wave-{wave_idx + 1}",
+                        "stop_reason": stop_reason,
+                        "can_resume": stop_reason == "paused",
+                        "completed_steps": len(self.build_state.completed_steps),
+                        "total_steps": self.build_state.total_steps,
+                    }
+                )
+
             wave_size = len(wave)
             self.console.print(f"\n[bold]Wave {wave_idx + 1}/{total_waves}:[/bold] {wave_size} step(s)")
 
@@ -1415,9 +1539,7 @@ IMPORTANT:
                     if goal_achieved:
                         # Goal achieved! Mark as completed despite step failures
                         self.console.print(f"\n[green]Goal achieved despite step failures![/green]")
-                        self.build_state.status = "completed"
-                        self._save_state()
-
+                        # Archive plan - this updates both Plan and build_states atomically
                         self._archive_plan(plan_id, "completed")
                         return WorkflowResult(
                             success=True,
@@ -2201,11 +2323,9 @@ Ensure all features work together correctly.""",
 
         # Handle result - only archive on full completion
         if result.success:
-            self.build_state.status = "completed"
+            # Clear current step indicator
             self.build_state.current_step = ""
-            self._save_state()
-
-            # Update plan status to completed in database
+            # Archive plan - this updates both Plan and build_states atomically
             self._archive_plan(plan_id, "completed")
 
             completed, total = self.build_state.get_progress()

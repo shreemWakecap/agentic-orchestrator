@@ -55,6 +55,12 @@ class PlanStateResponse(BaseModel):
     files_created: List[str] = Field(default_factory=list)
     files_modified: List[str] = Field(default_factory=list)
     last_error: Optional[str] = None
+    # Recovery-related fields
+    is_stuck: bool = Field(False, description="Whether the plan is stuck in building/in-progress state")
+    minutes_since_update: Optional[float] = Field(None, description="Minutes since last update")
+    can_resume: bool = Field(False, description="Whether the plan can be resumed from current state")
+    can_cancel: bool = Field(False, description="Whether the plan can be cancelled")
+    recovery_options: List[str] = Field(default_factory=list, description="Available recovery actions: reset, resume, retry_step, cancel")
 
 
 class BuildStateResponse(PlanStateResponse):
@@ -243,3 +249,35 @@ class ResetBuildResponse(BaseModel):
     new_status: str = "pending"
     steps_cleared: int = 0
     message: str = "Build state reset successfully"
+
+
+class StuckPlanInfo(BaseModel):
+    """Information about a single stuck/recoverable plan."""
+    plan_id: str = Field(..., description="Unique identifier for the plan")
+    status: str = Field(..., description="Current status: building, in-progress, failed")
+    minutes_stale: float = Field(..., description="Minutes since last update")
+    progress_percent: float = Field(0.0, description="Build progress percentage (0.0 to 100.0)")
+    last_error: Optional[str] = Field(None, description="Last error message if any")
+    current_step: Optional[str] = Field(None, description="Current/last step being executed")
+    can_resume: bool = Field(True, description="Whether the plan can be resumed")
+
+
+class StuckPlansResponse(BaseModel):
+    """Response for listing stuck/recoverable plans."""
+    plans: List[StuckPlanInfo] = Field(default_factory=list, description="List of stuck plans")
+    count: int = Field(0, description="Total number of stuck plans")
+
+
+class RecoverPlanRequest(BaseModel):
+    """Request schema for recovering a stuck plan."""
+    action: str = Field(..., description="Recovery action: reset, resume, retry_step, skip_step, cancel")
+
+
+class CancelBuildResponse(BaseModel):
+    """Response for cancelling a build operation."""
+    status: str = "cancelled"
+    plan_id: str
+    previous_status: str
+    message: str = "Build cancelled successfully"
+    steps_completed: int = 0
+    steps_remaining: int = 0

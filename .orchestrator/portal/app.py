@@ -42,6 +42,10 @@ from portal.services.task_manager import (
     get_task_manager,
     shutdown_task_manager,
 )
+from portal.services.auto_recovery import (
+    start_auto_recovery,
+    stop_auto_recovery,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +57,8 @@ _task_manager: TaskManager | None = None
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown events.
 
-    Initializes the TaskManager on startup and gracefully shuts it down
-    when the application stops.
+    Initializes the TaskManager and auto-recovery task on startup,
+    and gracefully shuts them down when the application stops.
     """
     global _task_manager
 
@@ -63,7 +67,22 @@ async def lifespan(app: FastAPI):
     _task_manager = get_task_manager(max_workers=4)
     logger.info("TaskManager initialized successfully")
 
+    # Startup: Start auto-recovery background task
+    # Checks for stale builds every 5 minutes (300 seconds)
+    logger.info("Starting auto-recovery task...")
+    await start_auto_recovery(
+        check_interval=300,  # 5 minutes
+        stale_threshold_minutes=15,
+        auto_pause=True,
+    )
+    logger.info("Auto-recovery task started successfully")
+
     yield
+
+    # Shutdown: Stop auto-recovery task
+    logger.info("Stopping auto-recovery task...")
+    await stop_auto_recovery()
+    logger.info("Auto-recovery task stopped")
 
     # Shutdown: Gracefully close TaskManager
     logger.info("Shutting down TaskManager...")

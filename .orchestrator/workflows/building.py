@@ -714,6 +714,39 @@ STEPS:
 
         return True, ""
 
+    def _check_build_should_stop(self) -> tuple[bool, str]:
+        """
+        Check if the build should stop due to cancellation or external pause.
+
+        Queries the database to check if the build status has been changed
+        to 'cancelled' or 'paused' by an external process (e.g., user action
+        through the portal or CLI).
+
+        Returns:
+            Tuple of (should_stop, reason) where should_stop is True if the
+            build should exit gracefully, and reason is the status that caused it.
+        """
+        if not self._current_plan_id:
+            return False, ""
+
+        # Query the database for current status
+        state_data = self._build_state_repo.get(self._current_plan_id)
+        if not state_data:
+            return False, ""
+
+        db_status = state_data.get('status', '')
+
+        # Check for stop conditions
+        if db_status == 'cancelled':
+            return True, 'cancelled'
+        elif db_status == 'paused':
+            # Check if this is an external pause (not set by us during normal operation)
+            # If our in-memory status is 'building' but DB shows 'paused', it's external
+            if self.build_state and self.build_state.status == 'building':
+                return True, 'paused'
+
+        return False, ""
+
     def _save_state(self, plan_path: Path = None):
         """Save current build state to database."""
         if not self.build_state or not self._current_plan_id:
@@ -812,7 +845,10 @@ STEPS:
 
     def _archive_plan(self, plan_id: str, destination: str):
         """
-        Update plan status in database to completed or failed.
+        Update plan status through aggregate root pattern.
+
+        Plan is the aggregate root - status updates flow through Plan first,
+        then cascade to build_states to ensure consistency.
 
         Args:
             plan_id: The plan ID to update
@@ -821,12 +857,13 @@ STEPS:
         if destination not in ("completed", "failed"):
             raise ValueError(f"Invalid archive destination: {destination}")
 
-        # Update plan status in database
+        # 1. Update Plan (authoritative source of truth)
         self._plan_repo.update_status(plan_id, destination)
 
-        # Update build state status
+        # 2. Update in-memory state
         if self.build_state:
             self.build_state.status = destination
+            # Save full state to persist all fields (current_step, etc.)
             self._save_state()
 
     def _get_plan_status(self, plan_id: str) -> str:
@@ -969,6 +1006,18 @@ STEPS:
         goal_context: Optional[GoalContext] = None
     ) -> StepResult:
         """Execute a single build step using goal-aware agentic builder."""
+        # Check if build should stop (cancelled or externally paused)
+        should_stop, stop_reason = self._check_build_should_stop()
+        if should_stop:
+            return StepResult(
+                step_id=step.id,
+                status="skipped",
+                action_taken="none",
+                target=step.target,
+                summary=f"Build {stop_reason} - step skipped",
+                error=f"Build was {stop_reason} by external request"
+            )
+
         step_context = self._get_relevant_context(step)
 
         # Build goal-aware context for the builder
@@ -1119,6 +1168,30 @@ IMPORTANT:
             phase_context = f"Building phase: {phase.name}\nDescription: {phase.name}"
 
             for step in phase.steps:
+                # Check if build should stop (cancelled or externally paused)
+                should_stop, stop_reason = self._check_build_should_stop()
+                if should_stop:
+                    # Save state before exiting
+                    self.build_state.status = stop_reason
+                    self.build_state.last_error = f"Build {stop_reason} by external request"
+                    self._save_state()
+
+                    from core.symbols import WARNING
+                    self.console.print(f"\n[yellow]{WARNING} Build {stop_reason} - exiting gracefully[/yellow]")
+
+                    return WorkflowResult(
+                        success=False,
+                        error=f"Build {stop_reason} by external request",
+                        steps_completed=steps_completed,
+                        data={
+                            "stopped_at": step.id,
+                            "stop_reason": stop_reason,
+                            "can_resume": stop_reason == "paused",
+                            "completed_steps": len(self.build_state.completed_steps),
+                            "total_steps": self.build_state.total_steps,
+                        }
+                    )
+
                 # Check step state for resume capability
                 existing_step_state = self.build_state.get_step_state(step.id)
 
@@ -1192,9 +1265,7 @@ IMPORTANT:
 
                         if goal_achieved:
                             self.console.print(f"\n[green]Goal achieved despite step failure![/green]")
-                            self.build_state.status = "completed"
-                            self._save_state()
-
+                            # Archive plan - this updates both Plan and build_states atomically
                             self._archive_plan(plan_id, "completed")
                             return WorkflowResult(
                                 success=True,
@@ -1321,6 +1392,29 @@ IMPORTANT:
         self.console.print(f"\n[bold]Parallel Build:[/bold] {len(steps_only)} steps in {total_waves} waves")
 
         for wave_idx, wave in enumerate(waves):
+            # Check if build should stop (cancelled or externally paused)
+            should_stop, stop_reason = self._check_build_should_stop()
+            if should_stop:
+                # Save state before exiting
+                self.build_state.status = stop_reason
+                self.build_state.last_error = f"Build {stop_reason} by external request"
+                self._save_state()
+
+                self.console.print(f"\n[yellow]{WARNING} Build {stop_reason} - exiting gracefully[/yellow]")
+
+                return WorkflowResult(
+                    success=False,
+                    error=f"Build {stop_reason} by external request",
+                    steps_completed=steps_completed,
+                    data={
+                        "stopped_at": f"wave-{wave_idx + 1}",
+                        "stop_reason": stop_reason,
+                        "can_resume": stop_reason == "paused",
+                        "completed_steps": len(self.build_state.completed_steps),
+                        "total_steps": self.build_state.total_steps,
+                    }
+                )
+
             wave_size = len(wave)
             self.console.print(f"\n[bold]Wave {wave_idx + 1}/{total_waves}:[/bold] {wave_size} step(s)")
 
@@ -1401,9 +1495,7 @@ IMPORTANT:
                     if goal_achieved:
                         # Goal achieved! Mark as completed despite step failures
                         self.console.print(f"\n[green]Goal achieved despite step failures![/green]")
-                        self.build_state.status = "completed"
-                        self._save_state()
-
+                        # Archive plan - this updates both Plan and build_states atomically
                         self._archive_plan(plan_id, "completed")
                         return WorkflowResult(
                             success=True,
@@ -2187,11 +2279,9 @@ Ensure all features work together correctly.""",
 
         # Handle result - only archive on full completion
         if result.success:
-            self.build_state.status = "completed"
+            # Clear current step indicator
             self.build_state.current_step = ""
-            self._save_state()
-
-            # Update plan status to completed in database
+            # Archive plan - this updates both Plan and build_states atomically
             self._archive_plan(plan_id, "completed")
 
             completed, total = self.build_state.get_progress()

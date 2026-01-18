@@ -654,10 +654,11 @@
 <script src="/static/js/plan-list.js"></script>
 <script src="/static/js/plan-confirm-dialog.js"></script>
 <script src="/static/js/plan-recovery.js"></script>
+<script src="/static/js/unified-plan-dialog.js"></script>
 <script>
 /**
  * Create Plan form handler for the plans page
- * Uses the same logic as dashboard.js but adapted for this page
+ * Uses UnifiedPlanDialog for AI-enhanced plan creation
  */
 function initPlanForm() {
     var form = document.getElementById('plan-form');
@@ -667,8 +668,8 @@ function initPlanForm() {
         e.preventDefault();
         var input = document.getElementById('plan-description');
         var description = input.value;
-        var button = this.querySelector('button[type="submit"]');
 
+        // Validate input
         if (!description.trim()) {
             input.focus();
             input.style.borderColor = '#EF4444';
@@ -676,45 +677,17 @@ function initPlanForm() {
             return;
         }
 
-        // Show confirmation dialog before proceeding
-        var confirmed = await PlanConfirmDialog.showPlanConfirmDialog(description);
-        if (!confirmed) {
-            return;
+        // Open the unified dialog which handles AI improvement and plan creation
+        // The dialog automatically improves the text, shows review, and creates the plan
+        var result = await UnifiedPlanDialog.showCreatePlanDialog(description.trim());
+
+        // If plan was created successfully, the dialog handles the redirect
+        // If user cancelled or closed the dialog, clear the form for a fresh start
+        if (result.created) {
+            // Clear form since plan was created (redirect happens in dialog)
+            input.value = '';
         }
-
-        button.disabled = true;
-        button.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Creating...';
-
-        try {
-            var response = await fetch('/api/workflows/plan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description: description })
-            });
-
-            if (!response.ok) {
-                throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-            }
-
-            var data = await response.json();
-            if (data.run_id) {
-                if (typeof Toast !== 'undefined') {
-                    Toast.show('Plan created! Redirecting...', 'success');
-                }
-                window.location.href = '/runs/' + data.run_id;
-            } else {
-                throw new Error('No run_id in response');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            if (typeof Toast !== 'undefined') {
-                Toast.show('Failed to create plan: ' + error.message, 'error');
-            } else {
-                alert('Failed to create plan: ' + error.message);
-            }
-            button.disabled = false;
-            button.innerHTML = '<svg class="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>Create Plan';
-        }
+        // If not created (user cancelled), do nothing - let them modify their input
     });
 }
 

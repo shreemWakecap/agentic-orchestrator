@@ -1,151 +1,41 @@
 /**
  * Dashboard page functionality
- * Handles plan creation form submission
+ * Handles plan creation form submission using unified AI-enhanced dialog
  */
 
 function initDashboard() {
     const form = document.getElementById('plan-form');
     if (!form) return;
 
-    // Setup "Improve with AI" button
-    const improveBtn = document.getElementById('improve-request-btn');
     const descriptionInput = document.getElementById('plan-description');
 
-    if (improveBtn && descriptionInput) {
-        improveBtn.addEventListener('click', async function() {
-            const draftText = descriptionInput.value.trim();
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const description = descriptionInput ? descriptionInput.value.trim() : '';
 
-            if (!draftText) {
+        if (!description) {
+            if (descriptionInput) {
                 descriptionInput.focus();
                 descriptionInput.style.borderColor = '#EF4444';
                 setTimeout(function() {
                     descriptionInput.style.borderColor = '';
                 }, 2000);
-                return;
             }
-
-            // Show improving state
-            const originalText = improveBtn.textContent;
-            improveBtn.disabled = true;
-            improveBtn.textContent = 'Improving...';
-
-            try {
-                // POST to create async task
-                const response = await fetch('/api/workflows/improve-request', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ draft: draftText })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                const taskId = data.task_id || data.run_id;
-
-                if (!taskId) {
-                    throw new Error('No task_id or run_id in response');
-                }
-
-                // Add task to background indicator (if available)
-                if (typeof BackgroundTasksIndicator !== 'undefined' && BackgroundTasksIndicator.addTask) {
-                    try {
-                        BackgroundTasksIndicator.addTask({
-                            id: taskId,
-                            type: 'improve-request',
-                            status: 'running',
-                            progress: 0,
-                            message: 'Improving request with AI...'
-                        });
-                    } catch (indicatorError) {
-                        console.warn('BackgroundTasksIndicator error:', indicatorError);
-                    }
-                }
-
-                // Poll for task completion
-                console.log('Polling for task:', taskId);
-                const result = await pollTaskUntilComplete(taskId, 'improve-request');
-                console.log('Poll result:', result);
-
-                // Update textarea with improved text
-                // Backend returns: { improved: "...", original: "...", success: true }
-                if (result && result.improved) {
-                    descriptionInput.value = result.improved;
-                    // Add visual feedback that text was updated
-                    descriptionInput.style.borderColor = '#8B5CF6';
-                    setTimeout(function() {
-                        descriptionInput.style.borderColor = '';
-                    }, 2000);
-                } else if (result && result.error) {
-                    throw new Error(result.error);
-                } else {
-                    console.warn('Unexpected result format:', result);
-                    // Try to extract improved text from nested result
-                    if (result && result.result && result.result.improved) {
-                        descriptionInput.value = result.result.improved;
-                        descriptionInput.style.borderColor = '#8B5CF6';
-                        setTimeout(function() {
-                            descriptionInput.style.borderColor = '';
-                        }, 2000);
-                    } else if (!result.success) {
-                        console.log('Task completed but improvement failed, keeping original text');
-                    }
-                }
-            } catch (error) {
-                console.error('Error improving request:', error);
-                alert('Failed to improve request: ' + error.message);
-            } finally {
-                improveBtn.disabled = false;
-                improveBtn.textContent = originalText;
-            }
-        });
-    }
-
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const input = document.getElementById('plan-description');
-        const description = input.value;
-        const button = this.querySelector('button[type="submit"]');
-
-        if (!description.trim()) {
-            input.focus();
-            input.style.borderColor = '#EF4444';
-            setTimeout(() => input.style.borderColor = '', 2000);
             return;
         }
 
-        // Show confirmation dialog before proceeding
-        const confirmed = await PlanConfirmDialog.showPlanConfirmDialog(description);
-        if (!confirmed) {
-            return;
-        }
-
-        button.disabled = true;
-        button.textContent = 'Creating...';
-
-        try {
-            const response = await fetch('/api/workflows/plan', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ description: description })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Use unified dialog which handles AI improvement and plan creation
+        if (typeof UnifiedPlanDialog !== 'undefined' && UnifiedPlanDialog.showCreatePlanDialog) {
+            var result = await UnifiedPlanDialog.showCreatePlanDialog(description);
+            if (result.created) {
+                // Dialog handles redirect, but clear input as backup
+                if (descriptionInput) {
+                    descriptionInput.value = '';
+                }
             }
-
-            const data = await response.json();
-            if (data.run_id) {
-                window.location.href = '/runs/' + data.run_id;
-            } else {
-                throw new Error('No run_id in response');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to create plan: ' + error.message);
-            button.disabled = false;
-            button.textContent = 'Create Plan';
+        } else {
+            console.error('UnifiedPlanDialog not available');
+            alert('Plan creation dialog is not available. Please refresh the page.');
         }
     });
 }

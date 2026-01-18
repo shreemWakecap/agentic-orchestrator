@@ -1,10 +1,11 @@
 """Plan-related API routes."""
 import uuid
+from datetime import datetime
 from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 from db import PlanRepository, BuildStateRepository, RunRepository
-from portal.dependencies import get_plan_repo, get_build_state_repo, get_run_repo
+from portal.dependencies import get_plan_repo, get_build_state_repo, get_run_repo, get_recovery_service
 from portal.schemas.requests import MovePlanRequest, ResumeBuildRequest
 from portal.schemas.responses import (
     PlanResponse,
@@ -19,7 +20,11 @@ from portal.schemas.responses import (
     RecoveryAction,
     RecoveryOptionsResponse,
     ResetBuildResponse,
+    StuckPlansResponse,
+    StuckPlanInfo,
+    CancelBuildResponse,
 )
+from portal.services.recovery_service import RecoveryService
 from portal.services.plan_service import PlanService
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
@@ -264,8 +269,17 @@ async def get_plan_state(
     plan_id: str,
     plan_repo: PlanRepository = Depends(get_plan_repo),
     build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
+    recovery_service: RecoveryService = Depends(get_recovery_service),
 ) -> PlanStateResponse:
-    """Get build state details for a plan."""
+    """Get build state details for a plan including recovery status.
+
+    Returns additional fields:
+    - is_stuck: Whether the plan is stuck in building/in-progress state
+    - minutes_since_update: Minutes since last update
+    - can_resume: Whether the plan can be resumed from current state
+    - can_cancel: Whether the plan can be cancelled
+    - recovery_options: List of available recovery actions
+    """
     plan = plan_repo.get_by_id(plan_id)
     if not plan:
         raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
@@ -278,26 +292,80 @@ async def get_plan_state(
             plan_id=plan_id,
             status="pending",
             folder_state=plan_status,
+            is_stuck=False,
+            minutes_since_update=None,
+            can_resume=False,
+            can_cancel=False,
+            recovery_options=[],
         )
 
     step_states = build_state_repo.get_step_states(plan_id)
     step_states_dict = {s["step_id"]: s for s in step_states}
 
+    build_status = build_state.get("status", "pending")
+    updated_at = build_state.get("updated_at")
+    completed_steps = build_state.get("completed_steps", [])
+    failed_steps = build_state.get("failed_steps", [])
+    current_step = build_state.get("current_step")
+
+    # Calculate minutes since update
+    minutes_since_update = None
+    if updated_at:
+        try:
+            updated_time = datetime.fromisoformat(updated_at)
+            delta = datetime.now() - updated_time
+            minutes_since_update = round(delta.total_seconds() / 60, 1)
+        except (ValueError, TypeError):
+            pass
+
+    # Determine if stuck (in active build state and stale)
+    is_stuck = recovery_service.is_build_stale(plan_id)
+
+    # Determine if can resume (has progress to resume from)
+    can_resume = bool(current_step or completed_steps) and build_status in [
+        "building", "in_progress", "failed", "paused"
+    ]
+
+    # Determine if can cancel (in active build state)
+    can_cancel = build_status in ["building", "in_progress"]
+
+    # Determine available recovery options
+    recovery_options: List[str] = []
+    if build_status in ["building", "in_progress"]:
+        recovery_options.append("reset")
+        recovery_options.append("cancel")
+        if can_resume:
+            recovery_options.append("resume")
+    elif build_status == "failed":
+        recovery_options.append("reset")
+        if can_resume:
+            recovery_options.append("resume")
+        if failed_steps:
+            recovery_options.append("retry_step")
+    elif build_status == "paused":
+        recovery_options.append("reset")
+        recovery_options.append("resume")
+
     return PlanStateResponse(
         plan_id=plan_id,
-        status=build_state.get("status", "pending"),
+        status=build_status,
         folder_state=plan_status,
         started_at=build_state.get("started_at"),
-        updated_at=build_state.get("updated_at"),
+        updated_at=updated_at,
         current_phase=build_state.get("current_phase", 0),
-        current_step=build_state.get("current_step"),
+        current_step=current_step,
         total_steps=build_state.get("total_steps", 0),
-        completed_steps=build_state.get("completed_steps", []),
-        failed_steps=build_state.get("failed_steps", []),
+        completed_steps=completed_steps,
+        failed_steps=failed_steps,
         step_states=step_states_dict,
         files_created=build_state.get("files_created", []),
         files_modified=build_state.get("files_modified", []),
         last_error=build_state.get("last_error"),
+        is_stuck=is_stuck,
+        minutes_since_update=minutes_since_update,
+        can_resume=can_resume,
+        can_cancel=can_cancel,
+        recovery_options=recovery_options,
     )
 
 
@@ -538,3 +606,198 @@ async def get_recovery_options(
         completed_steps_count=completed_steps_count,
         total_steps_count=total_steps_count,
     )
+
+
+@router.get("/recovery/stuck", response_model=StuckPlansResponse)
+async def list_stuck_plans(
+    threshold_minutes: Optional[int] = None,
+    recovery_service: RecoveryService = Depends(get_recovery_service),
+) -> StuckPlansResponse:
+    """List all plans that are stuck in building/in-progress state.
+
+    Returns plans that have been in an active build state (building or in_progress)
+    without updates for longer than the threshold period.
+
+    Args:
+        threshold_minutes: Optional override for stale threshold (default is 10 minutes)
+    """
+    recoverable = recovery_service.get_recoverable_plans(threshold_minutes)
+
+    plans = [
+        StuckPlanInfo(
+            plan_id=p.get("plan_id", ""),
+            status=p.get("status", "unknown"),
+            minutes_stale=p.get("minutes_stale", 0),
+            progress_percent=p.get("progress_percent", 0.0),
+            last_error=p.get("last_error"),
+            current_step=p.get("current_step"),
+            can_resume=p.get("can_resume", True),
+        )
+        for p in recoverable
+    ]
+
+    return StuckPlansResponse(plans=plans, count=len(plans))
+
+
+@router.post("/{plan_id}/recover", response_model=WorkflowStartResponse)
+async def recover_plan(
+    plan_id: str,
+    action: str,
+    background_tasks: BackgroundTasks,
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+    build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
+    run_repo: RunRepository = Depends(get_run_repo),
+) -> WorkflowStartResponse:
+    """Recover a stuck plan by resuming or restarting the build.
+
+    Args:
+        plan_id: The plan to recover
+        action: Recovery action - 'resume' to continue from last step,
+                'restart' to reset and start fresh
+
+    Returns:
+        WorkflowStartResponse with the new run_id
+    """
+    plan = plan_repo.get_by_id(plan_id)
+
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    current_status = plan.get("status", "pending")
+    recoverable_states = ["building", "in_progress", "failed", "paused"]
+
+    if current_status not in recoverable_states:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plan '{plan_id}' is in '{current_status}' state. Only plans in {recoverable_states} states can be recovered.",
+        )
+
+    valid_actions = ["resume", "restart"]
+    if action not in valid_actions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid action '{action}'. Must be one of: {valid_actions}",
+        )
+
+    if action == "restart":
+        # Reset the build state first
+        build_state = build_state_repo.get(plan_id)
+        if build_state:
+            build_state_repo.clear(plan_id)
+        plan_repo.update_status(plan_id, "pending")
+
+        # Import and start fresh build
+        from portal.services.workflow_runner import run_building_workflow
+
+        run_id = str(uuid.uuid4())[:8]
+        run_repo.create(run_id, workflow="building", plan_id=plan_id)
+        background_tasks.add_task(run_building_workflow, run_id, plan_id)
+
+        return WorkflowStartResponse(run_id=run_id, status="restarted", plan_id=plan_id)
+
+    else:  # action == "resume"
+        # Resume from current state
+        from portal.services.workflow_runner import run_building_workflow_resume
+
+        run_id = str(uuid.uuid4())[:8]
+        run_repo.create(run_id, workflow="building", plan_id=plan_id)
+        background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, None)
+
+        return WorkflowStartResponse(run_id=run_id, status="resumed", plan_id=plan_id)
+
+
+@router.post("/{plan_id}/cancel", response_model=CancelBuildResponse)
+async def cancel_plan_build(
+    plan_id: str,
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+    build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
+) -> CancelBuildResponse:
+    """Cancel a running or stuck build and mark it as paused.
+
+    This endpoint:
+    - Changes the plan status from building/in_progress to paused
+    - Preserves the build state for potential later resumption
+    - Does not clear completed steps
+
+    The plan can later be resumed with resume-build or reset with reset-build.
+    """
+    plan = plan_repo.get_by_id(plan_id)
+
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    current_status = plan.get("status", "pending")
+    cancellable_states = ["building", "in_progress"]
+
+    if current_status not in cancellable_states:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot cancel plan in '{current_status}' state. Only plans in {cancellable_states} states can be cancelled.",
+        )
+
+    # Get build state for progress info
+    build_state = build_state_repo.get(plan_id)
+    steps_completed = 0
+    steps_remaining = 0
+
+    if build_state:
+        completed_steps = build_state.get("completed_steps", [])
+        total_steps = build_state.get("total_steps", 0)
+        steps_completed = len(completed_steps)
+        steps_remaining = max(0, total_steps - steps_completed)
+
+    # Update using aggregate root pattern:
+    # 1. Update Plan first (authoritative source of truth)
+    plan_repo.update_status(plan_id, "paused")
+    # 2. Cascade to build_states
+    if build_state:
+        build_state_repo.update(plan_id, status="paused")
+
+    return CancelBuildResponse(
+        status="cancelled",
+        plan_id=plan_id,
+        previous_status=current_status,
+        message=f"Build cancelled. {steps_completed} steps completed, {steps_remaining} steps remaining.",
+        steps_completed=steps_completed,
+        steps_remaining=steps_remaining,
+    )
+
+
+@router.post("/{plan_id}/review", response_model=WorkflowStartResponse)
+async def start_plan_review(
+    plan_id: str,
+    background_tasks: BackgroundTasks,
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+    run_repo: RunRepository = Depends(get_run_repo),
+) -> WorkflowStartResponse:
+    """Start a review workflow for a completed plan.
+
+    This endpoint validates that:
+    - The plan exists
+    - The plan is in 'completed' status
+
+    The review workflow analyzes the completed implementation and generates
+    a review report.
+    """
+    plan = plan_repo.get_by_id(plan_id)
+
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    plan_state = plan.get("status", "pending")
+
+    if plan_state != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plan '{plan_id}' is in '{plan_state}' state. Only completed plans can be reviewed.",
+        )
+
+    # Create run entry in database
+    run_id = str(uuid.uuid4())[:8]
+    run_repo.create(run_id, workflow="reviewing", plan_id=plan_id)
+
+    # Start review workflow in background
+    from portal.services.workflow_runner import run_review_workflow
+    background_tasks.add_task(run_review_workflow, run_id, plan_id)
+
+    return WorkflowStartResponse(run_id=run_id, status="started", plan_id=plan_id)

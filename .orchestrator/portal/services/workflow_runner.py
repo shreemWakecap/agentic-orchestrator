@@ -399,6 +399,64 @@ def run_scouting_workflow(
         _cleanup_thread_local()
 
 
+def run_review_workflow(run_id: str, plan_id: str):
+    """Execute reviewing workflow for a completed plan.
+
+    This function runs in a ThreadPoolExecutor worker thread.
+    Thread-safe execution with proper cleanup on completion or error.
+
+    Currently a stub implementation that marks the review as completed.
+    TODO: Implement actual ReviewingWorkflow when ready.
+
+    Args:
+        run_id: Unique identifier for this run
+        plan_id: ID of the completed plan to review
+    """
+    run_repo = _get_run_repo()
+
+    try:
+        run_repo.update(run_id, status="running")
+        _add_event(run_id, "start", {"workflow": "reviewing", "plan_id": plan_id})
+
+        try:
+            # TODO: Implement actual ReviewingWorkflow
+            # from workflows.reviewing import ReviewingWorkflow
+            # workflow = ReviewingWorkflow(project_root=PROJECT_ROOT)
+            # result = workflow.run(plan_id)
+
+            # For now, mark as completed with placeholder message
+            import time
+            time.sleep(1)  # Brief delay to simulate work
+
+            run_repo.update(
+                run_id,
+                status="completed",
+                completed_at=datetime.now().isoformat(),
+                progress=100,
+                data={
+                    "plan_id": plan_id,
+                    "message": "Review workflow not yet implemented - placeholder completion",
+                },
+            )
+
+            _add_event(
+                run_id,
+                "complete",
+                {
+                    "success": True,
+                    "plan_id": plan_id,
+                    "message": "Review placeholder completed",
+                },
+            )
+
+        except Exception as e:
+            logger.exception(f"Review workflow failed: {e}")
+            _mark_run_failed(run_id, e)
+
+    finally:
+        _cleanup_thread_local()
+
+
 # Aliases for backward compatibility (functions are now directly sync)
 run_planning_workflow_sync = run_planning_workflow
 run_building_workflow_sync = run_building_workflow

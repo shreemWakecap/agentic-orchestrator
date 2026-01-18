@@ -80,3 +80,16 @@ class ResumeBuildRequest(BaseModel):
         None,
         description="Step ID to resume from. If not provided, resumes from last incomplete step."
     )
+
+
+class RecoverPlanRequest(BaseModel):
+    """Request to recover a plan that failed or was interrupted during building."""
+    action: str = Field(
+        ...,
+        pattern="^(resume|restart|cancel)$",
+        description="Recovery action: 'resume' to continue from last step, 'restart' to start over, 'cancel' to abort"
+    )
+    from_step: Optional[str] = Field(
+        None,
+        description="Step ID to resume from (only used when action is 'resume'). If not provided, resumes from last incomplete step."
+    )

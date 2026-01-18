@@ -133,3 +133,49 @@ class BuildStateRepository:
                 "DELETE FROM build_states WHERE plan_id = ?", (plan_id,)
             )
             return cursor.rowcount > 0
+
+    def cancel(self, plan_id: str) -> bool:
+        """Cancel a build by setting status to 'cancelled'.
+
+        Allows graceful stopping of stuck or unwanted builds.
+
+        Returns True if the build was cancelled, False if not found.
+        """
+        now = datetime.now().isoformat()
+        with self.db.transaction() as conn:
+            cursor = conn.execute(
+                "UPDATE build_states SET status = 'cancelled', updated_at = ? WHERE plan_id = ?",
+                (now, plan_id)
+            )
+            return cursor.rowcount > 0
+
+    def pause(self, plan_id: str) -> bool:
+        """Pause a build by setting status to 'paused'.
+
+        Allows graceful pausing of builds that can be resumed later.
+
+        Returns True if the build was paused, False if not found.
+        """
+        now = datetime.now().isoformat()
+        with self.db.transaction() as conn:
+            cursor = conn.execute(
+                "UPDATE build_states SET status = 'paused', updated_at = ? WHERE plan_id = ?",
+                (now, plan_id)
+            )
+            return cursor.rowcount > 0
+
+    def update_status(self, plan_id: str, status: str) -> bool:
+        """Update build state status.
+
+        This method is called by PlanStatusService to cascade status changes
+        from the Plan (aggregate root) to build_states.
+
+        Args:
+            plan_id: The plan identifier
+            status: New status value
+
+        Returns:
+            True if update succeeded, False if build state not found
+        """
+        self.update(plan_id, status=status)
+        return True

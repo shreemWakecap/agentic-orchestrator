@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
-from db import get_database, get_build_state_repository, BuildStateRepository
+from db import get_database, get_build_state_repository, get_plan_repository, BuildStateRepository, PlanRepository
 
 logger = logging.getLogger(__name__)
 
@@ -29,15 +29,18 @@ class RecoveryService:
     def __init__(
         self,
         build_state_repo: Optional[BuildStateRepository] = None,
+        plan_repo: Optional[PlanRepository] = None,
         stale_threshold_minutes: int = DEFAULT_STALE_THRESHOLD_MINUTES
     ):
         """Initialize the recovery service.
 
         Args:
             build_state_repo: Repository for build state. If None, uses default.
+            plan_repo: Repository for plans. If None, uses default.
             stale_threshold_minutes: Minutes without update before build is stale.
         """
         self._repo = build_state_repo or get_build_state_repository()
+        self._plan_repo = plan_repo or get_plan_repository()
         self._db = get_database()
         self.stale_threshold_minutes = stale_threshold_minutes
 
@@ -307,6 +310,119 @@ class RecoveryService:
             status = plan.get('status', 'unknown')
             counts[status] = counts.get(status, 0) + 1
         return counts
+
+    def get_plan_name(self, plan_id: str) -> Optional[str]:
+        """Get the plan name for UI display.
+
+        Args:
+            plan_id: The plan identifier
+
+        Returns:
+            Plan name if found, None otherwise
+        """
+        row = self._db.fetchone(
+            "SELECT name FROM plans WHERE id = ?", (plan_id,)
+        )
+        return row.get('name') if row else None
+
+    def cancel_build(self, plan_id: str) -> Dict:
+        """Cancel a build that is in progress or stale.
+
+        Validates that the plan is in a cancelable state before cancelling.
+        Uses aggregate root pattern: Plan.status is updated first, then build_states.
+
+        Args:
+            plan_id: The plan identifier to cancel
+
+        Returns:
+            Dict with 'success' boolean and 'message' or 'error' string
+        """
+        # Check if build state exists
+        build_state = self._repo.get(plan_id)
+        if not build_state:
+            return {
+                'success': False,
+                'error': f'No build found for plan {plan_id}'
+            }
+
+        # Validate cancelable state
+        current_status = build_state.get('status', '')
+        cancelable_statuses = ('building', 'in_progress', 'pending', 'paused')
+
+        if current_status not in cancelable_statuses:
+            return {
+                'success': False,
+                'error': f'Build cannot be cancelled: current status is {current_status}'
+            }
+
+        # Cancel the build using aggregate root pattern:
+        # 1. Update Plan first (authoritative)
+        self._plan_repo.update_status(plan_id, 'cancelled')
+        # 2. Cascade to build_states
+        cancelled = self._repo.cancel(plan_id)
+
+        if cancelled:
+            plan_name = self.get_plan_name(plan_id) or plan_id
+            logger.info(f"Build cancelled for plan: {plan_name} ({plan_id})")
+            return {
+                'success': True,
+                'message': f'Build cancelled for plan: {plan_name}'
+            }
+        else:
+            return {
+                'success': False,
+                'error': 'Failed to cancel build'
+            }
+
+    def pause_build(self, plan_id: str) -> Dict:
+        """Pause a build that is in progress.
+
+        Validates that the plan is in a pausable state before pausing.
+        Paused builds can be resumed later.
+        Uses aggregate root pattern: Plan.status is updated first, then build_states.
+
+        Args:
+            plan_id: The plan identifier to pause
+
+        Returns:
+            Dict with 'success' boolean and 'message' or 'error' string
+        """
+        # Check if build state exists
+        build_state = self._repo.get(plan_id)
+        if not build_state:
+            return {
+                'success': False,
+                'error': f'No build found for plan {plan_id}'
+            }
+
+        # Validate pausable state
+        current_status = build_state.get('status', '')
+        pausable_statuses = ('building', 'in_progress')
+
+        if current_status not in pausable_statuses:
+            return {
+                'success': False,
+                'error': f'Build cannot be paused: current status is {current_status}'
+            }
+
+        # Pause the build using aggregate root pattern:
+        # 1. Update Plan first (authoritative)
+        self._plan_repo.update_status(plan_id, 'paused')
+        # 2. Cascade to build_states
+        paused = self._repo.pause(plan_id)
+
+        if paused:
+            plan_name = self.get_plan_name(plan_id) or plan_id
+            logger.info(f"Build paused for plan: {plan_name} ({plan_id})")
+            return {
+                'success': True,
+                'message': f'Build paused for plan: {plan_name}'
+            }
+        else:
+            return {
+                'success': False,
+                'error': 'Failed to pause build'
+            }
 
 
 # Factory function for consistency with other services

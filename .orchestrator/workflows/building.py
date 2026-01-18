@@ -13,6 +13,7 @@ Features:
 import json
 import re
 import shutil
+import threading
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -150,6 +151,10 @@ class BuildState:
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
     last_error: Optional[str] = None
+    # Extended state fields
+    execution_mode: str = "sequential"  # sequential, parallel, coordinated
+    current_wave_index: int = 0  # For parallel execution wave tracking
+    thinking_enabled: bool = False  # Whether extended thinking was used
 
     def to_dict(self) -> dict:
         return {
@@ -168,6 +173,9 @@ class BuildState:
             "files_created": self.files_created,
             "files_modified": self.files_modified,
             "last_error": self.last_error,
+            "execution_mode": self.execution_mode,
+            "current_wave_index": self.current_wave_index,
+            "thinking_enabled": self.thinking_enabled,
         }
 
     @classmethod
@@ -255,6 +263,12 @@ class BuildingWorkflow(Workflow):
         # Build state
         self.build_state: Optional[BuildState] = None
         self._current_plan_id: Optional[str] = None
+
+        # Goal context cache for persistence across pauses
+        self._goal_context: Optional[GoalContext] = None
+
+        # Thread safety for parallel execution
+        self._save_state_lock = threading.Lock()
 
         # Async test execution
         self._test_executor: Optional[ThreadPoolExecutor] = None
@@ -748,48 +762,74 @@ STEPS:
         return False, ""
 
     def _save_state(self, plan_path: Path = None):
-        """Save current build state to database."""
-        if not self.build_state or not self._current_plan_id:
-            return
+        """Save current build state to database with thread safety."""
+        with self._save_state_lock:
+            if not self.build_state or not self._current_plan_id:
+                return
 
-        self.build_state.updated_at = datetime.now().isoformat()
+            self.build_state.updated_at = datetime.now().isoformat()
 
-        # Update build state in database
-        self._build_state_repo.update(
-            plan_id=self._current_plan_id,
-            status=self.build_state.status,
-            current_phase=self.build_state.current_phase,
-            current_step=self.build_state.current_step,
-            total_steps=self.build_state.total_steps,
-            completed_steps=self.build_state.completed_steps,
-            failed_steps=self.build_state.failed_steps,
-            skipped_steps=self.build_state.skipped_steps,
-            files_created=self.build_state.files_created,
-            files_modified=self.build_state.files_modified,
-            last_error=self.build_state.last_error
-        )
-
-        # Update individual step states
-        for step_id, step_data in self.build_state.step_states.items():
-            self._build_state_repo.set_step_state(
+            # Update build state in database (including extended fields)
+            self._build_state_repo.update(
                 plan_id=self._current_plan_id,
-                step_id=step_id,
-                status=step_data.get('status', 'pending'),
-                started_at=step_data.get('started_at'),
-                completed_at=step_data.get('completed_at'),
-                retry_count=step_data.get('retry_count', 0),
-                error=step_data.get('error'),
-                files_affected=step_data.get('files_affected', []),
-                summary=step_data.get('summary', '')
+                status=self.build_state.status,
+                current_phase=self.build_state.current_phase,
+                current_step=self.build_state.current_step,
+                total_steps=self.build_state.total_steps,
+                completed_steps=self.build_state.completed_steps,
+                failed_steps=self.build_state.failed_steps,
+                skipped_steps=self.build_state.skipped_steps,
+                files_created=self.build_state.files_created,
+                files_modified=self.build_state.files_modified,
+                last_error=self.build_state.last_error,
+                execution_mode=self.build_state.execution_mode,
+                current_wave_index=self.build_state.current_wave_index,
+                thinking_enabled=1 if self.build_state.thinking_enabled else 0,
             )
 
+            # Save goal context if available
+            if self._goal_context:
+                self._build_state_repo.save_goal_context(
+                    self._current_plan_id,
+                    self._goal_context.to_dict()
+                )
+
+            # Update individual step states
+            for step_id, step_data in self.build_state.step_states.items():
+                self._build_state_repo.set_step_state(
+                    plan_id=self._current_plan_id,
+                    step_id=step_id,
+                    status=step_data.get('status', 'pending'),
+                    started_at=step_data.get('started_at'),
+                    completed_at=step_data.get('completed_at'),
+                    retry_count=step_data.get('retry_count', 0),
+                    error=step_data.get('error'),
+                    files_affected=step_data.get('files_affected', []),
+                    summary=step_data.get('summary', '')
+                )
+
     def _load_state(self, plan_id: str) -> Optional[BuildState]:
-        """Load existing build state from database."""
+        """Load existing build state from database including goal context."""
         state_data = self._build_state_repo.get(plan_id)
         if not state_data:
             return None
 
         try:
+            # Load goal context from database
+            goal_data = self._build_state_repo.get_goal_context(plan_id)
+            if goal_data:
+                self._goal_context = GoalContext(
+                    goal=goal_data.get('goal', ''),
+                    original_request=goal_data.get('original_request', ''),
+                    verify_commands=goal_data.get('verify_commands', []),
+                    context_notes=goal_data.get('context_notes', []),
+                    goal_achieved=goal_data.get('goal_achieved', False),
+                    verification_attempts=goal_data.get('verification_attempts', 0),
+                    missing_items=goal_data.get('missing_items', []),
+                    completion_percentage=goal_data.get('completion_percentage', 0),
+                )
+                self.console.print(f"  [dim]Goal context restored from database[/dim]")
+
             # Get step states
             step_states_data = self._build_state_repo.get_step_states(plan_id)
             step_states = {
@@ -821,7 +861,11 @@ STEPS:
                 step_states=step_states,
                 files_created=state_data.get('files_created', []),
                 files_modified=state_data.get('files_modified', []),
-                last_error=state_data.get('last_error')
+                last_error=state_data.get('last_error'),
+                # Extended fields
+                execution_mode=state_data.get('execution_mode', 'sequential'),
+                current_wave_index=state_data.get('current_wave_index', 0),
+                thinking_enabled=bool(state_data.get('thinking_enabled', 0)),
             )
         except Exception as e:
             self.console.print(f"[yellow]Warning: Could not load state: {e}[/yellow]")

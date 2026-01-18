@@ -29,7 +29,8 @@ const BuildProgress = (function() {
             running: { bg: 'bg-blue-100', text: 'text-blue-800' },
             pending: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
             failed: { bg: 'bg-red-100', text: 'text-red-800' },
-            error: { bg: 'bg-red-100', text: 'text-red-800' }
+            error: { bg: 'bg-red-100', text: 'text-red-800' },
+            thinking: { bg: 'bg-purple-100', text: 'text-purple-800' }
         },
         eventBadgeClasses: {
             error: 'bg-red-100 text-red-800',
@@ -37,6 +38,9 @@ const BuildProgress = (function() {
             done: 'bg-green-100 text-green-800',
             warning: 'bg-yellow-100 text-yellow-800',
             info: 'bg-blue-100 text-blue-800',
+            thinking_start: 'bg-purple-100 text-purple-800',
+            thinking_complete: 'bg-purple-100 text-purple-800',
+            wave_start: 'bg-indigo-100 text-indigo-800',
             default: 'bg-gray-100 text-gray-800'
         }
     };
@@ -45,6 +49,7 @@ const BuildProgress = (function() {
     let eventSource = null;
     let runId = null;
     let isConnected = false;
+    let isThinking = false;
 
     // DOM element references
     const elements = {
@@ -52,7 +57,10 @@ const BuildProgress = (function() {
         progressBar: null,
         progressPercent: null,
         currentStep: null,
-        eventsLog: null
+        eventsLog: null,
+        thinkingIndicator: null,
+        waveProgress: null,
+        executionMode: null
     };
 
     /**
@@ -90,6 +98,9 @@ const BuildProgress = (function() {
         elements.progressPercent = document.getElementById('progress-percent');
         elements.currentStep = document.getElementById('current-step');
         elements.eventsLog = document.getElementById('events-log');
+        elements.thinkingIndicator = document.getElementById('thinking-indicator');
+        elements.waveProgress = document.getElementById('wave-progress');
+        elements.executionMode = document.getElementById('execution-mode');
     }
 
     /**
@@ -142,8 +153,26 @@ const BuildProgress = (function() {
         // Update status on completion
         if (event.type === 'done') {
             updateStatus(event.status);
+            updateThinkingStatus(false);
             stopStreaming();
             dispatchEvent('complete', { status: event.status });
+        }
+
+        // Handle thinking events
+        if (event.type === 'thinking_start') {
+            updateThinkingStatus(true, event.budget);
+        } else if (event.type === 'thinking_complete') {
+            updateThinkingStatus(false);
+        }
+
+        // Handle wave progress for parallel execution
+        if (event.type === 'wave_start') {
+            updateWaveProgress(event.wave_index, event.total_waves, event.steps_in_wave);
+        }
+
+        // Handle execution mode updates
+        if (event.execution_mode) {
+            updateExecutionMode(event.execution_mode);
         }
 
         // Update progress
@@ -205,6 +234,63 @@ const BuildProgress = (function() {
         if (elements.currentStep) {
             elements.currentStep.textContent = step;
         }
+    }
+
+    /**
+     * Update the thinking indicator
+     * @param {boolean} active - Whether thinking is active
+     * @param {number} [budget] - Token budget for thinking
+     */
+    function updateThinkingStatus(active, budget) {
+        isThinking = active;
+
+        if (!elements.thinkingIndicator) return;
+
+        if (active) {
+            elements.thinkingIndicator.classList.remove('hidden');
+            const budgetText = budget ? ' (budget: ' + budget.toLocaleString() + ' tokens)' : '';
+            elements.thinkingIndicator.innerHTML =
+                '<svg class="animate-spin h-4 w-4 mr-2 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">' +
+                '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+                '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
+                '</svg>' +
+                '<span class="text-purple-700">Extended thinking active' + escapeHtml(budgetText) + '</span>';
+        } else {
+            elements.thinkingIndicator.classList.add('hidden');
+            elements.thinkingIndicator.innerHTML = '';
+        }
+    }
+
+    /**
+     * Update wave progress for parallel execution
+     * @param {number} waveIndex - Current wave index (0-based)
+     * @param {number} totalWaves - Total number of waves
+     * @param {number} stepsInWave - Number of steps in this wave
+     */
+    function updateWaveProgress(waveIndex, totalWaves, stepsInWave) {
+        if (!elements.waveProgress) return;
+
+        elements.waveProgress.innerHTML =
+            '<span class="text-sm text-gray-600">' +
+            'Wave ' + (waveIndex + 1) + '/' + totalWaves +
+            ' (' + stepsInWave + ' step' + (stepsInWave > 1 ? 's' : '') + ' in parallel)' +
+            '</span>';
+    }
+
+    /**
+     * Update execution mode display
+     * @param {string} mode - Execution mode (sequential, parallel, coordinated)
+     */
+    function updateExecutionMode(mode) {
+        if (!elements.executionMode) return;
+
+        const modeLabels = {
+            'sequential': 'Sequential',
+            'parallel': 'Parallel Waves',
+            'coordinated': 'Coordinated Build'
+        };
+
+        elements.executionMode.textContent = modeLabels[mode] || mode;
     }
 
     /**
@@ -298,6 +384,9 @@ const BuildProgress = (function() {
         updateStatus: updateStatus,
         updateProgress: updateProgress,
         updateCurrentStep: updateCurrentStep,
+        updateThinkingStatus: updateThinkingStatus,
+        updateWaveProgress: updateWaveProgress,
+        updateExecutionMode: updateExecutionMode,
         addEventToLog: addEventToLog,
         isConnected: isStreamConnected,
         getRunId: getRunId,

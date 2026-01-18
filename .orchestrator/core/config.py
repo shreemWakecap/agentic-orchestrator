@@ -51,12 +51,21 @@ class ParallelConfig:
 
 
 @dataclass(frozen=True)
+class ThinkingConfig:
+    """Extended thinking configuration for Claude CLI."""
+    enabled: bool = False  # Whether to enable extended thinking
+    budget: int = 10000  # Token budget for thinking (default 10k)
+    timeout_multiplier: float = 1.5  # Multiply timeout when thinking enabled
+
+
+@dataclass(frozen=True)
 class AgentConfig:
     """Complete agent configuration."""
     timeouts: TimeoutConfig = field(default_factory=TimeoutConfig)
     retry: RetryConfig = field(default_factory=RetryConfig)
     context_limits: ContextLimitsConfig = field(default_factory=ContextLimitsConfig)
     parallel: ParallelConfig = field(default_factory=ParallelConfig)
+    thinking: ThinkingConfig = field(default_factory=ThinkingConfig)
 
 
 @dataclass(frozen=True)
@@ -120,6 +129,7 @@ class ConfigLoader:
         retry_data = data.get("retry", {})
         context_data = data.get("context_limits", {})
         parallel_data = data.get("parallel", {})
+        thinking_data = data.get("thinking", {})
 
         config = AgentConfig(
             timeouts=TimeoutConfig(
@@ -146,6 +156,11 @@ class ConfigLoader:
                 max_build_workers=parallel_data.get("max_build_workers", 3),
                 overlap_build_test=parallel_data.get("overlap_build_test", True),
                 simple_build_parallel=parallel_data.get("simple_build_parallel", True),
+            ),
+            thinking=ThinkingConfig(
+                enabled=thinking_data.get("enabled", False),
+                budget=thinking_data.get("budget", 10000),
+                timeout_multiplier=thinking_data.get("timeout_multiplier", 1.5),
             ),
         )
 

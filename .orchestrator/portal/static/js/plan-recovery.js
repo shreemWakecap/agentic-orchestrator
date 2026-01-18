@@ -234,10 +234,30 @@ const PlanRecovery = (function() {
         if (window.PLAN_DATA) {
             if (window.PLAN_DATA.failedStep) {
                 stepInfo = 'Failed at step: ' + escapeHtml(window.PLAN_DATA.failedStep);
+
+                // Add retry info if available
+                if (window.PLAN_DATA.retryCount > 0) {
+                    stepInfo += ' (' + window.PLAN_DATA.retryCount + ' retries attempted)';
+                }
             } else if (window.PLAN_DATA.currentStep) {
                 stepInfo = 'Last active step: ' + escapeHtml(window.PLAN_DATA.currentStep);
             } else if (window.PLAN_DATA.completedSteps) {
                 stepInfo = 'Completed ' + window.PLAN_DATA.completedSteps + ' steps before issue.';
+            }
+
+            // Add wave context for parallel builds
+            if (window.PLAN_DATA.executionMode === 'parallel' && window.PLAN_DATA.currentWaveIndex !== undefined) {
+                stepInfo += ' | Wave ' + (window.PLAN_DATA.currentWaveIndex + 1);
+            }
+
+            // Add execution mode context
+            if (window.PLAN_DATA.executionMode && window.PLAN_DATA.executionMode !== 'sequential') {
+                const modeLabels = {
+                    'parallel': 'Parallel Waves',
+                    'coordinated': 'Coordinated Build'
+                };
+                const modeLabel = modeLabels[window.PLAN_DATA.executionMode] || window.PLAN_DATA.executionMode;
+                stepInfo += ' | Mode: ' + modeLabel;
             }
         }
 

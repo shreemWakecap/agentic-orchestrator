@@ -749,24 +749,23 @@ const PlanManager = (function() {
         var id = KeyboardShortcuts.registerShortcut('b', function(event) {
             console.log('[PlanManager] Shortcut triggered via KeyboardShortcuts: B (Start Build)', { selectedPlanId: selectedPlanId });
             highlightShortcutHint('build');
-            if (selectedPlanId) {
-                var state = getSelectedPlanState();
-                console.log('[PlanManager] Selected plan state:', state);
-                if (state === 'pending') {
-                    console.log('[PlanManager] Executing startBuild for plan:', selectedPlanId);
-                    if (typeof window.startBuild === 'function') {
-                        window.startBuild(selectedPlanId, null);
-                    } else {
-                        startBuild(selectedPlanId);
-                    }
-                    return true; // Prevent default
-                } else {
-                    showNotification('Cannot start build: plan is not in pending state', 'error');
-                }
-            } else {
+            if (!selectedPlanId) {
                 showNotification('Select a plan first (click on a plan)', 'info');
+                return true; // Always return true to prevent default
             }
-            return true;
+            var state = getSelectedPlanState();
+            console.log('[PlanManager] Selected plan state:', state);
+            if (state !== 'pending') {
+                showNotification('Cannot start build: plan is not in pending state', 'error');
+                return true; // Always return true to prevent default
+            }
+            console.log('[PlanManager] Executing startBuild for plan:', selectedPlanId);
+            if (typeof window.startBuild === 'function') {
+                window.startBuild(selectedPlanId, null);
+            } else {
+                startBuild(selectedPlanId);
+            }
+            return true; // Prevent default after execution
         }, priority);
         if (id) registeredShortcutIds.push(id);
 
@@ -774,17 +773,17 @@ const PlanManager = (function() {
         id = KeyboardShortcuts.registerShortcut('d', function(event) {
             console.log('[PlanManager] Shortcut triggered via KeyboardShortcuts: D (Delete Plan)', { selectedPlanId: selectedPlanId });
             highlightShortcutHint('delete');
-            if (selectedPlanId) {
-                console.log('[PlanManager] Executing deletePlan for plan:', selectedPlanId);
-                if (typeof window.deletePlan === 'function') {
-                    window.deletePlan(selectedPlanId, null);
-                } else {
-                    deletePlan(selectedPlanId);
-                }
-            } else {
+            if (!selectedPlanId) {
                 showNotification('Select a plan first (click on a plan)', 'info');
+                return true; // Always return true to prevent default
             }
-            return true;
+            console.log('[PlanManager] Executing deletePlan for plan:', selectedPlanId);
+            if (typeof window.deletePlan === 'function') {
+                window.deletePlan(selectedPlanId, null);
+            } else {
+                deletePlan(selectedPlanId);
+            }
+            return true; // Prevent default after execution
         }, priority);
         if (id) registeredShortcutIds.push(id);
 

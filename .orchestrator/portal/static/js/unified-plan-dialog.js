@@ -271,7 +271,7 @@ const UnifiedPlanDialog = (function() {
                             }
                         }, 1500);
                     } else {
-                        throw new Error(data.error || 'Failed to create plan');
+                        throw new Error(data.detail || data.error || 'Failed to create plan');
                     }
                 })
                 .catch(function(err) {

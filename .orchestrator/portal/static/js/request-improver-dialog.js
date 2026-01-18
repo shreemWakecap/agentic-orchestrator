@@ -103,6 +103,12 @@ const RequestImproverDialog = (function() {
             var improvedText = '';
             var isLoading = true;
             var hasError = false;
+            var escShortcutId = null;
+
+            // Notify keyboard shortcuts module that a modal is open
+            if (typeof KeyboardShortcuts !== 'undefined') {
+                KeyboardShortcuts.modalOpened();
+            }
 
             // Build dialog HTML
             dialog.innerHTML = buildDialogHTML(draftText);
@@ -135,6 +141,15 @@ const RequestImproverDialog = (function() {
             var errorEl = dialog.querySelector('#improve-error');
 
             function cleanup() {
+                // Unregister ESC shortcut
+                if (escShortcutId && typeof KeyboardShortcuts !== 'undefined') {
+                    KeyboardShortcuts.unregisterShortcut(escShortcutId);
+                    escShortcutId = null;
+                }
+                // Notify keyboard shortcuts module that modal is closed
+                if (typeof KeyboardShortcuts !== 'undefined') {
+                    KeyboardShortcuts.modalClosed();
+                }
                 overlay.remove();
             }
 
@@ -164,13 +179,21 @@ const RequestImproverDialog = (function() {
                 close({ accepted: true, text: improvedText || draftText, wasImproved: true });
             });
 
-            // Handle escape key
-            function handleKeydown(e) {
-                if (e.key === 'Escape') {
+            // Handle escape key using centralized keyboard shortcuts
+            if (typeof KeyboardShortcuts !== 'undefined') {
+                escShortcutId = KeyboardShortcuts.registerShortcut('esc', function(e) {
                     close({ accepted: false, text: draftText, wasImproved: false });
-                }
+                    return true; // Prevent default and stop propagation
+                }, KeyboardShortcuts.PRIORITY.MODAL);
+            } else {
+                // Fallback for when KeyboardShortcuts is not available
+                document.addEventListener('keydown', function handleKeydown(e) {
+                    if (e.key === 'Escape') {
+                        document.removeEventListener('keydown', handleKeydown);
+                        close({ accepted: false, text: draftText, wasImproved: false });
+                    }
+                });
             }
-            document.addEventListener('keydown', handleKeydown);
 
             // Click outside to close
             overlay.addEventListener('click', function(e) {

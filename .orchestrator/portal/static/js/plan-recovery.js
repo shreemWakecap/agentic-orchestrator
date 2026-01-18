@@ -443,11 +443,11 @@ const PlanRecovery = (function() {
             const fromStep = window.PLAN_DATA ?
                 (window.PLAN_DATA.failedStep || window.PLAN_DATA.currentStep) : null;
 
-            const response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/start-build', {
+            // Use /resume-build endpoint for plans that are already in building/paused/failed state
+            const response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/resume-build', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    resume: true,
                     from_step: fromStep
                 })
             });
@@ -530,24 +530,12 @@ const PlanRecovery = (function() {
                 }
             }
 
-            // Reset plan state
-            const resetResponse = await fetch('/api/plans/' + encodeURIComponent(planId) + '/reset', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-
-            if (!resetResponse.ok) {
-                // Reset endpoint might not exist, continue anyway
-                console.warn('Reset endpoint returned error, continuing with restart');
-            }
-
-            // Start fresh build
-            const response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/start-build', {
+            // Use /recover endpoint with restart action - it properly clears state and resets to pending
+            const response = await fetch('/api/plans/' + encodeURIComponent(planId) + '/recover', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    restart: true,
-                    from_step: null // Start from beginning
+                    action: 'restart'
                 })
             });
 

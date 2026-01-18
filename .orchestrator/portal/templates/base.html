@@ -659,13 +659,52 @@
                 window.backgroundTasksIndicator = BackgroundTasksIndicator;
             }
 
-            // Initialize keyboard shortcuts manager
+            // Initialize and verify keyboard shortcuts manager
             // The module auto-initializes when first shortcut is registered,
-            // but we log to confirm it's loaded on all pages
+            // but we also verify it's properly set up on all pages
             if (typeof KeyboardShortcuts !== 'undefined') {
-                console.log('KeyboardShortcuts module loaded and ready');
+                // Verify the module is properly initialized by checking its state
+                (function verifyKeyboardShortcuts() {
+                    var shortcuts = KeyboardShortcuts.getRegisteredShortcuts();
+                    var shortcutKeys = Object.keys(shortcuts);
+                    var totalHandlers = shortcutKeys.reduce(function(sum, key) {
+                        return sum + (shortcuts[key] ? shortcuts[key].length : 0);
+                    }, 0);
+
+                    // Log successful initialization with details
+                    console.log(
+                        '%c[KeyboardShortcuts] ✓ Module initialized successfully',
+                        'color: #10b981; font-weight: bold;'
+                    );
+                    console.log(
+                        '[KeyboardShortcuts] Registered shortcuts: ' + shortcutKeys.length +
+                        ' key(s), ' + totalHandlers + ' handler(s)'
+                    );
+
+                    // If no shortcuts registered yet, that's okay - they register on page-specific scripts
+                    // But ensure the module is ready to receive registrations by triggering ensureInitialized
+                    // via a dummy shortcut registration and immediate unregistration
+                    if (shortcutKeys.length === 0) {
+                        // Force initialization by registering a temporary no-op shortcut
+                        var tempId = KeyboardShortcuts.registerShortcut('ctrl+shift+f12', function() {
+                            return false; // Never handle this
+                        }, 0);
+                        if (tempId) {
+                            KeyboardShortcuts.unregisterShortcut(tempId);
+                            console.log('[KeyboardShortcuts] Event listener initialized (ready to receive shortcuts)');
+                        }
+                    }
+
+                    // List registered shortcuts for debugging (only in development)
+                    if (shortcutKeys.length > 0 && window.location.hostname === 'localhost') {
+                        console.log('[KeyboardShortcuts] Active shortcuts:', shortcutKeys.join(', '));
+                    }
+                })();
             } else {
-                console.warn('KeyboardShortcuts module not found');
+                console.error(
+                    '%c[KeyboardShortcuts] ✗ Module not found - keyboard shortcuts will not work!',
+                    'color: #ef4444; font-weight: bold;'
+                );
             }
         });
     </script>

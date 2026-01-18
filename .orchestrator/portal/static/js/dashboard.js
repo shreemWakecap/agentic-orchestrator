@@ -1058,7 +1058,7 @@ async function recoverPlan(planId, action) {
 
         if (!response.ok) {
             var errorData = await response.json();
-            throw new Error(errorData.error || 'Recovery failed');
+            throw new Error(errorData.detail || errorData.error || 'Recovery failed');
         }
 
         var data = await response.json();
@@ -1090,7 +1090,7 @@ async function cancelBuild(planId) {
 
         if (!response.ok) {
             var errorData = await response.json();
-            throw new Error(errorData.error || 'Cancel failed');
+            throw new Error(errorData.detail || errorData.error || 'Cancel failed');
         }
 
         // Refresh stuck plans list

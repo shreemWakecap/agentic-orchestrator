@@ -232,8 +232,10 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
         })
 
         try:
-            workflow = BuildingWorkflow(project_root=PROJECT_ROOT, resume=True)
-            result = workflow.run(plan_id, from_step=from_step)
+            # BuildingWorkflow automatically resumes from existing state in DB
+            # No need for resume=True flag - execute() loads state and continues
+            workflow = BuildingWorkflow(project_root=PROJECT_ROOT)
+            result = workflow.run(plan_id)
 
             status = "completed" if result.success else "failed"
             run_repo.update(

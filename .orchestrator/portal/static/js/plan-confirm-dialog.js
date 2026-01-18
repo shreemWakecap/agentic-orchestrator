@@ -6,6 +6,7 @@
  *
  * Dependencies:
  * - OrchestratorUtils (from common.js) for escapeHtml utility
+ * - KeyboardShortcuts (from keyboard-shortcuts.js) for centralized keyboard handling
  *
  * Usage:
  *   const confirmed = await PlanConfirmDialog.showPlanConfirmDialog(descriptionText);
@@ -147,14 +148,35 @@ const PlanConfirmDialog = (function() {
             // Track if dialog has been resolved
             var resolved = false;
 
+            // Track registered shortcut IDs for cleanup
+            var escShortcutId = null;
+            var ctrlEnterShortcutId = null;
+            var metaEnterShortcutId = null;
+
             /**
              * Cleanup function to remove dialog and event listeners
              */
             function cleanup() {
+                // Unregister keyboard shortcuts
+                if (escShortcutId && typeof KeyboardShortcuts !== 'undefined') {
+                    KeyboardShortcuts.unregisterShortcut(escShortcutId);
+                }
+                if (ctrlEnterShortcutId && typeof KeyboardShortcuts !== 'undefined') {
+                    KeyboardShortcuts.unregisterShortcut(ctrlEnterShortcutId);
+                }
+                if (metaEnterShortcutId && typeof KeyboardShortcuts !== 'undefined') {
+                    KeyboardShortcuts.unregisterShortcut(metaEnterShortcutId);
+                }
+
+                // Notify modal closed
+                if (typeof KeyboardShortcuts !== 'undefined') {
+                    KeyboardShortcuts.modalClosed();
+                }
+
+                // Remove overlay from DOM
                 if (overlay.parentNode) {
                     overlay.remove();
                 }
-                document.removeEventListener('keydown', handleKeydown);
             }
 
             /**
@@ -168,19 +190,28 @@ const PlanConfirmDialog = (function() {
                 resolve(result);
             }
 
-            /**
-             * Handle keyboard events
-             * @param {KeyboardEvent} e - The keyboard event
-             */
-            function handleKeydown(e) {
-                if (e.key === 'Escape') {
-                    e.preventDefault();
+            // Register keyboard shortcuts using centralized module with MODAL priority
+            if (typeof KeyboardShortcuts !== 'undefined') {
+                // Notify modal opened for priority handling
+                KeyboardShortcuts.modalOpened();
+
+                // ESC to cancel
+                escShortcutId = KeyboardShortcuts.registerShortcut('esc', function(e) {
                     resolveDialog(false);
-                } else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                    // Ctrl+Enter to confirm quickly
-                    e.preventDefault();
+                    return true; // Explicitly return true to prevent default and stop propagation
+                }, KeyboardShortcuts.PRIORITY.MODAL);
+
+                // Ctrl+Enter to confirm
+                ctrlEnterShortcutId = KeyboardShortcuts.registerShortcut('ctrl+enter', function(e) {
                     resolveDialog(true);
-                }
+                    return true; // Explicitly return true to prevent default and stop propagation
+                }, KeyboardShortcuts.PRIORITY.MODAL);
+
+                // Meta+Enter (Cmd+Enter on Mac) to confirm
+                metaEnterShortcutId = KeyboardShortcuts.registerShortcut('meta+enter', function(e) {
+                    resolveDialog(true);
+                    return true; // Explicitly return true to prevent default and stop propagation
+                }, KeyboardShortcuts.PRIORITY.MODAL);
             }
 
             // Attach event listeners
@@ -202,9 +233,6 @@ const PlanConfirmDialog = (function() {
                     resolveDialog(false);
                 }
             });
-
-            // Handle escape key and Ctrl+Enter
-            document.addEventListener('keydown', handleKeydown);
 
             // Focus confirm button for quick keyboard confirmation
             confirmBtn.focus();

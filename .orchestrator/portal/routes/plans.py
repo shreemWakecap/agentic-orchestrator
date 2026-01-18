@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 from db import PlanRepository, BuildStateRepository, RunRepository
 from portal.dependencies import get_plan_repo, get_build_state_repo, get_run_repo, get_recovery_service
-from portal.schemas.requests import MovePlanRequest, ResumeBuildRequest
+from portal.schemas.requests import MovePlanRequest, ResumeBuildRequest, RecoverPlanRequest
 from portal.schemas.responses import (
     PlanResponse,
     PlanDetailResponse,
@@ -176,6 +176,9 @@ async def resume_plan_build(
                         status_code=400,
                         detail=f"Invalid from_step '{from_step}'. Available steps: {step_ids or 'none recorded yet'}",
                     )
+
+    # Update plan status to building before starting
+    plan_repo.update_status(plan_id, "building")
 
     # Create run entry in database with resume flag
     run_id = str(uuid.uuid4())[:8]
@@ -642,7 +645,7 @@ async def list_stuck_plans(
 @router.post("/{plan_id}/recover", response_model=WorkflowStartResponse)
 async def recover_plan(
     plan_id: str,
-    action: str,
+    request: RecoverPlanRequest,
     background_tasks: BackgroundTasks,
     plan_repo: PlanRepository = Depends(get_plan_repo),
     build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
@@ -652,12 +655,15 @@ async def recover_plan(
 
     Args:
         plan_id: The plan to recover
-        action: Recovery action - 'resume' to continue from last step,
-                'restart' to reset and start fresh
+        request: RecoverPlanRequest with action ('resume', 'restart', 'cancel')
+                 and optional from_step for resume
 
     Returns:
         WorkflowStartResponse with the new run_id
     """
+    action = request.action
+    from_step = request.from_step
+
     plan = plan_repo.get_by_id(plan_id)
 
     if not plan:
@@ -672,19 +678,27 @@ async def recover_plan(
             detail=f"Plan '{plan_id}' is in '{current_status}' state. Only plans in {recoverable_states} states can be recovered.",
         )
 
-    valid_actions = ["resume", "restart"]
-    if action not in valid_actions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid action '{action}'. Must be one of: {valid_actions}",
-        )
+    # Handle cancel action
+    if action == "cancel":
+        try:
+            plan_repo.update_status(plan_id, "failed")
+            build_state = build_state_repo.get(plan_id)
+            if build_state:
+                build_state_repo.update(plan_id, status="failed")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to cancel plan: {str(e)}")
+
+        return WorkflowStartResponse(run_id="", status="cancelled", plan_id=plan_id)
 
     if action == "restart":
         # Reset the build state first
-        build_state = build_state_repo.get(plan_id)
-        if build_state:
-            build_state_repo.clear(plan_id)
-        plan_repo.update_status(plan_id, "pending")
+        try:
+            build_state = build_state_repo.get(plan_id)
+            if build_state:
+                build_state_repo.clear(plan_id)
+            plan_repo.update_status(plan_id, "pending")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to reset plan: {str(e)}")
 
         # Import and start fresh build
         from portal.services.workflow_runner import run_building_workflow
@@ -696,12 +710,15 @@ async def recover_plan(
         return WorkflowStartResponse(run_id=run_id, status="restarted", plan_id=plan_id)
 
     else:  # action == "resume"
+        # Update plan status to building before starting
+        plan_repo.update_status(plan_id, "building")
+
         # Resume from current state
         from portal.services.workflow_runner import run_building_workflow_resume
 
         run_id = str(uuid.uuid4())[:8]
         run_repo.create(run_id, workflow="building", plan_id=plan_id)
-        background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, None)
+        background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, from_step)
 
         return WorkflowStartResponse(run_id=run_id, status="resumed", plan_id=plan_id)
 

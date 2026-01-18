@@ -12,6 +12,9 @@ class PlanResponse(BaseModel):
     request: Optional[str] = None
     goal: Optional[str] = None
     files: List[str] = Field(default_factory=list)
+    is_stuck: bool = Field(False, description="Whether the plan is stuck in building/in-progress state")
+    last_update: Optional[str] = Field(None, description="Last update timestamp from build state")
+    recovery_options: List[str] = Field(default_factory=list, description="Available recovery actions: reset, resume, retry_step, skip_step")
 
     class Config:
         from_attributes = True
@@ -208,3 +211,35 @@ class TaskStatusResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RecoveryAction(BaseModel):
+    """A single recovery action that can be taken."""
+    action: str = Field(..., description="Action identifier: reset, resume, retry_step, skip_step")
+    label: str = Field(..., description="Human-readable action label")
+    description: str = Field(..., description="Description of what the action does")
+    available: bool = Field(True, description="Whether this action is currently available")
+    endpoint: str = Field(..., description="API endpoint to call for this action")
+    method: str = Field("POST", description="HTTP method to use")
+
+
+class RecoveryOptionsResponse(BaseModel):
+    """Response for plan recovery options."""
+    plan_id: str
+    current_status: str
+    can_recover: bool = Field(..., description="Whether any recovery action is available")
+    actions: List[RecoveryAction] = Field(default_factory=list)
+    last_error: Optional[str] = None
+    failed_step: Optional[str] = None
+    completed_steps_count: int = 0
+    total_steps_count: int = 0
+
+
+class ResetBuildResponse(BaseModel):
+    """Response for build reset operation."""
+    status: str = "reset"
+    plan_id: str
+    previous_status: str
+    new_status: str = "pending"
+    steps_cleared: int = 0
+    message: str = "Build state reset successfully"

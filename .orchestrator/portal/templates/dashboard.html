@@ -74,6 +74,41 @@
         </a>
     </div>
 
+    <!-- Stuck Plans Section - Only shown when there are recoverable plans -->
+    <div id="stuck-plans-section" class="glass-card mb-12 hidden">
+        <div class="p-8">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-red-600 flex items-center justify-center mr-4 shadow-lg">
+                        <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-primary dark:text-primary">Stuck Plans</h2>
+                        <span id="stuck-plans-indicator" class="flex items-center text-sm text-amber-600 dark:text-amber-400 mt-1">
+                            <span class="relative flex h-2.5 w-2.5 mr-2">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                            </span>
+                            Needs Attention
+                        </span>
+                    </div>
+                </div>
+                <button id="refresh-stuck-btn" type="button" class="btn btn-secondary btn-sm btn-modern group">
+                    <svg class="h-4 w-4 mr-1.5 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+
+            <div id="stuck-plans-list" class="space-y-4">
+                <!-- Stuck plans populated by JS -->
+            </div>
+        </div>
+    </div>
+
     <!-- Quick Actions - Modern Glass Cards -->
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-12">
         <!-- Create New Plan Card -->

@@ -43,6 +43,11 @@
  *       return true; // Prevents browser default
  *   }, 10);
  *
+ * Page-Specific Shortcuts:
+ *   - Ctrl+R : Resume plan (on plan detail page when plan is resumable)
+ *              Overrides browser refresh when recovery UI is active.
+ *              See: plan-recovery.js
+ *
  * Usage:
  * KeyboardShortcuts.registerShortcut('ctrl+s', handler, 10);
  * KeyboardShortcuts.unregisterShortcut('ctrl+s');

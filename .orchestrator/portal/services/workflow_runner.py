@@ -109,17 +109,22 @@ async def run_building_workflow(run_id: str, plan_id: str):
         _add_event(run_id, "error", {"message": str(e)})
 
 
-async def run_syncing_workflow(run_id: str):
-    """Execute syncing workflow to commit changes and create PR."""
+async def run_syncing_workflow(run_id: str, auto_merge: bool = True):
+    """Execute syncing workflow to commit changes and create PR.
+
+    Args:
+        run_id: Unique identifier for this run
+        auto_merge: Whether to auto-merge the PR after creation (default: True)
+    """
     from workflows.syncing import SyncingWorkflow
 
     run_repo = _get_run_repo()
 
     run_repo.update(run_id, status="running")
-    _add_event(run_id, "start", {"workflow": "syncing"})
+    _add_event(run_id, "start", {"workflow": "syncing", "auto_merge": auto_merge})
 
     try:
-        workflow = SyncingWorkflow(project_root=PROJECT_ROOT)
+        workflow = SyncingWorkflow(project_root=PROJECT_ROOT, auto_merge=auto_merge)
         result = workflow.run("")  # Pass empty string as request
 
         status = "completed" if result.success else "failed"

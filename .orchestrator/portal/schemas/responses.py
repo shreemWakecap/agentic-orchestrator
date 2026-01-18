@@ -146,3 +146,16 @@ class SyncStatusResponse(BaseModel):
     diff_summary: str
     staged_count: int
     unstaged_count: int
+
+
+class GitStatisticsResponse(BaseModel):
+    """Response for git repository statistics."""
+    commits_ahead: int = 0
+    commits_behind: int = 0
+    current_branch: str
+    remote_branch: Optional[str] = None
+    pr_status: str = "none"  # "open", "merged", "none"
+    pr_url: Optional[str] = None
+    pr_number: Optional[int] = None
+    last_commit_hash: Optional[str] = None
+    last_commit_message: Optional[str] = None

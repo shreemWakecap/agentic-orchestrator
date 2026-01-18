@@ -9,10 +9,12 @@ Provides a browser-based dashboard for:
 This module sets up the FastAPI application and registers all route modules.
 Business logic has been extracted to services/ and routes to routes/.
 """
+import logging
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles
 
 # Add parent directory to path for imports
@@ -31,16 +33,66 @@ from portal.routes import (
     pages_router,
     health_router,
     knowledge_router,
+    background_tasks_router,
 )
 from portal.routes.health import set_version
 from portal.exception_handlers import register_exception_handlers
+from portal.services.task_manager import (
+    TaskManager,
+    get_task_manager,
+    shutdown_task_manager,
+)
+
+logger = logging.getLogger(__name__)
+
+# Global TaskManager instance for the application
+_task_manager: TaskManager | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup/shutdown events.
+
+    Initializes the TaskManager on startup and gracefully shuts it down
+    when the application stops.
+    """
+    global _task_manager
+
+    # Startup: Initialize TaskManager
+    logger.info("Starting TaskManager...")
+    _task_manager = get_task_manager(max_workers=4)
+    logger.info("TaskManager initialized successfully")
+
+    yield
+
+    # Shutdown: Gracefully close TaskManager
+    logger.info("Shutting down TaskManager...")
+    shutdown_task_manager(wait=True)
+    _task_manager = None
+    logger.info("TaskManager shutdown complete")
+
 
 # FastAPI app
 app = FastAPI(
     title="Agentic Orchestrator Portal",
     description="Web portal for managing planning and building workflows",
     version="1.0.0",
+    lifespan=lifespan,
 )
+
+
+def get_task_manager_dependency() -> TaskManager:
+    """FastAPI dependency to get the TaskManager instance.
+
+    Returns:
+        The application's TaskManager instance
+
+    Raises:
+        RuntimeError: If TaskManager hasn't been initialized
+    """
+    if _task_manager is None:
+        raise RuntimeError("TaskManager not initialized - application not started properly")
+    return _task_manager
 
 # Set version in health module
 set_version(app.version)
@@ -61,6 +113,7 @@ app.include_router(workflows_router)
 app.include_router(cost_router)
 app.include_router(pages_router)
 app.include_router(knowledge_router)
+app.include_router(background_tasks_router)
 
 
 def run_portal(host: str = "127.0.0.1", port: int = 8000):

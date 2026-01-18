@@ -38,6 +38,9 @@ const PlanManager = (function() {
     // Keyboard shortcuts enabled flag
     let keyboardShortcutsEnabled = false;
 
+    // Store shortcut IDs for unregistration
+    let registeredShortcutIds = [];
+
     // =========================================================================
     // Private Helpers
     // =========================================================================
@@ -495,23 +498,23 @@ const PlanManager = (function() {
             '<div id="keyboard-shortcuts-hint" class="fixed bottom-4 right-4 bg-gray-800 text-white text-xs rounded-lg shadow-lg p-3 opacity-80 hover:opacity-100 transition-opacity z-40">' +
                 '<div class="font-semibold mb-2 text-gray-300">Keyboard Shortcuts</div>' +
                 '<div class="space-y-1">' +
-                    '<div class="flex justify-between gap-4">' +
+                    '<div id="shortcut-hint-select" class="flex justify-between gap-4 px-1 py-0.5 rounded transition-colors duration-150">' +
                         '<span class="text-gray-400">Select plan</span>' +
                         '<span><kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">Click</kbd> / <kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">↑</kbd><kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">↓</kbd></span>' +
                     '</div>' +
-                    '<div class="flex justify-between gap-4">' +
+                    '<div id="shortcut-hint-build" class="flex justify-between gap-4 px-1 py-0.5 rounded transition-colors duration-150">' +
                         '<span class="text-gray-400">Start build</span>' +
                         '<kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">B</kbd>' +
                     '</div>' +
-                    '<div class="flex justify-between gap-4">' +
+                    '<div id="shortcut-hint-delete" class="flex justify-between gap-4 px-1 py-0.5 rounded transition-colors duration-150">' +
                         '<span class="text-gray-400">Delete plan</span>' +
                         '<kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">D</kbd>' +
                     '</div>' +
-                    '<div class="flex justify-between gap-4">' +
+                    '<div id="shortcut-hint-refresh" class="flex justify-between gap-4 px-1 py-0.5 rounded transition-colors duration-150">' +
                         '<span class="text-gray-400">Refresh list</span>' +
                         '<kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">R</kbd>' +
                     '</div>' +
-                    '<div class="flex justify-between gap-4">' +
+                    '<div id="shortcut-hint-escape" class="flex justify-between gap-4 px-1 py-0.5 rounded transition-colors duration-150">' +
                         '<span class="text-gray-400">Clear selection</span>' +
                         '<kbd class="px-1.5 py-0.5 bg-gray-700 rounded text-gray-200">Esc</kbd>' +
                     '</div>' +
@@ -521,6 +524,23 @@ const PlanManager = (function() {
         var hintsContainer = document.createElement('div');
         hintsContainer.innerHTML = hintsHtml;
         document.body.appendChild(hintsContainer.firstChild);
+    }
+
+    /**
+     * Highlight a shortcut hint row when the shortcut is triggered
+     * @param {string} shortcutName - The shortcut name (select, build, delete, refresh, escape)
+     */
+    function highlightShortcutHint(shortcutName) {
+        var hintElement = document.getElementById('shortcut-hint-' + shortcutName);
+        if (!hintElement) return;
+
+        // Add active class for highlight effect
+        hintElement.classList.add('shortcut-hint-active');
+
+        // Remove the class after animation completes
+        setTimeout(function() {
+            hintElement.classList.remove('shortcut-hint-active');
+        }, 300);
     }
 
     /**
@@ -538,28 +558,54 @@ const PlanManager = (function() {
      * @param {KeyboardEvent} event - The keyboard event
      */
     function handleKeyboardShortcut(event) {
+        console.log('[PlanManager] Keyboard event received:', {
+            key: event.key,
+            code: event.code,
+            target: event.target.tagName,
+            ctrlKey: event.ctrlKey,
+            metaKey: event.metaKey,
+            altKey: event.altKey,
+            shiftKey: event.shiftKey
+        });
+
         // Ignore if typing in an input/textarea or if modifiers are pressed
         if (event.target.tagName === 'INPUT' ||
             event.target.tagName === 'TEXTAREA' ||
             event.target.isContentEditable ||
             event.ctrlKey || event.metaKey || event.altKey) {
+            console.log('[PlanManager] Shortcut ignored - reason:', {
+                isInput: event.target.tagName === 'INPUT',
+                isTextarea: event.target.tagName === 'TEXTAREA',
+                isContentEditable: event.target.isContentEditable,
+                hasCtrl: event.ctrlKey,
+                hasMeta: event.metaKey,
+                hasAlt: event.altKey
+            });
             return;
         }
 
         // Check if a modal/dialog is open
         if (document.getElementById('confirm-dialog-overlay')) {
+            console.log('[PlanManager] Shortcut ignored - dialog is open');
             return;
         }
 
         var key = event.key.toLowerCase();
+        console.log('Shortcut key pressed:', key);
 
         switch (key) {
             case 'b':
                 // Start build on selected plan (if pending)
+                console.log('[PlanManager] Shortcut matched: B (Start Build)', { selectedPlanId: selectedPlanId });
+                highlightShortcutHint('build');
                 if (selectedPlanId) {
                     var state = getSelectedPlanState();
+                    console.log('[PlanManager] Selected plan state:', state);
                     if (state === 'pending') {
                         event.preventDefault();
+                        event.stopPropagation();
+                        event.stopImmediatePropagation();
+                        console.log('[PlanManager] Executing startBuild for plan:', selectedPlanId);
                         // Trigger startBuild with the selected plan
                         if (typeof window.startBuild === 'function') {
                             window.startBuild(selectedPlanId, null);
@@ -576,8 +622,13 @@ const PlanManager = (function() {
 
             case 'd':
                 // Delete selected plan
+                console.log('[PlanManager] Shortcut matched: D (Delete Plan)', { selectedPlanId: selectedPlanId });
+                highlightShortcutHint('delete');
                 if (selectedPlanId) {
                     event.preventDefault();
+                    event.stopPropagation();
+                    event.stopImmediatePropagation();
+                    console.log('[PlanManager] Executing deletePlan for plan:', selectedPlanId);
                     // Trigger deletePlan with the selected plan
                     if (typeof window.deletePlan === 'function') {
                         window.deletePlan(selectedPlanId, null);
@@ -591,27 +642,47 @@ const PlanManager = (function() {
 
             case 'r':
                 // Refresh plan list
+                console.log('[PlanManager] Shortcut matched: R (Refresh List)');
+                highlightShortcutHint('refresh');
                 event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
                 showNotification('Refreshing plan list...', 'info');
                 refreshPlanList();
                 break;
 
             case 'escape':
                 // Clear selection
+                console.log('[PlanManager] Shortcut matched: Escape (Clear Selection)');
+                highlightShortcutHint('escape');
                 event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
                 clearSelection();
                 break;
 
             case 'arrowdown':
                 // Select next plan
+                console.log('[PlanManager] Shortcut matched: ArrowDown (Select Next)');
+                highlightShortcutHint('select');
                 event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
                 selectNextPlan(1);
                 break;
 
             case 'arrowup':
                 // Select previous plan
+                console.log('[PlanManager] Shortcut matched: ArrowUp (Select Previous)');
+                highlightShortcutHint('select');
                 event.preventDefault();
+                event.stopPropagation();
+                event.stopImmediatePropagation();
                 selectNextPlan(-1);
+                break;
+
+            default:
+                console.log('[PlanManager] Key not matched to any shortcut:', key);
                 break;
         }
     }
@@ -648,14 +719,111 @@ const PlanManager = (function() {
         selectPlan(planItems[newIndex].dataset.planId);
     }
 
+    // Verification flag for keyboard shortcuts initialization
+    let keyboardShortcutsInitialized = false;
+
     /**
-     * Initialize keyboard shortcuts
+     * Initialize keyboard shortcuts using the centralized KeyboardShortcuts module
      */
     function initKeyboardShortcuts() {
+        console.log('[PlanManager] initKeyboardShortcuts called, already enabled:', keyboardShortcutsEnabled);
         if (keyboardShortcutsEnabled) return;
 
-        // Add keyboard event listener
-        document.addEventListener('keydown', handleKeyboardShortcut);
+        // Check if KeyboardShortcuts module is available
+        if (typeof KeyboardShortcuts === 'undefined') {
+            console.warn('[PlanManager] KeyboardShortcuts module not available, falling back to direct listener');
+            document.addEventListener('keydown', handleKeyboardShortcut);
+            keyboardShortcutsEnabled = true;
+            keyboardShortcutsInitialized = true;
+            createShortcutHints();
+            console.log('[PlanManager] Keyboard shortcuts initialized (direct listener attached)');
+            return;
+        }
+
+        console.log('[PlanManager] Registering shortcuts with KeyboardShortcuts module');
+
+        // Use PAGE priority for plan manager shortcuts
+        var priority = KeyboardShortcuts.PRIORITY.PAGE;
+
+        // Register 'b' for start build
+        var id = KeyboardShortcuts.registerShortcut('b', function(event) {
+            console.log('[PlanManager] Shortcut triggered via KeyboardShortcuts: B (Start Build)', { selectedPlanId: selectedPlanId });
+            highlightShortcutHint('build');
+            if (selectedPlanId) {
+                var state = getSelectedPlanState();
+                console.log('[PlanManager] Selected plan state:', state);
+                if (state === 'pending') {
+                    console.log('[PlanManager] Executing startBuild for plan:', selectedPlanId);
+                    if (typeof window.startBuild === 'function') {
+                        window.startBuild(selectedPlanId, null);
+                    } else {
+                        startBuild(selectedPlanId);
+                    }
+                    return true; // Prevent default
+                } else {
+                    showNotification('Cannot start build: plan is not in pending state', 'error');
+                }
+            } else {
+                showNotification('Select a plan first (click on a plan)', 'info');
+            }
+            return true;
+        }, priority);
+        if (id) registeredShortcutIds.push(id);
+
+        // Register 'd' for delete plan
+        id = KeyboardShortcuts.registerShortcut('d', function(event) {
+            console.log('[PlanManager] Shortcut triggered via KeyboardShortcuts: D (Delete Plan)', { selectedPlanId: selectedPlanId });
+            highlightShortcutHint('delete');
+            if (selectedPlanId) {
+                console.log('[PlanManager] Executing deletePlan for plan:', selectedPlanId);
+                if (typeof window.deletePlan === 'function') {
+                    window.deletePlan(selectedPlanId, null);
+                } else {
+                    deletePlan(selectedPlanId);
+                }
+            } else {
+                showNotification('Select a plan first (click on a plan)', 'info');
+            }
+            return true;
+        }, priority);
+        if (id) registeredShortcutIds.push(id);
+
+        // Register 'r' for refresh
+        id = KeyboardShortcuts.registerShortcut('r', function(event) {
+            console.log('[PlanManager] Shortcut triggered via KeyboardShortcuts: R (Refresh List)');
+            highlightShortcutHint('refresh');
+            showNotification('Refreshing plan list...', 'info');
+            refreshPlanList();
+            return true;
+        }, priority);
+        if (id) registeredShortcutIds.push(id);
+
+        // Register 'esc' for clear selection
+        id = KeyboardShortcuts.registerShortcut('esc', function(event) {
+            console.log('[PlanManager] Shortcut triggered via KeyboardShortcuts: Escape (Clear Selection)');
+            highlightShortcutHint('escape');
+            clearSelection();
+            return true;
+        }, priority);
+        if (id) registeredShortcutIds.push(id);
+
+        // Register arrow down for next plan
+        id = KeyboardShortcuts.registerShortcut('down', function(event) {
+            console.log('[PlanManager] Shortcut triggered via KeyboardShortcuts: ArrowDown (Select Next)');
+            highlightShortcutHint('select');
+            selectNextPlan(1);
+            return true;
+        }, priority);
+        if (id) registeredShortcutIds.push(id);
+
+        // Register arrow up for previous plan
+        id = KeyboardShortcuts.registerShortcut('up', function(event) {
+            console.log('[PlanManager] Shortcut triggered via KeyboardShortcuts: ArrowUp (Select Previous)');
+            highlightShortcutHint('select');
+            selectNextPlan(-1);
+            return true;
+        }, priority);
+        if (id) registeredShortcutIds.push(id);
 
         // Add click handlers to plan items for selection
         document.querySelectorAll('.plan-item[data-plan-id]').forEach(function(item) {
@@ -672,6 +840,51 @@ const PlanManager = (function() {
         createShortcutHints();
 
         keyboardShortcutsEnabled = true;
+        keyboardShortcutsInitialized = true;
+        console.log('[PlanManager] Keyboard shortcuts initialized');
+        console.log('[PlanManager] Shortcuts registered:', registeredShortcutIds);
+    }
+
+    /**
+     * Test keyboard shortcuts by dispatching a synthetic keydown event
+     * @param {string} key - The key to simulate (e.g., 'b', 'd', 'r')
+     * @returns {boolean} True if handler responded
+     */
+    function testKeyboardShortcut(key) {
+        if (!keyboardShortcutsInitialized) {
+            console.warn('[PlanManager] testKeyboardShortcut: Shortcuts not initialized');
+            return false;
+        }
+
+        console.log('[PlanManager] Testing keyboard shortcut:', key);
+
+        var event = new KeyboardEvent('keydown', {
+            key: key,
+            code: 'Key' + key.toUpperCase(),
+            bubbles: true,
+            cancelable: true
+        });
+
+        // Track if the event was handled
+        var wasHandled = false;
+        var originalPreventDefault = event.preventDefault;
+        event.preventDefault = function() {
+            wasHandled = true;
+            originalPreventDefault.call(event);
+        };
+
+        document.dispatchEvent(event);
+
+        console.log('[PlanManager] Test shortcut dispatched, handled:', wasHandled);
+        return wasHandled;
+    }
+
+    /**
+     * Check if keyboard shortcuts are initialized
+     * @returns {boolean} True if initialized
+     */
+    function isKeyboardShortcutsInitialized() {
+        return keyboardShortcutsInitialized;
     }
 
     /**
@@ -680,10 +893,23 @@ const PlanManager = (function() {
     function disableKeyboardShortcuts() {
         if (!keyboardShortcutsEnabled) return;
 
-        document.removeEventListener('keydown', handleKeyboardShortcut);
+        // Unregister from KeyboardShortcuts module if available
+        if (typeof KeyboardShortcuts !== 'undefined') {
+            console.log('[PlanManager] Unregistering shortcuts:', registeredShortcutIds);
+            registeredShortcutIds.forEach(function(id) {
+                KeyboardShortcuts.unregisterShortcut(id);
+            });
+            registeredShortcutIds = [];
+        } else {
+            // Fallback: remove direct listener
+            document.removeEventListener('keydown', handleKeyboardShortcut);
+        }
+
         removeShortcutHints();
         clearSelection();
         keyboardShortcutsEnabled = false;
+        keyboardShortcutsInitialized = false;
+        console.log('[PlanManager] Keyboard shortcuts disabled');
     }
 
     // =========================================================================
@@ -704,7 +930,9 @@ const PlanManager = (function() {
         clearSelection: clearSelection,
         // Keyboard shortcuts API
         initKeyboardShortcuts: initKeyboardShortcuts,
-        disableKeyboardShortcuts: disableKeyboardShortcuts
+        disableKeyboardShortcuts: disableKeyboardShortcuts,
+        testKeyboardShortcut: testKeyboardShortcut,
+        isKeyboardShortcutsInitialized: isKeyboardShortcutsInitialized
     };
 })();
 

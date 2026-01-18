@@ -109,6 +109,8 @@
     </script>
     <!-- Modern UI CSS -->
     <link rel="stylesheet" href="/static/css/modern.css">
+    <!-- Background Tasks Indicator CSS -->
+    <link rel="stylesheet" href="/static/css/background-tasks.css">
     {% block head %}{% endblock %}
     <style>
         /* Page transition styles */
@@ -588,8 +590,14 @@
     <!-- Toast Container -->
     <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
+    <!-- Background Tasks Floating Indicator -->
+    <div id="background-tasks-indicator"></div>
+
     <!-- Generic Side Popup JavaScript -->
     <script src="/static/js/side-popup.js"></script>
+
+    <!-- Keyboard Shortcuts Module (loaded early for other modules to register shortcuts) -->
+    <script src="/static/js/keyboard-shortcuts.js"></script>
 
     <!-- Toast Notification System -->
     <script src="/static/js/toast.js"></script>
@@ -606,7 +614,10 @@
     <!-- Animations Module -->
     <script src="/static/js/animations.js"></script>
 
-    <!-- Initialize Dark Mode and Scroll Animations -->
+    <!-- Background Tasks Indicator -->
+    <script src="/static/js/background-tasks.js"></script>
+
+    <!-- Initialize Dark Mode, Scroll Animations, and Background Tasks -->
     <script>
         // Ensure DarkMode is initialized on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -635,6 +646,21 @@
 
                 // Initialize ripple effect on buttons
                 OrchestratorAnimations.initRipple('.btn, .btn-primary, .btn-secondary, .btn-success, .btn-danger');
+            }
+
+            // Background tasks indicator auto-initializes via background-tasks.js
+            // Store reference for convenience
+            if (typeof BackgroundTasksIndicator !== 'undefined') {
+                window.backgroundTasksIndicator = BackgroundTasksIndicator;
+            }
+
+            // Initialize keyboard shortcuts manager
+            // The module auto-initializes when first shortcut is registered,
+            // but we log to confirm it's loaded on all pages
+            if (typeof KeyboardShortcuts !== 'undefined') {
+                console.log('KeyboardShortcuts module loaded and ready');
+            } else {
+                console.warn('KeyboardShortcuts module not found');
             }
         });
     </script>

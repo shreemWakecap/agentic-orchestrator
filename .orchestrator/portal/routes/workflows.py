@@ -1,11 +1,12 @@
 """Workflow-related API routes."""
 import uuid
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends
 
 from db import RunRepository
 from portal.dependencies import get_run_repo
 from portal.schemas.requests import PlanRequest, BuildRequest, SyncRemoteRequest, ImproveRequestRequest
 from portal.schemas.responses import WorkflowStartResponse, SyncStatusResponse, GitStatisticsResponse, ImproveRequestResponse
+from portal.services.task_manager import TaskManager, get_task_manager
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 
@@ -13,18 +14,26 @@ router = APIRouter(prefix="/api/workflows", tags=["workflows"])
 @router.post("/plan", response_model=WorkflowStartResponse)
 async def create_plan(
     request: PlanRequest,
-    background_tasks: BackgroundTasks,
     run_repo: RunRepository = Depends(get_run_repo),
+    task_manager: TaskManager = Depends(get_task_manager),
 ) -> WorkflowStartResponse:
     """Start a new planning workflow."""
-    from portal.services.workflow_runner import run_planning_workflow
+    from portal.services.workflow_runner import run_planning_workflow_sync
 
     run_id = str(uuid.uuid4())[:8]
 
     # Create run entry in database
     run_repo.create(run_id, workflow="planning", description=request.description)
 
-    background_tasks.add_task(run_planning_workflow, run_id, request.description)
+    # Submit to TaskManager for background execution
+    task_manager.submit_task(
+        func=run_planning_workflow_sync,
+        args=(run_id, request.description),
+        name=f"Planning: {request.description[:50]}..." if len(request.description) > 50 else f"Planning: {request.description}",
+        task_id=run_id,
+        task_type="plan",
+        metadata={"run_id": run_id, "description": request.description[:100]},
+    )
 
     return WorkflowStartResponse(run_id=run_id, status="started")
 
@@ -32,14 +41,14 @@ async def create_plan(
 @router.post("/build", response_model=WorkflowStartResponse)
 async def start_build(
     request: BuildRequest,
-    background_tasks: BackgroundTasks,
     run_repo: RunRepository = Depends(get_run_repo),
+    task_manager: TaskManager = Depends(get_task_manager),
 ) -> WorkflowStartResponse:
     """Start a build workflow.
 
     Note: plan_path is now interpreted as plan_id for database lookup.
     """
-    from portal.services.workflow_runner import run_building_workflow
+    from portal.services.workflow_runner import run_building_workflow_sync
 
     run_id = str(uuid.uuid4())[:8]
     plan_id = request.plan_path  # plan_path is now plan_id
@@ -47,19 +56,27 @@ async def start_build(
     # Create run entry in database
     run_repo.create(run_id, workflow="building", plan_id=plan_id)
 
-    background_tasks.add_task(run_building_workflow, run_id, plan_id)
+    # Submit to TaskManager for background execution
+    task_manager.submit_task(
+        func=run_building_workflow_sync,
+        args=(run_id, plan_id),
+        name=f"Building: {plan_id}",
+        task_id=run_id,
+        task_type="build",
+        metadata={"run_id": run_id, "plan_id": plan_id},
+    )
 
     return WorkflowStartResponse(run_id=run_id, status="started", plan_id=plan_id)
 
 
 @router.post("/sync-remote", response_model=WorkflowStartResponse)
 async def sync_remote(
-    background_tasks: BackgroundTasks,
     run_repo: RunRepository = Depends(get_run_repo),
+    task_manager: TaskManager = Depends(get_task_manager),
     request: SyncRemoteRequest = None,
 ) -> WorkflowStartResponse:
     """Start a sync-remote workflow to commit changes and create PR."""
-    from portal.services.workflow_runner import run_syncing_workflow
+    from portal.services.workflow_runner import run_syncing_workflow_sync
 
     run_id = str(uuid.uuid4())[:8]
     auto_merge = request.auto_merge if request else True
@@ -67,7 +84,15 @@ async def sync_remote(
     # Create run entry in database
     run_repo.create(run_id, workflow="syncing")
 
-    background_tasks.add_task(run_syncing_workflow, run_id, auto_merge)
+    # Submit to TaskManager for background execution
+    task_manager.submit_task(
+        func=run_syncing_workflow_sync,
+        args=(run_id, auto_merge),
+        name="Sync Remote",
+        task_id=run_id,
+        task_type="sync",
+        metadata={"run_id": run_id, "auto_merge": auto_merge},
+    )
 
     return WorkflowStartResponse(run_id=run_id, status="started")
 
@@ -358,12 +383,14 @@ async def pull_latest():
         return {"success": False, "error": str(e)}
 
 
-@router.post("/improve-request", response_model=ImproveRequestResponse)
-async def improve_request(request: ImproveRequestRequest) -> ImproveRequestResponse:
-    """Use AI to improve a draft feature request.
+def _run_improve_request_task(draft: str) -> dict:
+    """Background task function to run the request-improver agent.
 
-    Takes a rough draft request and returns an improved, more detailed version
-    using the request-improver agent.
+    Args:
+        draft: The original draft text to improve
+
+    Returns:
+        Dictionary with improved text, original text, and success status
     """
     import re
     from pathlib import Path
@@ -377,14 +404,14 @@ async def improve_request(request: ImproveRequestRequest) -> ImproveRequestRespo
         agent = Agent.load("request-improver", project_root)
 
         # Run the agent with the draft
-        result = agent.run(request.draft)
+        result = agent.run(draft)
 
         if not result.success or not result.content:
-            return ImproveRequestResponse(
-                improved=request.draft,
-                original=request.draft,
-                success=False,
-            )
+            return {
+                "improved": draft,
+                "original": draft,
+                "success": False,
+            }
 
         # Extract improved text from response
         # Agent should respond with "IMPROVED: ..." format
@@ -401,25 +428,55 @@ async def improve_request(request: ImproveRequestRequest) -> ImproveRequestRespo
         # Clean up any trailing ``` or markdown artifacts
         improved = re.sub(r'```\s*$', '', improved).strip()
 
-        return ImproveRequestResponse(
-            improved=improved,
-            original=request.draft,
-            success=True,
-        )
+        return {
+            "improved": improved,
+            "original": draft,
+            "success": True,
+        }
 
     except FileNotFoundError:
         # Agent not found - return original
-        return ImproveRequestResponse(
-            improved=request.draft,
-            original=request.draft,
-            success=False,
-        )
+        return {
+            "improved": draft,
+            "original": draft,
+            "success": False,
+        }
     except Exception as e:
         # Log error but don't expose internals
         import logging
         logging.getLogger(__name__).exception(f"Request improvement failed: {e}")
-        return ImproveRequestResponse(
-            improved=request.draft,
-            original=request.draft,
-            success=False,
-        )
+        return {
+            "improved": draft,
+            "original": draft,
+            "success": False,
+        }
+
+
+@router.post("/improve-request", response_model=WorkflowStartResponse)
+async def improve_request(
+    request: ImproveRequestRequest,
+    task_manager: TaskManager = Depends(get_task_manager),
+) -> WorkflowStartResponse:
+    """Start an AI request improvement task in the background.
+
+    Takes a rough draft request and starts a background task to improve it
+    using the request-improver agent. Returns immediately with a task_id.
+    Client should poll GET /api/background-tasks/{task_id} to get the result.
+
+    The task result will contain:
+    - improved: The AI-improved request text
+    - original: The original draft text
+    - success: Whether improvement succeeded
+    """
+    # Submit the improvement task to run in background
+    task_id = task_manager.submit_task(
+        func=_run_improve_request_task,
+        args=(request.draft,),
+        name="Improve Request",
+        task_type="improve-request",
+        metadata={
+            "draft_preview": request.draft[:100] if len(request.draft) > 100 else request.draft,
+        }
+    )
+
+    return WorkflowStartResponse(run_id=task_id, status="started")

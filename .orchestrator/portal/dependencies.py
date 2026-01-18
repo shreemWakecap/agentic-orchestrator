@@ -22,6 +22,7 @@ from db import (
     CostRepository,
     KnowledgeRepository,
 )
+from portal.services.task_manager import TaskManager, get_task_manager as _get_task_manager
 
 # Project paths
 PORTAL_DIR = Path(__file__).parent
@@ -62,3 +63,8 @@ def get_project_root() -> Path:
 def get_orchestrator_dir() -> Path:
     """Get orchestrator directory path for dependency injection."""
     return ORCHESTRATOR_DIR
+
+
+def get_task_manager() -> TaskManager:
+    """Get TaskManager singleton instance for dependency injection."""
+    return _get_task_manager()

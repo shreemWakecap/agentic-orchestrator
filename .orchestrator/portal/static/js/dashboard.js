@@ -24,19 +24,80 @@ function initDashboard() {
                 return;
             }
 
-            // Show improvement dialog
+            // Show improving state
+            const originalText = improveBtn.textContent;
+            improveBtn.disabled = true;
+            improveBtn.textContent = 'Improving...';
+
             try {
-                const result = await RequestImproverDialog.showImproveDialog(draftText);
-                if (result.accepted && result.text) {
-                    descriptionInput.value = result.text;
+                // POST to create async task
+                const response = await fetch('/api/workflows/improve-request', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ draft: draftText })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                const taskId = data.task_id || data.run_id;
+
+                if (!taskId) {
+                    throw new Error('No task_id or run_id in response');
+                }
+
+                // Add task to background indicator (if available)
+                if (typeof BackgroundTasksIndicator !== 'undefined' && BackgroundTasksIndicator.addTask) {
+                    try {
+                        BackgroundTasksIndicator.addTask({
+                            id: taskId,
+                            type: 'improve-request',
+                            status: 'running',
+                            progress: 0,
+                            message: 'Improving request with AI...'
+                        });
+                    } catch (indicatorError) {
+                        console.warn('BackgroundTasksIndicator error:', indicatorError);
+                    }
+                }
+
+                // Poll for task completion
+                console.log('Polling for task:', taskId);
+                const result = await pollTaskUntilComplete(taskId, 'improve-request');
+                console.log('Poll result:', result);
+
+                // Update textarea with improved text
+                // Backend returns: { improved: "...", original: "...", success: true }
+                if (result && result.improved) {
+                    descriptionInput.value = result.improved;
                     // Add visual feedback that text was updated
                     descriptionInput.style.borderColor = '#8B5CF6';
                     setTimeout(function() {
                         descriptionInput.style.borderColor = '';
                     }, 2000);
+                } else if (result && result.error) {
+                    throw new Error(result.error);
+                } else {
+                    console.warn('Unexpected result format:', result);
+                    // Try to extract improved text from nested result
+                    if (result && result.result && result.result.improved) {
+                        descriptionInput.value = result.result.improved;
+                        descriptionInput.style.borderColor = '#8B5CF6';
+                        setTimeout(function() {
+                            descriptionInput.style.borderColor = '';
+                        }, 2000);
+                    } else if (!result.success) {
+                        console.log('Task completed but improvement failed, keeping original text');
+                    }
                 }
             } catch (error) {
                 console.error('Error improving request:', error);
+                alert('Failed to improve request: ' + error.message);
+            } finally {
+                improveBtn.disabled = false;
+                improveBtn.textContent = originalText;
             }
         });
     }
@@ -773,6 +834,102 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+/**
+ * Poll a task until it completes or fails
+ * @param {string} taskId - The task ID to poll
+ * @param {string} taskType - The task type for indicator updates
+ * @param {number} maxAttempts - Maximum poll attempts (default 120 = 2 minutes at 1s interval)
+ * @param {number} interval - Poll interval in ms (default 1000)
+ * @returns {Promise<Object>} The task result
+ */
+async function pollTaskUntilComplete(taskId, taskType, maxAttempts, interval) {
+    maxAttempts = maxAttempts || 120;
+    interval = interval || 1000;
+
+    let attempts = 0;
+
+    while (attempts < maxAttempts) {
+        attempts++;
+
+        try {
+            const response = await fetch('/api/background-tasks/' + encodeURIComponent(taskId));
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch task status: HTTP ' + response.status);
+            }
+
+            const task = await response.json();
+
+            // Update background indicator with progress
+            if (typeof BackgroundTasksIndicator !== 'undefined' && BackgroundTasksIndicator.updateTask) {
+                try {
+                    BackgroundTasksIndicator.updateTask(taskId, {
+                        status: task.status,
+                        progress: task.progress || 0,
+                        message: task.message || task.current_step || 'Processing...'
+                    });
+                } catch (e) {
+                    console.warn('BackgroundTasksIndicator.updateTask error:', e);
+                }
+            }
+
+            // Check if task is complete
+            if (task.status === 'completed') {
+                // Mark as completed in indicator
+                if (typeof BackgroundTasksIndicator !== 'undefined' && BackgroundTasksIndicator.updateTask) {
+                    try {
+                        BackgroundTasksIndicator.updateTask(taskId, {
+                            status: 'completed',
+                            progress: 100,
+                            message: 'Completed'
+                        });
+                    } catch (e) {
+                        console.warn('BackgroundTasksIndicator.updateTask error:', e);
+                    }
+                }
+                console.log('Task completed, result:', task.result);
+                return task.result || task;
+            }
+
+            // Check if task failed
+            if (task.status === 'failed' || task.status === 'error') {
+                // Mark as failed in indicator
+                if (typeof BackgroundTasksIndicator !== 'undefined' && BackgroundTasksIndicator.updateTask) {
+                    try {
+                        BackgroundTasksIndicator.updateTask(taskId, {
+                            status: 'failed',
+                            message: task.error || 'Task failed'
+                        });
+                    } catch (e) {
+                        console.warn('BackgroundTasksIndicator.updateTask error:', e);
+                    }
+                }
+                throw new Error(task.error || 'Task failed');
+            }
+
+            // Wait before next poll
+            await new Promise(function(resolve) { setTimeout(resolve, interval); });
+
+        } catch (error) {
+            // On network error, wait and retry
+            if (attempts < maxAttempts) {
+                await new Promise(function(resolve) { setTimeout(resolve, interval * 2); });
+            } else {
+                throw error;
+            }
+        }
+    }
+
+    // Timeout reached
+    if (typeof BackgroundTasksIndicator !== 'undefined') {
+        BackgroundTasksIndicator.updateTask(taskId, {
+            status: 'failed',
+            message: 'Task timed out'
+        });
+    }
+    throw new Error('Task polling timed out after ' + maxAttempts + ' attempts');
 }
 
 // Cleanup function for page unload

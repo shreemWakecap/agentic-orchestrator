@@ -556,6 +556,20 @@
 <script src="/static/js/request-improver-dialog.js"></script>
 <script src="/static/js/dashboard.js"></script>
 <script src="/static/js/build-progress.js"></script>
+<script src="/static/js/plan-manager.js"></script>
+<script>
+// Initialize keyboard shortcuts for plan management on dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if page has plan-related elements (recent plans, plan form, etc.)
+    var hasPlanElements = document.getElementById('plan-form') ||
+                          document.querySelector('.plan-item') ||
+                          document.querySelector('[href*="/plans"]');
+
+    if (hasPlanElements && typeof PlanManager !== 'undefined' && PlanManager.initKeyboardShortcuts) {
+        PlanManager.initKeyboardShortcuts();
+    }
+});
+</script>
 <script>
 /**
  * Live Builds Dashboard Module

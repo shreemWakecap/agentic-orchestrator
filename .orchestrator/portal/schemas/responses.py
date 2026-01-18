@@ -166,3 +166,45 @@ class ImproveRequestResponse(BaseModel):
     improved: str = Field(..., description="The AI-improved request text")
     original: str = Field(..., description="The original draft text")
     success: bool = Field(True, description="Whether improvement succeeded")
+
+
+class ImproveRequestTaskResponse(BaseModel):
+    """Response when starting an improve request task asynchronously."""
+    task_id: str = Field(..., description="Unique identifier for the background task")
+    status: str = Field("started", description="Task status: started, pending, running")
+    message: str = Field("Improve request task started", description="Human-readable status message")
+
+
+class BackgroundTaskResponse(BaseModel):
+    """Response for a single background task."""
+    task_id: str = Field(..., description="Unique identifier for the task")
+    status: str = Field(..., description="Current status: pending, running, completed, failed, cancelled")
+    task_type: str = Field(..., description="Type of task: plan, build, sync, etc.")
+    started_at: Optional[str] = Field(None, description="ISO timestamp when task started")
+    progress: float = Field(0.0, description="Progress percentage (0.0 to 100.0)")
+
+    class Config:
+        from_attributes = True
+
+
+class BackgroundTaskListResponse(BaseModel):
+    """Response for listing background tasks."""
+    tasks: List[BackgroundTaskResponse] = Field(default_factory=list)
+    count: int = Field(0, description="Total number of tasks")
+
+
+class TaskStatusResponse(BaseModel):
+    """Detailed status response for a background task."""
+    task_id: str = Field(..., description="Unique identifier for the task")
+    status: str = Field(..., description="Current status: pending, running, completed, failed, cancelled")
+    task_type: str = Field(..., description="Type of task: plan, build, sync, etc.")
+    started_at: Optional[str] = Field(None, description="ISO timestamp when task started")
+    completed_at: Optional[str] = Field(None, description="ISO timestamp when task completed")
+    progress: float = Field(0.0, description="Progress percentage (0.0 to 100.0)")
+    current_step: Optional[str] = Field(None, description="Description of current step being executed")
+    result: Optional[Dict[str, Any]] = Field(None, description="Task result data on success")
+    error: Optional[str] = Field(None, description="Error message on failure")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional task metadata")
+
+    class Config:
+        from_attributes = True

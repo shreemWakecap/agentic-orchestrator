@@ -22,7 +22,7 @@ from typing import Optional
 
 from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.plan_parser import PlanParser, ParseResult
-from db import get_plan_repository, get_build_state_repository
+from db import get_plan_repository, get_build_state_repository, get_run_repository
 
 
 @dataclass
@@ -246,6 +246,7 @@ class BuildingWorkflow(Workflow):
         self,
         project_root: Path,
         max_parallel: Optional[int] = None,
+        run_id: Optional[str] = None,
     ):
         self.project_root = project_root
         self._config = get_agent_config(project_root)
@@ -254,6 +255,7 @@ class BuildingWorkflow(Workflow):
         # Database repositories
         self._plan_repo = get_plan_repository()
         self._build_state_repo = get_build_state_repository()
+        self._run_repo = get_run_repository()
 
         super().__init__(name="Smart Building Workflow")
 
@@ -263,6 +265,9 @@ class BuildingWorkflow(Workflow):
         # Build state
         self.build_state: Optional[BuildState] = None
         self._current_plan_id: Optional[str] = None
+
+        # Run ID for event emission (used for real-time UI updates)
+        self._run_id: Optional[str] = run_id
 
         # Goal context cache for persistence across pauses
         self._goal_context: Optional[GoalContext] = None
@@ -286,6 +291,65 @@ class BuildingWorkflow(Workflow):
             except FileNotFoundError:
                 if agent_name in required:
                     self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
+
+    def _emit_step_event(
+        self,
+        event_type: str,
+        step: BuildStep,
+        result: Optional[StepResult] = None,
+        output: Optional[str] = None,
+        progress: Optional[dict] = None
+    ):
+        """
+        Emit a step event via RunRepository.add_event() for real-time UI updates.
+
+        Args:
+            event_type: One of 'step_start', 'step_complete', 'step_failed', 'step_output', 'progress'
+            step: The BuildStep being executed
+            result: Optional StepResult if step is complete
+            output: Optional output message for step_output events
+            progress: Optional progress dict with completed/total counts
+        """
+        # Use run_id for event emission (preferred for UI updates)
+        # Fall back to plan_id for backwards compatibility
+        emit_id = self._run_id or self._current_plan_id
+        if not emit_id:
+            return
+
+        # Build event data
+        event_data = {
+            "step_id": step.id,
+            "step_action": step.action,
+            "step_target": step.target,
+            "step_description": step.description[:100] if step.description else "",
+        }
+
+        if event_type == "step_start":
+            event_data["status"] = "in_progress"
+
+        elif event_type == "step_complete" and result:
+            event_data["status"] = "completed"
+            event_data["summary"] = result.summary[:200] if result.summary else ""
+            event_data["files_affected"] = result.files_affected
+
+        elif event_type == "step_failed" and result:
+            event_data["status"] = "failed"
+            event_data["error"] = result.error or "Unknown error"
+            event_data["summary"] = result.summary[:200] if result.summary else ""
+
+        elif event_type == "step_output" and output:
+            event_data["output"] = output[:500]
+
+        if progress:
+            event_data["completed_steps"] = progress.get("completed", 0)
+            event_data["total_steps"] = progress.get("total", 0)
+
+        # Emit via run repository using run_id (or plan_id as fallback)
+        try:
+            self._run_repo.add_event(emit_id, event_type, event_data)
+        except Exception:
+            # Don't let event emission errors break the build
+            pass
 
     def _extract_goal_context(self, plan_content: str) -> GoalContext:
         """
@@ -1270,6 +1334,12 @@ IMPORTANT:
                 progress_str = f"[{completed}/{total}]"
                 self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] {progress_str} {step.description[:55]}...")
 
+                # Emit step_start event for real-time UI updates
+                self._emit_step_event(
+                    "step_start", step,
+                    progress={"completed": completed, "total": total}
+                )
+
                 # Execute the step with goal context for goal-aware building
                 result = self._execute_step(step, phase_context, goal_context)
 
@@ -1290,6 +1360,13 @@ IMPORTANT:
                     )
                     self.console.print(f"  [green]{CHECK}[/green] {result.summary[:50]}")
                     steps_completed.append(step.id)
+
+                    # Emit step_complete event for real-time UI updates
+                    completed_now, total_now = self.build_state.get_progress()
+                    self._emit_step_event(
+                        "step_complete", step, result=result,
+                        progress={"completed": completed_now, "total": total_now}
+                    )
                 else:
                     step_state.status = "failed"
                     step_state.error = result.error
@@ -1300,6 +1377,13 @@ IMPORTANT:
                     self._save_state()
 
                     self.console.print(f"  [red]{CROSS}[/red] {result.error or 'Failed'}")
+
+                    # Emit step_failed event for real-time UI updates
+                    completed_now, total_now = self.build_state.get_progress()
+                    self._emit_step_event(
+                        "step_failed", step, result=result,
+                        progress={"completed": completed_now, "total": total_now}
+                    )
 
                     # Check if goal is achieved despite step failure
                     self.console.print(f"\n[yellow]Step failed - checking if goal achieved...[/yellow]")
@@ -1469,6 +1553,7 @@ IMPORTANT:
                 continue
 
             # Mark all steps in wave as in_progress
+            completed, total = self.build_state.get_progress()
             for step in pending_steps:
                 existing_step_state = self.build_state.get_step_state(step.id)
                 step_state = StepState(
@@ -1478,6 +1563,12 @@ IMPORTANT:
                     retry_count=(existing_step_state.retry_count if existing_step_state else 0)
                 )
                 self.build_state.set_step_state(step_state)
+
+                # Emit step_start event for real-time UI updates
+                self._emit_step_event(
+                    "step_start", step,
+                    progress={"completed": completed, "total": total}
+                )
             self._save_state()
 
             if wave_size == 1:
@@ -1516,6 +1607,13 @@ IMPORTANT:
                         [f for f in result.files_affected if result.action_taken == "modified"]
                     )
                     steps_completed.append(step.id)
+
+                    # Emit step_complete event for real-time UI updates
+                    completed_now, total_now = self.build_state.get_progress()
+                    self._emit_step_event(
+                        "step_complete", step, result=result,
+                        progress={"completed": completed_now, "total": total_now}
+                    )
                 else:
                     step_state.status = "failed"
                     step_state.error = result.error
@@ -1524,6 +1622,13 @@ IMPORTANT:
                     if step.id not in self.build_state.failed_steps:
                         self.build_state.failed_steps.append(step.id)
                     wave_failed = True
+
+                    # Emit step_failed event for real-time UI updates
+                    completed_now, total_now = self.build_state.get_progress()
+                    self._emit_step_event(
+                        "step_failed", step, result=result,
+                        progress={"completed": completed_now, "total": total_now}
+                    )
 
             self._save_state()
 
@@ -1877,6 +1982,14 @@ IMPORTANT:
             if not pending_steps:
                 continue
 
+            # Emit step_start for all pending steps
+            completed, total = self.build_state.get_progress()
+            for step in pending_steps:
+                self._emit_step_event(
+                    "step_start", step,
+                    progress={"completed": completed, "total": total}
+                )
+
             if len(pending_steps) == 1:
                 # Sequential for single step
                 step = pending_steps[0]
@@ -1884,8 +1997,20 @@ IMPORTANT:
                 results.append(result)
                 if result.status == "completed":
                     self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                    # Emit step_complete event
+                    completed_now, total_now = self.build_state.get_progress()
+                    self._emit_step_event(
+                        "step_complete", step, result=result,
+                        progress={"completed": completed_now, "total": total_now}
+                    )
                 else:
                     self.console.print(f"    [red]{CROSS}[/red] {step.id}: {result.error or 'Failed'}")
+                    # Emit step_failed event
+                    completed_now, total_now = self.build_state.get_progress()
+                    self._emit_step_event(
+                        "step_failed", step, result=result,
+                        progress={"completed": completed_now, "total": total_now}
+                    )
             else:
                 # Parallel execution within wave
                 with ThreadPoolExecutor(max_workers=self.max_parallel) as executor:
@@ -1901,18 +2026,37 @@ IMPORTANT:
                             results.append(result)
                             if result.status == "completed":
                                 self.console.print(f"    [green]{CHECK}[/green] {step.id}: {result.summary[:40]}")
+                                # Emit step_complete event
+                                completed_now, total_now = self.build_state.get_progress()
+                                self._emit_step_event(
+                                    "step_complete", step, result=result,
+                                    progress={"completed": completed_now, "total": total_now}
+                                )
                             else:
                                 self.console.print(f"    [red]{CROSS}[/red] {step.id}: {result.error or 'Failed'}")
+                                # Emit step_failed event
+                                completed_now, total_now = self.build_state.get_progress()
+                                self._emit_step_event(
+                                    "step_failed", step, result=result,
+                                    progress={"completed": completed_now, "total": total_now}
+                                )
                         except Exception as e:
-                            results.append(StepResult(
+                            error_result = StepResult(
                                 step_id=step.id,
                                 status="failed",
                                 action_taken="none",
                                 target=step.target,
                                 summary="",
                                 error=str(e)
-                            ))
+                            )
+                            results.append(error_result)
                             self.console.print(f"    [red]{CROSS}[/red] {step.id}: {e}")
+                            # Emit step_failed event for exception
+                            completed_now, total_now = self.build_state.get_progress()
+                            self._emit_step_event(
+                                "step_failed", step, result=error_result,
+                                progress={"completed": completed_now, "total": total_now}
+                            )
 
         return results
 
@@ -1975,6 +2119,12 @@ IMPORTANT:
                     completed, total = self.build_state.get_progress()
                     self.console.print(f"  [cyan]{ARROW_RIGHT}[/cyan] [{completed}/{total}] {step.description[:50]}...")
 
+                    # Emit step_start event for real-time UI updates
+                    self._emit_step_event(
+                        "step_start", step,
+                        progress={"completed": completed, "total": total}
+                    )
+
                     result = self._execute_step(step, phase_context)
                     results.append(result)
 
@@ -1986,11 +2136,25 @@ IMPORTANT:
                     if result.status == "completed":
                         step_state.status = "completed"
                         self.console.print(f"  [green]{CHECK}[/green] Done")
+
+                        # Emit step_complete event for real-time UI updates
+                        completed_now, total_now = self.build_state.get_progress()
+                        self._emit_step_event(
+                            "step_complete", step, result=result,
+                            progress={"completed": completed_now, "total": total_now}
+                        )
                     else:
                         step_state.status = "failed"
                         step_state.error = result.error
                         step_state.retry_count += 1
                         self.console.print(f"  [red]{CROSS}[/red] {result.error}")
+
+                        # Emit step_failed event for real-time UI updates
+                        completed_now, total_now = self.build_state.get_progress()
+                        self._emit_step_event(
+                            "step_failed", step, result=result,
+                            progress={"completed": completed_now, "total": total_now}
+                        )
 
                     self.build_state.set_step_state(step_state)
 

@@ -173,7 +173,8 @@ def run_building_workflow(run_id: str, plan_id: str):
         _add_event(run_id, "start", {"workflow": "building", "plan_id": plan_id})
 
         try:
-            workflow = BuildingWorkflow(project_root=PROJECT_ROOT)
+            # Pass run_id to BuildingWorkflow for real-time event emission
+            workflow = BuildingWorkflow(project_root=PROJECT_ROOT, run_id=run_id)
             result = workflow.run(plan_id)
 
             status = "completed" if result.success else "failed"
@@ -234,7 +235,8 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
         try:
             # BuildingWorkflow automatically resumes from existing state in DB
             # No need for resume=True flag - execute() loads state and continues
-            workflow = BuildingWorkflow(project_root=PROJECT_ROOT)
+            # Pass run_id to BuildingWorkflow for real-time event emission
+            workflow = BuildingWorkflow(project_root=PROJECT_ROOT, run_id=run_id)
             result = workflow.run(plan_id)
 
             status = "completed" if result.success else "failed"

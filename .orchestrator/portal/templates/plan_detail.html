@@ -262,6 +262,160 @@
         animation: fade-in-up 0.4s ease-out forwards;
     }
 
+    /* Step state transition animations */
+    /* Fade-in for new steps appearing */
+    @keyframes step-fade-in {
+        from {
+            opacity: 0;
+            transform: translateX(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    .step-fade-in {
+        animation: step-fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    /* Pulse animation for running step */
+    @keyframes step-pulse {
+        0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+        }
+        50% {
+            transform: scale(1.02);
+            box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+        }
+    }
+
+    .step-pulse {
+        animation: step-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Enhanced pulse for timeline dot when running */
+    .step-pulse .timeline-dot {
+        animation: pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Success bounce for completed steps */
+    @keyframes step-success-bounce {
+        0% {
+            transform: scale(1);
+        }
+        25% {
+            transform: scale(1.05);
+        }
+        50% {
+            transform: scale(0.98);
+        }
+        75% {
+            transform: scale(1.02);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    .step-success-bounce {
+        animation: step-success-bounce 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Success checkmark pop-in animation */
+    @keyframes checkmark-pop {
+        0% {
+            transform: scale(0);
+            opacity: 0;
+        }
+        50% {
+            transform: scale(1.2);
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    .step-success-bounce .timeline-dot svg {
+        animation: checkmark-pop 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+
+    /* Error shake for failed steps */
+    @keyframes step-error-shake {
+        0%, 100% {
+            transform: translateX(0);
+        }
+        10%, 30%, 50%, 70%, 90% {
+            transform: translateX(-6px);
+        }
+        20%, 40%, 60%, 80% {
+            transform: translateX(6px);
+        }
+    }
+
+    .step-error-shake {
+        animation: step-error-shake 0.6s cubic-bezier(0.4, 0, 0.6, 1);
+    }
+
+    /* Error glow effect */
+    .step-error-shake .timeline-dot {
+        animation: error-glow 0.6s ease-in-out;
+    }
+
+    @keyframes error-glow {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+        }
+        50% {
+            box-shadow: 0 0 0 12px rgba(239, 68, 68, 0);
+        }
+    }
+
+    /* Smooth state change transitions for step cards */
+    .step-card {
+        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .step-card.state-transitioning {
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Timeline dot state transitions */
+    .timeline-dot {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                    transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    }
+
+    /* Timeline line fill animation for completed steps */
+    @keyframes line-fill {
+        from {
+            background-position: 0% 100%;
+        }
+        to {
+            background-position: 0% 0%;
+        }
+    }
+
+    .timeline-step.step-completing::before {
+        background: linear-gradient(180deg, #22c55e 0%, #22c55e 50%, #e2e8f0 50%, #e2e8f0 100%);
+        background-size: 100% 200%;
+        animation: line-fill 0.5s ease-out forwards;
+    }
+
+    /* Stagger animation delay for multiple steps */
+    .step-card:nth-child(1) { animation-delay: 0s; }
+    .step-card:nth-child(2) { animation-delay: 0.05s; }
+    .step-card:nth-child(3) { animation-delay: 0.1s; }
+    .step-card:nth-child(4) { animation-delay: 0.15s; }
+    .step-card:nth-child(5) { animation-delay: 0.2s; }
+    .step-card:nth-child(6) { animation-delay: 0.25s; }
+    .step-card:nth-child(7) { animation-delay: 0.3s; }
+    .step-card:nth-child(8) { animation-delay: 0.35s; }
+    .step-card:nth-child(9) { animation-delay: 0.4s; }
+    .step-card:nth-child(10) { animation-delay: 0.45s; }
+
     /* Status badge modern styling */
     .status-badge {
         padding: 0.375rem 1rem;
@@ -322,6 +476,74 @@
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(10px);
         border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    /* Connection status badge styling */
+    .connection-status-badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.625rem;
+        border-radius: 9999px;
+        font-size: 0.625rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+        text-transform: uppercase;
+        transition: all 0.3s ease;
+    }
+
+    .connection-status-badge .status-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        margin-right: 0.375rem;
+    }
+
+    .connection-connected {
+        background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        color: #166534;
+    }
+
+    .connection-connected .status-dot {
+        background-color: #22c55e;
+    }
+
+    .connection-reconnecting {
+        background: linear-gradient(135deg, #fef9c3 0%, #fef08a 100%);
+        color: #854d0e;
+    }
+
+    .connection-reconnecting .status-dot {
+        background-color: #eab308;
+        animation: pulse-yellow 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-yellow {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.5;
+            transform: scale(0.8);
+        }
+    }
+
+    .connection-disconnected {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        color: #64748b;
+    }
+
+    .connection-disconnected .status-dot {
+        background-color: #94a3b8;
+    }
+
+    .connection-polling {
+        background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+        color: #9a3412;
+    }
+
+    .connection-polling .status-dot {
+        background-color: #f97316;
     }
 
     /* Terminal log styling */
@@ -554,6 +776,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                         </svg>
                         <h4 class="text-sm font-semibold text-gray-700">Build Steps</h4>
+                        <!-- Connection Status Badge -->
+                        <span id="connection-status-badge" class="connection-status-badge connection-disconnected ml-2" title="Connection status">
+                            <span class="status-dot"></span>
+                            <span id="connection-status-text">Disconnected</span>
+                        </span>
                     </div>
                     <div class="flex items-center space-x-3">
                         <button onclick="PlanDetail.expandAllSteps()" class="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors flex items-center">

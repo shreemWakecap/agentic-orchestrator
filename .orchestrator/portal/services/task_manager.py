@@ -530,12 +530,12 @@ class TaskManager:
             logger.debug(f"Cleared {len(to_remove)} completed tasks")
             return len(to_remove)
 
-    def shutdown(self, wait: bool = True, timeout: Optional[float] = None) -> None:
+    def shutdown(self, wait: bool = True, timeout: Optional[float] = 5.0) -> None:
         """Shutdown the task manager gracefully.
 
         Args:
             wait: If True, wait for running tasks to complete
-            timeout: Optional timeout in seconds when waiting
+            timeout: Timeout in seconds when waiting (default 5 seconds)
         """
         if self._shutdown:
             return
@@ -543,16 +543,33 @@ class TaskManager:
         self._shutdown = True
         logger.info("TaskManager shutting down...")
 
+        # Clear all subscriber queues to unblock waiting threads
+        with self._lock:
+            # Send None to all queues to signal shutdown
+            for q in list(self._global_subscribers):
+                try:
+                    q.put_nowait(None)
+                except Exception:
+                    pass
+            self._global_subscribers.clear()
+
+            for queues in list(self._subscribers.values()):
+                for q in list(queues):
+                    try:
+                        q.put_nowait(None)
+                    except Exception:
+                        pass
+            self._subscribers.clear()
+
         if self._executor:
-            self._executor.shutdown(wait=wait)
-            if wait and timeout:
-                # Wait for pending futures with timeout
-                with self._lock:
-                    for future in self._futures.values():
-                        try:
-                            future.result(timeout=timeout)
-                        except Exception:
-                            pass
+            # Use wait=False with cancel_futures=True for faster shutdown
+            # This cancels pending futures and doesn't wait for running ones
+            try:
+                self._executor.shutdown(wait=False, cancel_futures=True)
+            except TypeError:
+                # Python < 3.9 doesn't have cancel_futures
+                self._executor.shutdown(wait=False)
+            logger.info("TaskManager executor shutdown initiated")
 
         logger.info("TaskManager shutdown complete")
 

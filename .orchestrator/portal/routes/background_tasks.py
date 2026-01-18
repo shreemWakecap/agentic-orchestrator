@@ -101,27 +101,38 @@ async def stream_all_tasks(
             yield f"data: {json.dumps(initial)}\n\n"
 
             # Stream updates using thread-safe queue
-            while True:
-                # Use asyncio.to_thread to bridge sync queue to async
-                # Short timeout (1s) to allow heartbeats and responsiveness
-                event = await asyncio.to_thread(_get_from_queue, q, 1.0)
+            while not task_manager.is_shutdown:
+                try:
+                    # Use asyncio.to_thread to bridge sync queue to async
+                    # Short timeout (1s) to allow heartbeats and responsiveness
+                    event = await asyncio.to_thread(_get_from_queue, q, 1.0)
 
-                if event is not None:
-                    yield f"data: {json.dumps(event)}\n\n"
-                    heartbeat_counter = 0
-                else:
-                    # No event, increment counter
-                    heartbeat_counter += 1
-                    # Send heartbeat every 5 seconds (5 x 1s timeout)
-                    if heartbeat_counter >= 5:
-                        heartbeat = {
-                            "type": "heartbeat",
-                            "timestamp": datetime.utcnow().isoformat() + "Z",
-                        }
-                        yield f"data: {json.dumps(heartbeat)}\n\n"
+                    if event is None:
+                        # None is sent as shutdown signal or timeout
+                        if task_manager.is_shutdown:
+                            break
+                        # No event, increment counter
+                        heartbeat_counter += 1
+                        # Send heartbeat every 5 seconds (5 x 1s timeout)
+                        if heartbeat_counter >= 5:
+                            heartbeat = {
+                                "type": "heartbeat",
+                                "timestamp": datetime.utcnow().isoformat() + "Z",
+                            }
+                            yield f"data: {json.dumps(heartbeat)}\n\n"
+                            heartbeat_counter = 0
+                    else:
+                        yield f"data: {json.dumps(event)}\n\n"
                         heartbeat_counter = 0
+                except asyncio.CancelledError:
+                    break
+        except asyncio.CancelledError:
+            pass
         finally:
-            task_manager.unsubscribe_global(q)
+            try:
+                task_manager.unsubscribe_global(q)
+            except Exception:
+                pass
 
     return StreamingResponse(
         event_generator(),
@@ -187,31 +198,42 @@ async def stream_task(
             if current:
                 yield f"data: {json.dumps({'type': 'task_status', **current})}\n\n"
 
-            while True:
-                # Check if task is done
-                current = task_manager.get_task_status(task_id)
-                if not current:
-                    yield f"data: {json.dumps({'type': 'error', 'message': 'Task not found'})}\n\n"
-                    break
+            while not task_manager.is_shutdown:
+                try:
+                    # Check if task is done
+                    current = task_manager.get_task_status(task_id)
+                    if not current:
+                        yield f"data: {json.dumps({'type': 'error', 'message': 'Task not found'})}\n\n"
+                        break
 
-                if current["status"] in ["completed", "failed"]:
-                    yield f"data: {json.dumps({'type': 'task_done', **current})}\n\n"
-                    break
+                    if current["status"] in ["completed", "failed"]:
+                        yield f"data: {json.dumps({'type': 'task_done', **current})}\n\n"
+                        break
 
-                # Use asyncio.to_thread to bridge sync queue to async
-                event = await asyncio.to_thread(_get_from_queue, q, 1.0)
+                    # Use asyncio.to_thread to bridge sync queue to async
+                    event = await asyncio.to_thread(_get_from_queue, q, 1.0)
 
-                if event is not None:
-                    yield f"data: {json.dumps(event)}\n\n"
-                    heartbeat_counter = 0
-                else:
-                    heartbeat_counter += 1
-                    # Send heartbeat every 5 seconds
-                    if heartbeat_counter >= 5:
-                        yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                    if event is None:
+                        # None is sent as shutdown signal or timeout
+                        if task_manager.is_shutdown:
+                            break
+                        heartbeat_counter += 1
+                        # Send heartbeat every 5 seconds
+                        if heartbeat_counter >= 5:
+                            yield f"data: {json.dumps({'type': 'heartbeat'})}\n\n"
+                            heartbeat_counter = 0
+                    else:
+                        yield f"data: {json.dumps(event)}\n\n"
                         heartbeat_counter = 0
+                except asyncio.CancelledError:
+                    break
+        except asyncio.CancelledError:
+            pass
         finally:
-            task_manager.unsubscribe_from_task(task_id, q)
+            try:
+                task_manager.unsubscribe_from_task(task_id, q)
+            except Exception:
+                pass
 
     return StreamingResponse(
         event_generator(),

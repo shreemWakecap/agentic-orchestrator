@@ -452,31 +452,19 @@ def _run_improve_request_task(draft: str) -> dict:
         }
 
 
-@router.post("/improve-request", response_model=WorkflowStartResponse)
+@router.post("/improve-request", response_model=ImproveRequestResponse)
 async def improve_request(
     request: ImproveRequestRequest,
-    task_manager: TaskManager = Depends(get_task_manager),
-) -> WorkflowStartResponse:
-    """Start an AI request improvement task in the background.
+) -> ImproveRequestResponse:
+    """Improve a draft feature request using AI.
 
-    Takes a rough draft request and starts a background task to improve it
-    using the request-improver agent. Returns immediately with a task_id.
-    Client should poll GET /api/background-tasks/{task_id} to get the result.
+    Takes a rough draft request and improves it using the request-improver agent.
+    Returns the improved text directly.
 
-    The task result will contain:
+    Returns:
     - improved: The AI-improved request text
     - original: The original draft text
     - success: Whether improvement succeeded
     """
-    # Submit the improvement task to run in background
-    task_id = task_manager.submit_task(
-        func=_run_improve_request_task,
-        args=(request.draft,),
-        name="Improve Request",
-        task_type="improve-request",
-        metadata={
-            "draft_preview": request.draft[:100] if len(request.draft) > 100 else request.draft,
-        }
-    )
-
-    return WorkflowStartResponse(run_id=task_id, status="started")
+    result = _run_improve_request_task(request.draft)
+    return ImproveRequestResponse(**result)

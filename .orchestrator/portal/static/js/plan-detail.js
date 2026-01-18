@@ -6,7 +6,7 @@
  *
  * Dependencies:
  * - Toast (toast.js) - For notifications
- * - BuildProgress (build-progress.js) - For SSE handling
+ * - SSEConnectionManager (sse-manager.js) - For SSE handling with reconnection
  */
 
 const PlanDetail = (function() {
@@ -14,11 +14,91 @@ const PlanDetail = (function() {
 
     // State
     let currentRunId = null;
-    let eventSource = null;
+    let sseManager = null;
     let buildStartTime = null;
     let steps = [];
     let stepStartTimes = {};
     let expandedSteps = new Set();
+    let pollingTimer = null;
+    let cleanupFunctions = [];
+
+    // Progress tracking state
+    let completedStepCount = 0;
+    let totalStepCount = 0;
+    let stepDurations = []; // Array of step durations in milliseconds
+
+    // LocalStorage key for persisting active build state
+    const ACTIVE_BUILD_STORAGE_KEY = 'planDetail_activeBuild';
+
+    /**
+     * Save active build state to localStorage
+     * @param {string} planId - The plan ID
+     * @param {string} runId - The run ID
+     * @param {Object} progress - Current progress state
+     */
+    function saveActiveBuild(planId, runId, progress) {
+        if (!planId || !runId) return;
+        try {
+            const buildState = {
+                plan_id: planId,
+                run_id: runId,
+                last_progress: progress || {},
+                timestamp: Date.now()
+            };
+            localStorage.setItem(ACTIVE_BUILD_STORAGE_KEY, JSON.stringify(buildState));
+        } catch (e) {
+            console.warn('Failed to save active build to localStorage:', e);
+        }
+    }
+
+    /**
+     * Load active build state from localStorage
+     * @returns {Object|null} Saved build state or null
+     */
+    function loadActiveBuild() {
+        try {
+            const stored = localStorage.getItem(ACTIVE_BUILD_STORAGE_KEY);
+            if (!stored) return null;
+            const buildState = JSON.parse(stored);
+            // Expire after 24 hours
+            if (Date.now() - buildState.timestamp > 24 * 60 * 60 * 1000) {
+                clearActiveBuild();
+                return null;
+            }
+            return buildState;
+        } catch (e) {
+            console.warn('Failed to load active build from localStorage:', e);
+            return null;
+        }
+    }
+
+    /**
+     * Clear active build state from localStorage
+     */
+    function clearActiveBuild() {
+        try {
+            localStorage.removeItem(ACTIVE_BUILD_STORAGE_KEY);
+        } catch (e) {
+            console.warn('Failed to clear active build from localStorage:', e);
+        }
+    }
+
+    /**
+     * Update the stored progress for the active build
+     * @param {Object} progressUpdate - Progress data to merge
+     */
+    function updateStoredProgress(progressUpdate) {
+        const stored = loadActiveBuild();
+        if (stored) {
+            stored.last_progress = Object.assign({}, stored.last_progress, progressUpdate);
+            stored.timestamp = Date.now();
+            try {
+                localStorage.setItem(ACTIVE_BUILD_STORAGE_KEY, JSON.stringify(stored));
+            } catch (e) {
+                console.debug('Failed to update stored progress:', e);
+            }
+        }
+    }
 
     // DOM element cache
     const elements = {};
@@ -43,6 +123,72 @@ const PlanDetail = (function() {
         elements.startBuildBtn = document.getElementById('start-build-btn');
         elements.resumeBuildBtn = document.getElementById('resume-build-btn');
         elements.pauseBuildBtn = document.getElementById('pause-build-btn');
+        elements.connectionStatus = document.getElementById('connection-status');
+        elements.stepsCompletedCount = document.getElementById('steps-completed-count');
+        elements.estimatedTimeRemaining = document.getElementById('estimated-time-remaining') || document.getElementById('estimated-time');
+    }
+
+    /**
+     * Create connection status indicator if it doesn't exist
+     */
+    function ensureConnectionStatusElement() {
+        if (elements.connectionStatus) return;
+
+        // Try to find a place to insert it (near current step label or progress section)
+        const progressHeader = elements.progressSection ?
+            elements.progressSection.querySelector('.flex.items-center') : null;
+
+        if (progressHeader) {
+            const statusEl = document.createElement('div');
+            statusEl.id = 'connection-status';
+            statusEl.className = 'connection-status ml-2 flex items-center text-xs';
+            statusEl.innerHTML = '<span class="status-dot w-2 h-2 rounded-full bg-gray-400 mr-1"></span><span class="status-text text-gray-500">Disconnected</span>';
+            progressHeader.appendChild(statusEl);
+            elements.connectionStatus = statusEl;
+        }
+    }
+
+    /**
+     * Update connection status indicator
+     * @param {string} state - Connection state from SSEConnectionManager
+     * @param {boolean} isPolling - Whether using polling fallback
+     */
+    function updateConnectionStatus(state, isPolling) {
+        ensureConnectionStatusElement();
+        if (!elements.connectionStatus) return;
+
+        const dot = elements.connectionStatus.querySelector('.status-dot');
+        const text = elements.connectionStatus.querySelector('.status-text');
+
+        if (!dot || !text) return;
+
+        const configs = {
+            connecting: { dot: 'bg-yellow-400 animate-pulse', text: 'Connecting...', label: 'Connecting' },
+            connected: { dot: 'bg-green-400', text: 'text-green-600', label: isPolling ? 'Polling' : 'Live' },
+            reconnecting: { dot: 'bg-yellow-400 animate-pulse', text: 'text-yellow-600', label: 'Reconnecting...' },
+            disconnected: { dot: 'bg-gray-400', text: 'text-gray-500', label: 'Disconnected' },
+            failed: { dot: 'bg-red-400', text: 'text-red-600', label: 'Connection failed' }
+        };
+
+        const config = configs[state] || configs.disconnected;
+
+        // Update dot classes
+        dot.className = 'status-dot w-2 h-2 rounded-full mr-1 ' + config.dot;
+
+        // Update text
+        text.className = 'status-text ' + config.text;
+        text.textContent = config.label;
+
+        elements.connectionStatus.classList.remove('hidden');
+    }
+
+    /**
+     * Hide connection status indicator
+     */
+    function hideConnectionStatus() {
+        if (elements.connectionStatus) {
+            elements.connectionStatus.classList.add('hidden');
+        }
     }
 
     /**
@@ -51,23 +197,246 @@ const PlanDetail = (function() {
     function init() {
         cacheElements();
 
-        // Check if there's an active build for this plan
-        if (window.PLAN_DATA && window.PLAN_DATA.state === 'in-progress') {
+        // First, check localStorage for a persisted active build for this plan
+        const currentPlanId = window.PLAN_DATA && window.PLAN_DATA.id;
+        const storedBuild = loadActiveBuild();
+
+        if (storedBuild && storedBuild.plan_id === currentPlanId && storedBuild.run_id) {
+            console.log('Found persisted active build in localStorage:', storedBuild);
+            // Restore from localStorage and attempt reconnection
+            currentRunId = storedBuild.run_id;
+            attemptBuildReconnection(storedBuild);
+        } else if (window.PLAN_DATA) {
+            // Check if there's an active or previous build for this plan via API
+            // Trigger for any state that might have build progress to restore
+            const planState = window.PLAN_DATA.state || window.PLAN_DATA.status;
+            const progressStates = ['in-progress', 'building', 'in_progress', 'failed', 'paused'];
+            if (progressStates.includes(planState)) {
+                checkForActiveRun();
+            }
+        }
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', function() {
+            stopEventStream();
+        });
+
+        // Clean up on visibility change (tab hidden)
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && sseManager) {
+                // Optionally pause connection when tab is hidden
+                console.log('Tab hidden, SSE connection maintained');
+            }
+        });
+    }
+
+    /**
+     * Attempt to reconnect to an active build from localStorage state
+     * @param {Object} storedBuild - The stored build state from localStorage
+     */
+    async function attemptBuildReconnection(storedBuild) {
+        try {
+            // Show progress section immediately with cached progress
+            showProgressSection();
+
+            if (storedBuild.last_progress) {
+                // Restore cached progress immediately for instant feedback
+                if (storedBuild.last_progress.progress !== undefined) {
+                    updateProgress(storedBuild.last_progress.progress);
+                }
+                if (storedBuild.last_progress.current_step) {
+                    updateCurrentStep(storedBuild.last_progress.current_step);
+                }
+            }
+
+            addLogEntry('Restoring build from previous session...', 'info');
+
+            // Verify the run is still active by fetching current status
+            const response = await fetch('/api/runs/' + storedBuild.run_id);
+            if (!response.ok) {
+                console.warn('Stored run not found, clearing localStorage');
+                clearActiveBuild();
+                return;
+            }
+
+            const data = await response.json();
+            const run = data.run || data;
+
+            if (run.status === 'running' || run.status === 'in_progress') {
+                // Run is still active, reconnect to SSE stream
+                addLogEntry('Reconnecting to active build...', 'info');
+                startEventStream(storedBuild.run_id);
+            } else if (run.status === 'completed') {
+                // Run completed while we were away
+                clearActiveBuild();
+                handleBuildComplete('completed');
+            } else if (run.status === 'failed') {
+                // Run failed while we were away
+                clearActiveBuild();
+                handleBuildComplete('failed');
+            } else if (run.status === 'paused' || run.status === 'cancelled') {
+                // Run was paused
+                clearActiveBuild();
+                updateStatusBadge('paused');
+                addLogEntry('Build was paused', 'warning');
+            } else {
+                // Unknown status, clear and fall back to normal check
+                clearActiveBuild();
+                checkForActiveRun();
+            }
+        } catch (error) {
+            console.error('Failed to reconnect to active build:', error);
+            clearActiveBuild();
+            // Fall back to normal active run check
             checkForActiveRun();
         }
     }
 
     /**
-     * Check for an active run for this plan
+     * Check for an active run for this plan and restore progress state
      */
     async function checkForActiveRun() {
+        try {
+            // Get plan_id from PLAN_DATA
+            const planId = window.PLAN_DATA && window.PLAN_DATA.id;
+            if (!planId) {
+                console.warn('No plan ID available for progress check');
+                return;
+            }
+
+            // Fetch build progress from the dedicated endpoint
+            const progressResponse = await fetch('/api/plans/' + encodeURIComponent(planId) + '/build-progress');
+            if (!progressResponse.ok) {
+                console.warn('Failed to fetch build progress:', progressResponse.status);
+                return;
+            }
+
+            const progressData = await progressResponse.json();
+
+            // Check if there's actual progress to restore
+            if (!progressData || progressData.status === 'pending') {
+                console.log('No active build progress to restore');
+                return;
+            }
+
+            // Restore run ID if available
+            if (progressData.run_id) {
+                currentRunId = progressData.run_id;
+            }
+
+            // Show progress section and initialize steps
+            showProgressSection();
+
+            // Initialize steps with restored status from API
+            if (progressData.steps && progressData.steps.length > 0) {
+                initializeStepsFromProgress(progressData.steps, progressData.current_step);
+            }
+
+            // Update overall progress bar
+            if (progressData.progress_percentage !== undefined) {
+                updateProgress(progressData.progress_percentage);
+            }
+
+            // Update current step label
+            if (progressData.current_step) {
+                updateCurrentStep(progressData.current_step);
+            }
+
+            // Add log entry about restoration
+            addLogEntry('Restored build progress from previous session', 'info');
+
+            // If build is still running, connect to SSE stream
+            if (progressData.status === 'running' && progressData.run_id) {
+                addLogEntry('Reconnecting to build stream...', 'info');
+                startEventStream(progressData.run_id);
+            } else if (progressData.status === 'completed') {
+                handleBuildComplete('completed');
+            } else if (progressData.status === 'failed') {
+                addLogEntry('Build failed - check error details above', 'error');
+                updateStatusBadge('failed');
+            } else if (progressData.status === 'cancelled') {
+                addLogEntry('Build was paused', 'warning');
+                updateStatusBadge('paused');
+            }
+
+        } catch (error) {
+            console.error('Error checking for active run:', error);
+            // Fall back to legacy run check
+            await checkForActiveRunLegacy();
+        }
+    }
+
+    /**
+     * Initialize steps from progress API response with pre-existing statuses
+     * @param {Array} progressSteps - Steps from build-progress API
+     * @param {string} currentStepId - ID of the currently running step
+     */
+    function initializeStepsFromProgress(progressSteps, currentStepId) {
+        if (!elements.stepsList || !progressSteps) return;
+
+        // Clear placeholder and existing steps
+        elements.stepsList.innerHTML = '';
+        steps = [];
+        stepStartTimes = {};
+        expandedSteps.clear();
+
+        // Handle empty steps array
+        if (progressSteps.length === 0) {
+            elements.stepsList.innerHTML = '<div class="text-sm text-gray-500 italic">No steps defined in plan</div>';
+            initializeProgressTracking(0, 0);
+            return;
+        }
+
+        let initialCompletedCount = 0;
+        progressSteps.forEach(function(step, index) {
+            // Map API status to UI status
+            let status = step.status || 'pending';
+
+            // If this is the current step, mark it as running
+            if (step.id === currentStepId && status === 'pending') {
+                status = 'running';
+            }
+
+            const stepData = {
+                id: step.id || 'step-' + (index + 1),
+                label: step.label || step.title || step.name || 'Step ' + (index + 1),
+                description: step.description || step.action || step.do || '',
+                status: status,
+                output: step.output || '',
+                error: step.error || '',
+                duration: step.duration || null
+            };
+
+            steps.push(stepData);
+            renderStepElement(stepData, index);
+
+            // Track start time for running steps
+            if (status === 'running') {
+                stepStartTimes[stepData.id] = new Date();
+            }
+
+            // Count already completed steps
+            if (status === 'completed') {
+                initialCompletedCount++;
+            }
+        });
+
+        // Initialize progress tracking with step counts
+        initializeProgressTracking(progressSteps.length, initialCompletedCount);
+    }
+
+    /**
+     * Legacy fallback: Check for active run using runs API
+     */
+    async function checkForActiveRunLegacy() {
         try {
             const response = await fetch('/api/runs?status=running');
             const data = await response.json();
 
             if (data.runs && data.runs.length > 0) {
                 const planRun = data.runs.find(function(r) {
-                    return r.plan_path === window.PLAN_DATA.file;
+                    return r.plan_path === window.PLAN_DATA.file ||
+                           r.plan_id === window.PLAN_DATA.id;
                 });
 
                 if (planRun) {
@@ -77,7 +446,7 @@ const PlanDetail = (function() {
                 }
             }
         } catch (error) {
-            console.error('Error checking for active run:', error);
+            console.error('Error checking for active run (legacy):', error);
         }
     }
 
@@ -104,6 +473,9 @@ const PlanDetail = (function() {
             if (data.run_id) {
                 currentRunId = data.run_id;
                 buildStartTime = new Date();
+
+                // Save to localStorage for persistence across page refresh
+                saveActiveBuild(planId, data.run_id, { progress: 0, current_step: 'Initializing...' });
 
                 showProgressSection();
                 hideFailedStepInfo();
@@ -147,6 +519,9 @@ const PlanDetail = (function() {
                 currentRunId = data.run_id;
                 buildStartTime = new Date();
 
+                // Save to localStorage for persistence across page refresh
+                saveActiveBuild(planId, data.run_id, { progress: 0, current_step: 'Resuming...' });
+
                 showProgressSection();
                 hideFailedStepInfo();
                 updateStatusBadge('in-progress');
@@ -184,6 +559,10 @@ const PlanDetail = (function() {
 
             Toast.warning('Build paused');
             stopEventStream();
+
+            // Clear localStorage since build is paused
+            clearActiveBuild();
+
             updateStatusBadge('paused');
         } catch (error) {
             console.error('Error pausing build:', error);
@@ -222,43 +601,161 @@ const PlanDetail = (function() {
     }
 
     /**
-     * Start SSE event stream for real-time updates
+     * Start SSE event stream for real-time updates using SSEConnectionManager
      * @param {string} runId - The run ID to stream events from
      */
     function startEventStream(runId) {
-        if (eventSource) {
-            eventSource.close();
+        // Clean up any existing connection
+        stopEventStream();
+
+        currentRunId = runId;
+        const url = '/api/runs/' + runId + '/events';
+
+        // Check if SSEConnectionManager is available
+        if (typeof SSEConnectionManager === 'undefined') {
+            console.warn('SSEConnectionManager not available, falling back to polling');
+            startPollingFallback(runId);
+            return;
         }
 
-        const url = '/api/runs/' + runId + '/events';
-        eventSource = new EventSource(url);
+        // Create new SSE connection manager with configuration
+        sseManager = new SSEConnectionManager(url, {
+            maxReconnectAttempts: 5,
+            initialReconnectDelay: 1000,
+            maxReconnectDelay: 15000,
+            heartbeatTimeout: 45000,
+            enablePollingFallback: true,
+            pollingInterval: 3000
+        });
 
-        eventSource.onopen = function() {
-            addLogEntry('Connected to build stream', 'info');
-        };
+        // Set up polling fallback function
+        sseManager.setPollingFallback(function() {
+            return pollRunStatus(runId);
+        });
 
-        eventSource.onmessage = function(e) {
-            try {
-                const event = JSON.parse(e.data);
-                handleEvent(event);
-            } catch (error) {
-                console.error('Error parsing event:', error);
+        // Track cleanup functions
+        cleanupFunctions = [];
+
+        // Handle connection state changes
+        var stateCleanup = sseManager.onStateChange(function(newState, oldState) {
+            console.log('PlanDetail SSE state: ' + oldState + ' -> ' + newState);
+            updateConnectionStatus(newState, sseManager.isPollingMode());
+
+            if (newState === 'connected') {
+                if (sseManager.isPollingMode()) {
+                    addLogEntry('Using polling fallback for updates', 'warning');
+                } else {
+                    addLogEntry('Connected to build stream', 'info');
+                }
+            } else if (newState === 'reconnecting') {
+                addLogEntry('Connection lost, reconnecting...', 'warning');
+            } else if (newState === 'failed') {
+                addLogEntry('Connection failed, using polling fallback', 'error');
             }
-        };
+        });
+        cleanupFunctions.push(stateCleanup);
 
-        eventSource.onerror = function() {
-            console.log('SSE connection closed');
-            stopEventStream();
-        };
+        // Handle incoming messages
+        var messageCleanup = sseManager.onMessage(function(data, event) {
+            if (data && typeof data === 'object') {
+                handleEvent(data);
+            }
+        });
+        cleanupFunctions.push(messageCleanup);
+
+        // Connect
+        sseManager.connect();
+        updateConnectionStatus('connecting', false);
     }
 
     /**
-     * Stop SSE event stream
+     * Stop SSE event stream and clean up
      */
     function stopEventStream() {
-        if (eventSource) {
-            eventSource.close();
-            eventSource = null;
+        // Stop polling if active
+        if (pollingTimer) {
+            clearInterval(pollingTimer);
+            pollingTimer = null;
+        }
+
+        // Clean up SSE manager
+        if (sseManager) {
+            sseManager.disconnect();
+            sseManager = null;
+        }
+
+        // Run cleanup functions
+        cleanupFunctions.forEach(function(fn) {
+            try {
+                fn();
+            } catch (e) {
+                console.debug('Cleanup error:', e);
+            }
+        });
+        cleanupFunctions = [];
+
+        hideConnectionStatus();
+    }
+
+    /**
+     * Start polling fallback when SSE is not available
+     * @param {string} runId - The run ID to poll
+     */
+    function startPollingFallback(runId) {
+        console.log('Starting polling fallback for run:', runId);
+        updateConnectionStatus('connected', true);
+        addLogEntry('Using polling mode (SSE unavailable)', 'warning');
+
+        // Initial poll
+        pollRunStatus(runId);
+
+        // Start polling interval
+        pollingTimer = setInterval(function() {
+            pollRunStatus(runId);
+        }, 3000);
+    }
+
+    /**
+     * Poll run status endpoint as fallback
+     * @param {string} runId - The run ID to poll
+     * @returns {Promise} Promise resolving when poll completes
+     */
+    async function pollRunStatus(runId) {
+        try {
+            const response = await fetch('/api/runs/' + runId);
+            if (!response.ok) {
+                throw new Error('Failed to fetch run status');
+            }
+
+            const data = await response.json();
+
+            // Convert run status to events
+            if (data.run) {
+                const run = data.run;
+
+                // Update progress if available
+                if (run.progress !== undefined) {
+                    handleEvent({ type: 'progress', progress: run.progress });
+                }
+
+                // Update current step
+                if (run.current_step) {
+                    handleEvent({ type: 'step', step: run.current_step });
+                }
+
+                // Check for completion
+                if (run.status === 'completed') {
+                    handleEvent({ type: 'done', status: 'completed' });
+                    stopEventStream();
+                } else if (run.status === 'failed') {
+                    handleEvent({ type: 'error', message: run.error || 'Build failed' });
+                    stopEventStream();
+                } else if (run.status === 'paused') {
+                    stopEventStream();
+                }
+            }
+        } catch (error) {
+            console.debug('Poll error:', error);
         }
     }
 
@@ -270,11 +767,15 @@ const PlanDetail = (function() {
         // Update progress bar
         if (event.progress !== undefined) {
             updateProgress(event.progress);
+            // Update stored progress for persistence
+            updateStoredProgress({ progress: event.progress });
         }
 
         // Update current step
         if (event.step) {
             updateCurrentStep(event.step);
+            // Update stored progress for persistence
+            updateStoredProgress({ current_step: event.step });
         }
 
         // Handle steps initialization from event
@@ -367,9 +868,11 @@ const PlanDetail = (function() {
         // Handle empty steps array
         if (planSteps.length === 0) {
             elements.stepsList.innerHTML = '<div class="text-sm text-gray-500 italic">No steps defined in plan</div>';
+            initializeProgressTracking(0, 0);
             return;
         }
 
+        let initialCompletedCount = 0;
         planSteps.forEach(function(step, index) {
             const stepData = {
                 id: step.id || 'step-' + (index + 1),
@@ -382,7 +885,15 @@ const PlanDetail = (function() {
             };
             steps.push(stepData);
             renderStepElement(stepData, index);
+
+            // Count already completed steps
+            if (stepData.status === 'completed') {
+                initialCompletedCount++;
+            }
         });
+
+        // Initialize progress tracking with step counts
+        initializeProgressTracking(planSteps.length, initialCompletedCount);
     }
 
     /**
@@ -397,7 +908,7 @@ const PlanDetail = (function() {
     }
 
     /**
-     * Render a step element with full visual checklist styling
+     * Render a step element with timeline styling and connector lines
      * @param {Object} stepData - Step data object
      * @param {number} index - Step index
      */
@@ -406,7 +917,7 @@ const PlanDetail = (function() {
 
         const stepEl = document.createElement('div');
         stepEl.id = 'step-' + stepData.id;
-        stepEl.className = 'step-item';
+        stepEl.className = 'timeline-step';
         stepEl.dataset.stepId = stepData.id;
 
         updateStepElementContent(stepEl, stepData, index);
@@ -414,7 +925,40 @@ const PlanDetail = (function() {
     }
 
     /**
-     * Update step element content
+     * Get the timeline dot class based on step status
+     * @param {string} status - Step status
+     * @returns {string} CSS class for the timeline dot
+     */
+    function getTimelineDotClass(status) {
+        var dotClasses = {
+            pending: 'timeline-dot-pending',
+            running: 'timeline-dot-running',
+            completed: 'timeline-dot-completed',
+            failed: 'timeline-dot-failed'
+        };
+        return dotClasses[status] || dotClasses.pending;
+    }
+
+    /**
+     * Get the timeline dot icon based on step status
+     * @param {string} status - Step status
+     * @param {number} stepNumber - Step number for display
+     * @returns {string} HTML for the dot icon
+     */
+    function getTimelineDotIcon(status, stepNumber) {
+        if (status === 'completed') {
+            return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+        } else if (status === 'running') {
+            return '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>';
+        } else if (status === 'failed') {
+            return '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
+        } else {
+            return '<span class="text-xs font-medium">' + stepNumber + '</span>';
+        }
+    }
+
+    /**
+     * Update step element content with timeline design and colored connectors
      * @param {HTMLElement} stepEl - Step DOM element
      * @param {Object} stepData - Step data object
      * @param {number} index - Step index
@@ -424,72 +968,92 @@ const PlanDetail = (function() {
         const isExpanded = expandedSteps.has(stepData.id);
         const hasDetails = stepData.description || stepData.output || stepData.duration;
         const stepNumber = index + 1;
+        const isLastStep = index === steps.length - 1;
 
-        // Build connector line (not for first step)
-        const connector = index > 0 ?
-            '<div class="step-connector absolute left-3 -top-2 w-0.5 h-2 ' +
-            (stepData.status === 'completed' ? 'bg-green-400' :
-             stepData.status === 'running' ? 'bg-blue-400' : 'bg-gray-300') + '"></div>' : '';
+        // Determine timeline step class based on status (for connector line coloring)
+        var timelineStepClass = 'timeline-step';
+        if (stepData.status === 'completed') {
+            timelineStepClass += ' step-completed';
+        } else if (stepData.status === 'running') {
+            timelineStepClass += ' step-running';
+        }
+        // Hide connector for last step
+        if (isLastStep) {
+            timelineStepClass += ' last-step';
+        }
 
-        stepEl.className = 'step-item relative ' + (stepData.status === 'running' ? 'step-running' : '');
+        stepEl.className = timelineStepClass;
+
+        // Get timeline dot class and icon
+        var dotClass = getTimelineDotClass(stepData.status);
+        var dotIcon = getTimelineDotIcon(stepData.status, stepNumber);
+
+        // Step card class based on status
+        var cardClass = 'step-card p-3';
+        if (stepData.status === 'running') {
+            cardClass += ' step-running';
+        } else if (stepData.status === 'completed') {
+            cardClass += ' step-completed';
+        } else if (stepData.status === 'failed') {
+            cardClass += ' step-failed';
+        }
+        if (hasDetails) {
+            cardClass += ' cursor-pointer';
+        }
 
         stepEl.innerHTML = [
-            connector,
-            '<div class="step-header flex items-start p-3 rounded-lg transition-all duration-200 ' +
-                (stepData.status === 'running' ? 'bg-blue-50 border border-blue-200' :
-                 stepData.status === 'completed' ? 'bg-green-50 border border-green-200' :
-                 stepData.status === 'failed' ? 'bg-red-50 border border-red-200' :
-                 'bg-gray-50 border border-gray-200') +
-                (hasDetails ? ' cursor-pointer hover:shadow-sm' : '') + '">',
+            // Timeline dot (positioned absolutely via CSS)
+            '<div class="timeline-dot ' + dotClass + '">',
+            '  ' + dotIcon,
+            '</div>',
 
-            // Status indicator
-            '  <div class="step-status flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full ' + statusConfig.bgClass + '">',
-            '    ' + statusConfig.icon,
-            '  </div>',
-
-            // Step content
-            '  <div class="step-content flex-1 ml-3 min-w-0">',
-            '    <div class="flex items-center justify-between">',
-            '      <div class="flex items-center min-w-0">',
-            '        <span class="step-number text-xs font-medium text-gray-500 mr-2">#' + stepNumber + '</span>',
-            '        <span class="step-label text-sm font-medium ' + statusConfig.textClass + ' truncate">' + escapeHtml(stepData.label) + '</span>',
-            '      </div>',
-            '      <div class="flex items-center ml-2">',
-                   stepData.duration ? '<span class="step-duration text-xs text-gray-500 mr-2">' + stepData.duration + '</span>' : '',
-                   hasDetails ? '<svg class="step-chevron w-4 h-4 text-gray-400 transition-transform duration-200 ' +
-                     (isExpanded ? 'rotate-180' : '') + '" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-                     '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>' : '',
-            '      </div>',
+            // Step card
+            '<div class="' + cardClass + '">',
+            '  <div class="flex items-center justify-between">',
+            '    <div class="flex items-center min-w-0 flex-1">',
+            '      <span class="step-number text-xs font-semibold text-gray-400 mr-2 bg-gray-100 px-1.5 py-0.5 rounded">#' + stepNumber + '</span>',
+            '      <span class="step-label text-sm font-medium ' + statusConfig.textClass + ' truncate">' + escapeHtml(stepData.label) + '</span>',
             '    </div>',
+            '    <div class="flex items-center ml-2 flex-shrink-0">',
+                   stepData.duration ? '<span class="step-duration text-xs text-gray-500 mr-2 bg-gray-50 px-2 py-0.5 rounded">' + stepData.duration + '</span>' : '',
+                   hasDetails ? '<svg class="step-chevron w-4 h-4 text-gray-400 transition-transform duration-200 ' +
+                     (isExpanded ? 'rotated' : '') + '" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                     '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>' : '',
+            '    </div>',
+            '  </div>',
 
             // Status label for running/failed
             stepData.status === 'running' ?
-                '<div class="step-status-label mt-1 text-xs text-blue-600 animate-pulse">In progress...</div>' : '',
+                '<div class="step-status-label mt-2 text-xs text-blue-600 animate-pulse flex items-center">' +
+                '  <span class="w-1.5 h-1.5 bg-blue-500 rounded-full mr-2 animate-ping"></span>' +
+                '  In progress...' +
+                '</div>' : '',
             stepData.status === 'failed' && stepData.error ?
-                '<div class="step-status-label mt-1 text-xs text-red-600">' + escapeHtml(stepData.error) + '</div>' : '',
-
-            '  </div>',
-            '</div>',
+                '<div class="step-status-label mt-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">' +
+                '  <span class="font-medium">Error:</span> ' + escapeHtml(stepData.error) +
+                '</div>' : '',
 
             // Expandable details section
             hasDetails ? [
-                '<div class="step-details overflow-hidden transition-all duration-300 ' + (isExpanded ? 'max-h-96' : 'max-h-0') + '">',
-                '  <div class="ml-10 mt-2 p-3 bg-gray-100 rounded-lg text-sm">',
-                     stepData.description ? '<div class="step-description text-gray-700 mb-2">' + escapeHtml(stepData.description) + '</div>' : '',
+                '<div class="step-details ' + (isExpanded ? 'expanded mt-3' : '') + '">',
+                '  <div class="p-3 bg-gray-50 rounded-lg text-sm border border-gray-100">',
+                     stepData.description ? '<div class="step-description text-gray-700 mb-2"><span class="font-medium text-gray-500 text-xs">Description:</span><br>' + escapeHtml(stepData.description) + '</div>' : '',
                      stepData.output ? [
-                         '<div class="step-output">',
+                         '<div class="step-output mt-2">',
                          '  <div class="text-xs font-medium text-gray-500 mb-1">Output:</div>',
-                         '  <pre class="text-xs text-gray-600 bg-white p-2 rounded border overflow-x-auto max-h-32 overflow-y-auto">' + escapeHtml(stepData.output) + '</pre>',
+                         '  <pre class="text-xs text-gray-600 bg-white p-2 rounded border overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">' + escapeHtml(stepData.output) + '</pre>',
                          '</div>'
                      ].join('') : '',
                 '  </div>',
                 '</div>'
-            ].join('') : ''
+            ].join('') : '',
+
+            '</div>'
         ].join('');
 
         // Add click handler for expandable steps
         if (hasDetails) {
-            const header = stepEl.querySelector('.step-header');
+            var header = stepEl.querySelector('.step-card');
             header.addEventListener('click', function() {
                 toggleStepDetails(stepData.id);
             });
@@ -542,9 +1106,15 @@ const PlanDetail = (function() {
         }
 
         let duration = null;
+        let durationMs = 0;
         if ((status === 'completed' || status === 'failed') && stepStartTimes[stepId]) {
-            duration = formatDuration(new Date() - stepStartTimes[stepId]);
+            durationMs = new Date() - stepStartTimes[stepId];
+            duration = formatDuration(durationMs);
         }
+
+        // Check if this is a status transition to completed
+        const wasCompleted = stepIndex >= 0 && steps[stepIndex].status === 'completed';
+        const isBecomingCompleted = status === 'completed' && !wasCompleted;
 
         if (stepIndex < 0) {
             // New step - add to list
@@ -559,7 +1129,18 @@ const PlanDetail = (function() {
             };
             steps.push(stepData);
             stepIndex = steps.length - 1;
+
+            // Update total step count if this is a new step
+            if (steps.length > totalStepCount) {
+                totalStepCount = steps.length;
+            }
+
             renderStepElement(stepData, stepIndex);
+
+            // Record completion if new step is already completed
+            if (status === 'completed') {
+                recordStepCompletion(stepId, durationMs);
+            }
         } else {
             // Update existing step
             steps[stepIndex].status = status;
@@ -571,6 +1152,11 @@ const PlanDetail = (function() {
 
             if (stepEl) {
                 updateStepElementContent(stepEl, steps[stepIndex], stepIndex);
+            }
+
+            // Record completion for progress tracking
+            if (isBecomingCompleted) {
+                recordStepCompletion(stepId, durationMs);
             }
         }
 
@@ -666,6 +1252,9 @@ const PlanDetail = (function() {
     function handleBuildComplete(status) {
         stopEventStream();
 
+        // Clear localStorage since build is complete
+        clearActiveBuild();
+
         const duration = buildStartTime ? formatDuration(new Date() - buildStartTime) : '';
 
         if (status === 'completed' || status === 'success') {
@@ -696,6 +1285,10 @@ const PlanDetail = (function() {
      */
     function handleBuildError(message) {
         stopEventStream();
+
+        // Clear localStorage since build has errored
+        clearActiveBuild();
+
         updateStatusBadge('failed');
         Toast.error('Build error: ' + message);
     }
@@ -791,6 +1384,138 @@ const PlanDetail = (function() {
         } else {
             return seconds + 's';
         }
+    }
+
+    /**
+     * Calculate estimated time remaining based on average step duration
+     * @returns {string|null} Formatted estimated time remaining or null if not calculable
+     */
+    function calculateEstimatedTimeRemaining() {
+        if (stepDurations.length === 0 || completedStepCount >= totalStepCount) {
+            return null;
+        }
+
+        // Calculate average duration of completed steps
+        const totalDuration = stepDurations.reduce(function(sum, duration) {
+            return sum + duration;
+        }, 0);
+        const avgDuration = totalDuration / stepDurations.length;
+
+        // Calculate remaining steps
+        const remainingSteps = totalStepCount - completedStepCount;
+
+        // Estimate remaining time
+        const estimatedRemainingMs = avgDuration * remainingSteps;
+
+        return formatDuration(estimatedRemainingMs);
+    }
+
+    /**
+     * Update the step count and estimated time display
+     */
+    function updateProgressDisplay() {
+        // Ensure elements exist, create them if needed
+        ensureProgressDisplayElements();
+
+        // Update step count display
+        if (elements.stepsCompletedCount) {
+            elements.stepsCompletedCount.textContent = completedStepCount + ' of ' + totalStepCount + ' steps completed';
+        }
+
+        // Update estimated time remaining
+        if (elements.estimatedTimeRemaining) {
+            const estimatedTime = calculateEstimatedTimeRemaining();
+            if (estimatedTime && completedStepCount < totalStepCount) {
+                elements.estimatedTimeRemaining.textContent = 'Est. remaining: ' + estimatedTime;
+                elements.estimatedTimeRemaining.classList.remove('hidden');
+            } else if (completedStepCount >= totalStepCount && totalStepCount > 0) {
+                elements.estimatedTimeRemaining.textContent = 'All steps completed';
+                elements.estimatedTimeRemaining.classList.remove('hidden');
+            } else {
+                elements.estimatedTimeRemaining.textContent = '';
+                elements.estimatedTimeRemaining.classList.add('hidden');
+            }
+        }
+    }
+
+    /**
+     * Ensure progress display elements exist in the DOM
+     */
+    function ensureProgressDisplayElements() {
+        // Find the progress section header area
+        const progressHeader = elements.progressSection ?
+            elements.progressSection.querySelector('.flex.items-center.justify-between') ||
+            elements.progressSection.querySelector('.flex.items-center') : null;
+
+        if (!progressHeader) return;
+
+        // Create steps completed count element if it doesn't exist
+        if (!elements.stepsCompletedCount) {
+            const existingEl = document.getElementById('steps-completed-count');
+            if (existingEl) {
+                elements.stepsCompletedCount = existingEl;
+            } else {
+                const countEl = document.createElement('div');
+                countEl.id = 'steps-completed-count';
+                countEl.className = 'steps-completed-count text-sm font-medium text-gray-700';
+                countEl.textContent = '0 of 0 steps completed';
+
+                // Insert after progress bar area or at end of header
+                const progressBarContainer = elements.progressSection.querySelector('.progress-bar-container') ||
+                    elements.progressSection.querySelector('[class*="bg-gray-200"]');
+                if (progressBarContainer && progressBarContainer.parentNode) {
+                    progressBarContainer.parentNode.insertBefore(countEl, progressBarContainer.nextSibling);
+                } else {
+                    progressHeader.appendChild(countEl);
+                }
+                elements.stepsCompletedCount = countEl;
+            }
+        }
+
+        // Create estimated time remaining element if it doesn't exist
+        if (!elements.estimatedTimeRemaining) {
+            // Try both ID formats for backward compatibility
+            const existingEl = document.getElementById('estimated-time-remaining') || document.getElementById('estimated-time');
+            if (existingEl) {
+                elements.estimatedTimeRemaining = existingEl;
+            } else {
+                const etaEl = document.createElement('span');
+                etaEl.id = 'estimated-time';
+                etaEl.className = 'text-xs text-gray-500';
+                etaEl.textContent = 'Calculating...';
+
+                // Insert after steps count
+                if (elements.stepsCompletedCount && elements.stepsCompletedCount.parentNode) {
+                    elements.stepsCompletedCount.parentNode.insertBefore(etaEl, elements.stepsCompletedCount.nextSibling);
+                }
+                elements.estimatedTimeRemaining = etaEl;
+            }
+        }
+    }
+
+    /**
+     * Record a step completion and update progress display
+     * @param {string} stepId - The step ID that completed
+     * @param {number} durationMs - Duration of the step in milliseconds
+     */
+    function recordStepCompletion(stepId, durationMs) {
+        completedStepCount++;
+        if (durationMs > 0) {
+            stepDurations.push(durationMs);
+        }
+        updateProgressDisplay();
+    }
+
+    /**
+     * Initialize progress tracking with total step count
+     * @param {number} total - Total number of steps
+     * @param {number} completed - Number of already completed steps
+     */
+    function initializeProgressTracking(total, completed) {
+        totalStepCount = total || 0;
+        completedStepCount = completed || 0;
+        stepDurations = [];
+        updateProgressDisplay();
     }
 
     /**

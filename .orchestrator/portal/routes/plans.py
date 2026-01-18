@@ -14,6 +14,8 @@ from portal.schemas.responses import (
     PlanFileResponse,
     PlanStateResponse,
     BuildStateResponse,
+    BuildProgressResponse,
+    BuildStepProgress,
     DeleteResponse,
     MoveResponse,
     WorkflowStartResponse,
@@ -424,6 +426,106 @@ async def get_plan_build_state(
         files_modified=build_state.get("files_modified", []),
         last_error=build_state.get("last_error"),
         progress_percentage=progress_percentage,
+    )
+
+
+@router.get("/{plan_id}/build-progress", response_model=BuildProgressResponse)
+async def get_build_progress(
+    plan_id: str,
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+    build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
+    run_repo: RunRepository = Depends(get_run_repo),
+) -> BuildProgressResponse:
+    """Get real-time build progress for a plan including step-level details.
+
+    Returns a structured response with:
+    - Overall build status and progress percentage
+    - Current step being executed
+    - List of all steps with their individual statuses (pending, running, completed, failed, skipped)
+    """
+    plan = plan_repo.get_by_id(plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    build_state = build_state_repo.get(plan_id)
+
+    # No build state means build hasn't started yet
+    if not build_state:
+        return BuildProgressResponse(
+            plan_id=plan_id,
+            run_id=None,
+            status="pending",
+            progress_percentage=0.0,
+            current_step=None,
+            steps=[],
+        )
+
+    # Get step states from build_state_repo
+    step_states = build_state_repo.get_step_states(plan_id)
+
+    # Build status mapping
+    build_status = build_state.get("status", "pending")
+    current_step = build_state.get("current_step")
+    completed_steps = set(build_state.get("completed_steps", []))
+    failed_steps = set(build_state.get("failed_steps", []))
+    total_steps = build_state.get("total_steps", 0)
+
+    # Get the run_id from the most recent run for this plan
+    run_id = None
+    runs = run_repo.list_all()
+    for run in runs:
+        if run.get("plan_id") == plan_id and run.get("workflow") == "building":
+            run_id = run.get("run_id")
+            break
+
+    # Calculate progress percentage
+    if total_steps > 0:
+        processed_steps = len(completed_steps) + len(failed_steps)
+        progress_percentage = round((processed_steps / total_steps) * 100, 1)
+    else:
+        progress_percentage = 0.0
+
+    # Build the steps list with status for each step
+    steps: List[BuildStepProgress] = []
+    for step_state in step_states:
+        step_id = step_state.get("step_id", "")
+        step_status = step_state.get("status", "pending")
+
+        # Determine step status based on build state
+        if step_id in completed_steps:
+            step_status = "completed"
+        elif step_id in failed_steps:
+            step_status = "failed"
+        elif step_id == current_step:
+            step_status = "running"
+        elif step_status not in ["completed", "failed", "skipped"]:
+            step_status = "pending"
+
+        steps.append(BuildStepProgress(
+            id=step_id,
+            status=step_status,
+            label=step_state.get("label", step_id),
+            description=step_state.get("description"),
+        ))
+
+    # Map build status to our status values
+    status_map = {
+        "pending": "pending",
+        "building": "running",
+        "in_progress": "running",
+        "completed": "completed",
+        "failed": "failed",
+        "paused": "cancelled",
+    }
+    status = status_map.get(build_status, build_status)
+
+    return BuildProgressResponse(
+        plan_id=plan_id,
+        run_id=run_id,
+        status=status,
+        progress_percentage=progress_percentage,
+        current_step=current_step,
+        steps=steps,
     )
 
 

@@ -68,6 +68,27 @@ class BuildStateResponse(PlanStateResponse):
     progress_percentage: float = 0.0
 
 
+class BuildStepProgress(BaseModel):
+    """Progress information for a single build step."""
+    id: str = Field(..., description="Unique identifier for the step")
+    status: str = Field("pending", description="Step status: pending, running, completed, failed, skipped")
+    label: str = Field(..., description="Short label for the step")
+    description: Optional[str] = Field(None, description="Detailed description of what the step does")
+
+
+class BuildProgressResponse(BaseModel):
+    """Real-time build progress response for SSE streaming."""
+    plan_id: str = Field(..., description="Unique identifier for the plan being built")
+    run_id: Optional[str] = Field(None, description="Unique identifier for the current build run")
+    status: str = Field("pending", description="Overall build status: pending, running, completed, failed, cancelled")
+    progress_percentage: float = Field(0.0, description="Overall progress percentage (0.0 to 100.0)")
+    current_step: Optional[str] = Field(None, description="ID of the currently executing step")
+    steps: List[BuildStepProgress] = Field(default_factory=list, description="Progress information for all steps")
+
+    class Config:
+        from_attributes = True
+
+
 class RunResponse(BaseModel):
     """Run information."""
     run_id: str

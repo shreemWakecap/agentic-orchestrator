@@ -84,9 +84,9 @@ async def lifespan(app: FastAPI):
     await stop_auto_recovery()
     logger.info("Auto-recovery task stopped")
 
-    # Shutdown: Gracefully close TaskManager
+    # Shutdown: Gracefully close TaskManager (non-blocking)
     logger.info("Shutting down TaskManager...")
-    shutdown_task_manager(wait=True)
+    shutdown_task_manager(wait=False)
     _task_manager = None
     logger.info("TaskManager shutdown complete")
 

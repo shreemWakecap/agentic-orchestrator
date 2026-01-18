@@ -1,0 +1,632 @@
+{% extends "base.html" %}
+
+{% block title %}Sync - SDLC Orchestrator{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    <!-- Page Header -->
+    <div class="mb-8 flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </div>
+                Sync to Remote
+            </h1>
+            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Commit local changes and create pull requests</p>
+        </div>
+        <button type="button" id="sync-refresh-btn" class="btn btn-secondary btn-modern group" title="Refresh sync status">
+            <svg class="h-4 w-4 mr-2 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            Refresh
+        </button>
+    </div>
+
+    <!-- Sync Status Card -->
+    <div class="glass-card p-8 mb-8">
+        <div class="flex items-start mb-6">
+            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
+            </div>
+            <div class="ml-5 flex-1">
+                <h3 class="text-xl font-semibold text-primary dark:text-primary">Git Status</h3>
+                <p class="text-sm text-secondary dark:text-secondary mt-1">Current branch and file changes</p>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="sync-status-loading" class="glass rounded-xl p-4 mb-5">
+            <div class="flex items-center justify-center text-sm text-secondary dark:text-secondary">
+                <svg class="animate-spin h-5 w-5 mr-3 text-violet-500" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading sync status...
+            </div>
+        </div>
+
+        <!-- Sync Status Content (hidden initially, shown after loading) -->
+        <div id="sync-status-content" class="hidden">
+            <!-- Branch Info -->
+            <div class="glass rounded-xl p-4 mb-4">
+                <div class="flex items-center text-sm text-secondary dark:text-secondary">
+                    <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                    <span class="font-medium mr-2">Branch:</span>
+                    <span id="sync-branch" class="font-mono text-primary dark:text-primary bg-tertiary dark:bg-tertiary px-2 py-0.5 rounded">--</span>
+                </div>
+            </div>
+
+            <!-- File Count Badge and Status -->
+            <div class="glass rounded-xl p-4 mb-4">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center text-sm text-secondary dark:text-secondary">
+                        <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span class="font-medium">Files to sync:</span>
+                    </div>
+                    <span id="sync-file-count" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-sm">0</span>
+                </div>
+                <!-- Staged/Unstaged counts -->
+                <div class="mt-3 flex items-center gap-4 text-xs text-tertiary dark:text-tertiary">
+                    <div class="flex items-center">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+                        <span>Staged: <span id="sync-staged-count" class="font-semibold text-emerald-600 dark:text-emerald-400">0</span></span>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
+                        <span>Unstaged: <span id="sync-unstaged-count" class="font-semibold text-amber-600 dark:text-amber-400">0</span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Expandable File List -->
+            <div class="glass rounded-xl mb-5 overflow-hidden">
+                <button type="button" id="sync-file-list-toggle" class="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-secondary dark:text-secondary hover:bg-tertiary/50 dark:hover:bg-tertiary/50 transition-colors">
+                    <span class="flex items-center">
+                        <svg class="h-4 w-4 mr-2 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                        </svg>
+                        View changed files
+                    </span>
+                    <svg id="sync-file-list-chevron" class="h-4 w-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                </button>
+                <div id="sync-file-list" class="hidden border-t border-primary/10 dark:border-primary/10 max-h-64 overflow-y-auto">
+                    <ul class="divide-y divide-primary/5 dark:divide-primary/5 text-sm font-mono">
+                        <!-- Files populated by JS -->
+                    </ul>
+                    <div id="sync-file-list-empty" class="px-4 py-3 text-center text-tertiary dark:text-tertiary text-sm">
+                        No files to sync
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- No Changes Message (hidden initially) -->
+        <div id="sync-no-changes" class="hidden glass rounded-xl p-6 mb-5 text-center">
+            <svg class="h-10 w-10 mx-auto mb-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <p class="text-sm font-medium text-secondary dark:text-secondary">All changes synced</p>
+            <p class="text-xs text-tertiary dark:text-tertiary mt-1">No pending changes to push to remote</p>
+        </div>
+    </div>
+
+    <!-- Sync Actions Card -->
+    <div class="glass-card p-8 mb-8">
+        <div class="flex items-start mb-6">
+            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+            </div>
+            <div class="ml-5 flex-1">
+                <h3 class="text-xl font-semibold text-primary dark:text-primary">Sync Actions</h3>
+                <p class="text-sm text-secondary dark:text-secondary mt-1">Push changes and pull updates</p>
+            </div>
+        </div>
+
+        <!-- Auto-merge Option -->
+        <div class="glass rounded-xl p-4 mb-5">
+            <label class="flex items-center justify-between cursor-pointer">
+                <div class="flex items-center">
+                    <svg class="h-5 w-5 mr-3 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                    </svg>
+                    <div>
+                        <span class="text-sm font-medium text-secondary dark:text-secondary">Auto-merge PR</span>
+                        <p class="text-xs text-tertiary dark:text-tertiary">Automatically merge and pull changes after PR creation</p>
+                    </div>
+                </div>
+                <div class="relative">
+                    <input type="checkbox" id="sync-auto-merge" class="sr-only peer" checked>
+                    <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:peer-focus:ring-violet-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-violet-600"></div>
+                </div>
+            </label>
+        </div>
+
+        <!-- Sync Actions -->
+        <div class="flex items-center gap-3">
+            <button type="button" id="sync-remote-btn" class="btn btn-primary btn-modern group flex-1">
+                <svg class="h-4 w-4 mr-2 group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                </svg>
+                Sync Remote
+            </button>
+            <button type="button" id="pull-latest-btn" class="btn btn-secondary btn-modern group" title="Pull latest from remote">
+                <svg class="h-4 w-4 mr-2 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Pull Latest
+            </button>
+        </div>
+    </div>
+
+    <!-- Open PRs Section -->
+    <div class="glass-card p-8 mb-8">
+        <div class="flex items-start mb-6">
+            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center shadow-lg">
+                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+                </svg>
+            </div>
+            <div class="ml-5 flex-1">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-primary dark:text-primary">Open Pull Requests</h3>
+                    <span id="sync-pr-count" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">0</span>
+                </div>
+                <p class="text-sm text-secondary dark:text-secondary mt-1">Pull requests awaiting review or merge</p>
+            </div>
+        </div>
+
+        <div id="sync-open-prs-content">
+            <!-- Loading State -->
+            <div id="sync-prs-loading" class="glass rounded-xl p-4">
+                <div class="flex items-center justify-center text-sm text-secondary dark:text-secondary">
+                    <svg class="animate-spin h-5 w-5 mr-3 text-amber-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading pull requests...
+                </div>
+            </div>
+
+            <!-- PR List -->
+            <div id="sync-open-prs" class="hidden">
+                <ul id="sync-pr-list" class="divide-y divide-primary/10 dark:divide-primary/10">
+                    <!-- PRs populated by JS -->
+                </ul>
+                <div id="sync-pr-list-empty" class="hidden glass rounded-xl p-6 text-center">
+                    <svg class="h-10 w-10 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+                    </svg>
+                    <p class="text-sm font-medium text-secondary dark:text-secondary">No open pull requests</p>
+                    <p class="text-xs text-tertiary dark:text-tertiary mt-1">All PRs have been merged or closed</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Local Sync Branches Section -->
+    <div class="glass-card p-8">
+        <div class="flex items-start mb-6">
+            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center shadow-lg">
+                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                </svg>
+            </div>
+            <div class="ml-5 flex-1">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold text-primary dark:text-primary">Local Sync Branches</h3>
+                    <span id="sync-branch-count" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">0</span>
+                </div>
+                <p class="text-sm text-secondary dark:text-secondary mt-1">Local branches created for sync operations</p>
+            </div>
+        </div>
+
+        <div id="sync-local-branches-content">
+            <!-- Loading State -->
+            <div id="sync-branches-loading" class="glass rounded-xl p-4">
+                <div class="flex items-center justify-center text-sm text-secondary dark:text-secondary">
+                    <svg class="animate-spin h-5 w-5 mr-3 text-blue-500" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading branches...
+                </div>
+            </div>
+
+            <!-- Branch List -->
+            <div id="sync-local-branches" class="hidden">
+                <ul id="sync-branch-list" class="divide-y divide-primary/10 dark:divide-primary/10">
+                    <!-- Branches populated by JS -->
+                </ul>
+                <div id="sync-branch-list-empty" class="hidden glass rounded-xl p-6 text-center">
+                    <svg class="h-10 w-10 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                    <p class="text-sm font-medium text-secondary dark:text-secondary">No local sync branches</p>
+                    <p class="text-xs text-tertiary dark:text-tertiary mt-1">Sync branches will appear here after syncing</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/common.js"></script>
+<script src="/static/js/toast.js"></script>
+<script src="/static/js/dashboard.js"></script>
+<script>
+/**
+ * Sync Page Module
+ * Handles git sync status, file changes, PRs, and branches display
+ */
+(function() {
+    'use strict';
+
+    /**
+     * Initialize the sync page
+     */
+    function init() {
+        loadSyncStatus();
+        setupEventListeners();
+    }
+
+    /**
+     * Load sync status from API
+     */
+    async function loadSyncStatus() {
+        try {
+            const response = await fetch('/api/sync/status');
+            if (!response.ok) {
+                throw new Error('Failed to load sync status');
+            }
+            const data = await response.json();
+            updateSyncUI(data);
+        } catch (error) {
+            console.error('Error loading sync status:', error);
+            showError('Failed to load sync status');
+        }
+    }
+
+    /**
+     * Update the sync UI with data
+     */
+    function updateSyncUI(data) {
+        // Hide loading states
+        document.getElementById('sync-status-loading').classList.add('hidden');
+        document.getElementById('sync-prs-loading').classList.add('hidden');
+        document.getElementById('sync-branches-loading').classList.add('hidden');
+
+        // Update branch name
+        const branchEl = document.getElementById('sync-branch');
+        if (branchEl && data.branch) {
+            branchEl.textContent = data.branch;
+        }
+
+        // Update file counts
+        const files = data.files || [];
+        const stagedFiles = files.filter(f => f.staged);
+        const unstagedFiles = files.filter(f => !f.staged);
+
+        document.getElementById('sync-file-count').textContent = files.length;
+        document.getElementById('sync-staged-count').textContent = stagedFiles.length;
+        document.getElementById('sync-unstaged-count').textContent = unstagedFiles.length;
+
+        // Show content or no changes message
+        if (files.length > 0) {
+            document.getElementById('sync-status-content').classList.remove('hidden');
+            document.getElementById('sync-no-changes').classList.add('hidden');
+            populateFileList(files);
+        } else {
+            document.getElementById('sync-status-content').classList.add('hidden');
+            document.getElementById('sync-no-changes').classList.remove('hidden');
+        }
+
+        // Update PRs
+        const prs = data.open_prs || [];
+        document.getElementById('sync-pr-count').textContent = prs.length;
+        document.getElementById('sync-open-prs').classList.remove('hidden');
+        populatePRList(prs);
+
+        // Update branches
+        const branches = data.sync_branches || [];
+        document.getElementById('sync-branch-count').textContent = branches.length;
+        document.getElementById('sync-local-branches').classList.remove('hidden');
+        populateBranchList(branches);
+    }
+
+    /**
+     * Populate the file list
+     */
+    function populateFileList(files) {
+        const listEl = document.querySelector('#sync-file-list ul');
+        const emptyEl = document.getElementById('sync-file-list-empty');
+
+        if (!listEl) return;
+
+        if (files.length === 0) {
+            listEl.innerHTML = '';
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        emptyEl.classList.add('hidden');
+        listEl.innerHTML = files.map(file => {
+            const statusClass = file.staged
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-amber-600 dark:text-amber-400';
+            const statusIcon = file.staged
+                ? '<span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>'
+                : '<span class="w-2 h-2 rounded-full bg-amber-500 mr-2"></span>';
+
+            return `
+                <li class="px-4 py-2 flex items-center justify-between hover:bg-tertiary/50 dark:hover:bg-tertiary/50 transition-colors">
+                    <div class="flex items-center">
+                        ${statusIcon}
+                        <span class="text-primary dark:text-primary">${escapeHtml(file.path)}</span>
+                    </div>
+                    <span class="text-xs ${statusClass} font-medium uppercase">${file.status || 'modified'}</span>
+                </li>
+            `;
+        }).join('');
+    }
+
+    /**
+     * Populate the PR list
+     */
+    function populatePRList(prs) {
+        const listEl = document.getElementById('sync-pr-list');
+        const emptyEl = document.getElementById('sync-pr-list-empty');
+
+        if (!listEl) return;
+
+        if (prs.length === 0) {
+            listEl.innerHTML = '';
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        emptyEl.classList.add('hidden');
+        listEl.innerHTML = prs.map(pr => `
+            <li class="glass rounded-xl p-4 mb-3 hover:shadow-md transition-all duration-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1 min-w-0">
+                        <a href="${escapeHtml(pr.url || '#')}" target="_blank"
+                           class="text-sm font-semibold text-primary dark:text-primary hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                            #${pr.number} ${escapeHtml(pr.title)}
+                        </a>
+                        <p class="text-xs text-tertiary dark:text-tertiary mt-1">${escapeHtml(pr.branch || '')}</p>
+                    </div>
+                    <span class="ml-3 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium
+                        ${pr.draft ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'}">
+                        ${pr.draft ? 'Draft' : 'Open'}
+                    </span>
+                </div>
+            </li>
+        `).join('');
+    }
+
+    /**
+     * Populate the branch list
+     */
+    function populateBranchList(branches) {
+        const listEl = document.getElementById('sync-branch-list');
+        const emptyEl = document.getElementById('sync-branch-list-empty');
+
+        if (!listEl) return;
+
+        if (branches.length === 0) {
+            listEl.innerHTML = '';
+            emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        emptyEl.classList.add('hidden');
+        listEl.innerHTML = branches.map(branch => `
+            <li class="glass rounded-xl p-4 mb-3 hover:shadow-md transition-all duration-200">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg class="h-4 w-4 mr-3 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                        </svg>
+                        <span class="text-sm font-mono text-primary dark:text-primary">${escapeHtml(branch.name || branch)}</span>
+                    </div>
+                    <button onclick="deleteBranch('${escapeHtml(branch.name || branch)}')"
+                            class="btn btn-sm btn-secondary btn-modern text-red-600 hover:text-red-700"
+                            title="Delete branch">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            </li>
+        `).join('');
+    }
+
+    /**
+     * Setup event listeners
+     */
+    function setupEventListeners() {
+        // Refresh button
+        const refreshBtn = document.getElementById('sync-refresh-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function() {
+                const icon = this.querySelector('svg');
+                if (icon) icon.classList.add('animate-spin');
+
+                loadSyncStatus().finally(() => {
+                    if (icon) {
+                        setTimeout(() => icon.classList.remove('animate-spin'), 500);
+                    }
+                });
+            });
+        }
+
+        // File list toggle
+        const fileToggle = document.getElementById('sync-file-list-toggle');
+        if (fileToggle) {
+            fileToggle.addEventListener('click', function() {
+                const fileList = document.getElementById('sync-file-list');
+                const chevron = document.getElementById('sync-file-list-chevron');
+
+                if (fileList) {
+                    fileList.classList.toggle('hidden');
+                }
+                if (chevron) {
+                    chevron.classList.toggle('rotate-180');
+                }
+            });
+        }
+
+        // Sync remote button
+        const syncBtn = document.getElementById('sync-remote-btn');
+        if (syncBtn) {
+            syncBtn.addEventListener('click', handleSyncRemote);
+        }
+
+        // Pull latest button
+        const pullBtn = document.getElementById('pull-latest-btn');
+        if (pullBtn) {
+            pullBtn.addEventListener('click', handlePullLatest);
+        }
+    }
+
+    /**
+     * Handle sync remote action
+     */
+    async function handleSyncRemote() {
+        const btn = document.getElementById('sync-remote-btn');
+        const autoMerge = document.getElementById('sync-auto-merge')?.checked ?? true;
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Syncing...';
+        }
+
+        try {
+            const response = await fetch('/api/sync/remote', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ auto_merge: autoMerge })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Sync failed');
+            }
+
+            Toast.show('Sync completed successfully!', 'success');
+            loadSyncStatus();
+        } catch (error) {
+            console.error('Sync error:', error);
+            Toast.show('Sync failed: ' + error.message, 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="h-4 w-4 mr-2 group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg> Sync Remote';
+            }
+        }
+    }
+
+    /**
+     * Handle pull latest action
+     */
+    async function handlePullLatest() {
+        const btn = document.getElementById('pull-latest-btn');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Pulling...';
+        }
+
+        try {
+            const response = await fetch('/api/sync/pull', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Pull failed');
+            }
+
+            Toast.show('Pull completed successfully!', 'success');
+            loadSyncStatus();
+        } catch (error) {
+            console.error('Pull error:', error);
+            Toast.show('Pull failed: ' + error.message, 'error');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="h-4 w-4 mr-2 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Pull Latest';
+            }
+        }
+    }
+
+    /**
+     * Delete a local sync branch
+     */
+    window.deleteBranch = async function(branchName) {
+        if (!confirm('Are you sure you want to delete the branch "' + branchName + '"?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/sync/branches/' + encodeURIComponent(branchName), {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.detail || 'Failed to delete branch');
+            }
+
+            Toast.show('Branch deleted successfully!', 'success');
+            loadSyncStatus();
+        } catch (error) {
+            console.error('Delete branch error:', error);
+            Toast.show('Failed to delete branch: ' + error.message, 'error');
+        }
+    };
+
+    /**
+     * Show error message
+     */
+    function showError(message) {
+        Toast.show(message, 'error');
+
+        // Show content with error state
+        document.getElementById('sync-status-loading').classList.add('hidden');
+        document.getElementById('sync-prs-loading').classList.add('hidden');
+        document.getElementById('sync-branches-loading').classList.add('hidden');
+    }
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+{% endblock %}

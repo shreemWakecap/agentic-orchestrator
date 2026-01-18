@@ -167,3 +167,9 @@ async def knowledge_page(
             "expert_count": expert_count,
         },
     )
+
+
+@router.get("/sync", response_class=HTMLResponse)
+async def sync_page(request: Request):
+    """Render sync to remote page."""
+    return templates.TemplateResponse(request, "sync.html", {})

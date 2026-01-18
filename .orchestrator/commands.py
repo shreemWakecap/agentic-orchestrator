@@ -9,16 +9,30 @@ ORCHESTRATOR_DIR = Path(__file__).parent
 PROJECT_ROOT = ORCHESTRATOR_DIR.parent
 
 
-def _find_free_port() -> int:
-    """Find a random available port."""
+def _is_port_available(port: int) -> bool:
+    """Check if a port is available."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        try:
+            s.bind(('127.0.0.1', port))
+            return True
+        except OSError:
+            return False
+
+
+def _find_free_port(preferred: int = 8000) -> int:
+    """Find an available port, preferring the specified port."""
+    # Try preferred port first
+    if _is_port_available(preferred):
+        return preferred
+    # Fall back to random port if preferred is in use
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(('', 0))
         return s.getsockname()[1]
 
 
 def run_portal(args=None) -> int:
-    """Start web portal on random available port."""
-    port = _find_free_port()
+    """Start web portal on port 8000 (or next available)."""
+    port = _find_free_port(8000)
     print(f"Portal: http://127.0.0.1:{port}")
     print("Press Ctrl+C to stop\n")
 

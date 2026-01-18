@@ -1,399 +1,17 @@
 /**
  * Dashboard page functionality
- * Handles plan creation form submission using unified AI-enhanced dialog
+ * Handles quick actions navigation and live build monitoring
  */
-
-function initDashboard() {
-    const form = document.getElementById('plan-form');
-    if (!form) return;
-
-    const descriptionInput = document.getElementById('plan-description');
-
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const description = descriptionInput ? descriptionInput.value.trim() : '';
-
-        if (!description) {
-            if (descriptionInput) {
-                descriptionInput.focus();
-                descriptionInput.style.borderColor = '#EF4444';
-                setTimeout(function() {
-                    descriptionInput.style.borderColor = '';
-                }, 2000);
-            }
-            return;
-        }
-
-        // Use unified dialog which handles AI improvement and plan creation
-        if (typeof UnifiedPlanDialog !== 'undefined' && UnifiedPlanDialog.showCreatePlanDialog) {
-            var result = await UnifiedPlanDialog.showCreatePlanDialog(description);
-            if (result.created) {
-                // Dialog handles redirect, but clear input as backup
-                if (descriptionInput) {
-                    descriptionInput.value = '';
-                }
-            }
-        } else {
-            console.error('UnifiedPlanDialog not available');
-            alert('Plan creation dialog is not available. Please refresh the page.');
-        }
-    });
-}
-
-function initSyncRemote() {
-    const button = document.getElementById('sync-remote-btn');
-    if (!button) return;
-
-    button.addEventListener('click', async function() {
-        const originalText = button.textContent;
-        button.disabled = true;
-        button.textContent = 'Syncing...';
-
-        // Get auto-merge setting
-        const autoMergeCheckbox = document.getElementById('sync-auto-merge');
-        const autoMerge = autoMergeCheckbox ? autoMergeCheckbox.checked : true;
-
-        try {
-            const response = await fetch('/api/workflows/sync-remote', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ auto_merge: autoMerge })
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            if (data.run_id) {
-                window.location.href = '/runs/' + data.run_id;
-            } else {
-                throw new Error('No run_id in response');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Failed to sync remote: ' + error.message);
-            button.disabled = false;
-            button.textContent = originalText;
-        }
-    });
-
-    // Setup refresh sync status button
-    const refreshBtn = document.getElementById('sync-refresh-btn');
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', function() {
-            const icon = refreshBtn.querySelector('svg');
-            if (icon) icon.classList.add('animate-spin');
-            fetchSyncStatus().finally(function() {
-                setTimeout(function() {
-                    if (icon) icon.classList.remove('animate-spin');
-                }, 500);
-            });
-        });
-    }
-
-    // Setup pull latest button
-    const pullLatestBtn = document.getElementById('pull-latest-btn');
-    if (pullLatestBtn) {
-        pullLatestBtn.addEventListener('click', async function() {
-            pullLatestBtn.disabled = true;
-            const icon = pullLatestBtn.querySelector('svg');
-            if (icon) icon.classList.add('animate-bounce');
-
-            try {
-                const response = await fetch('/api/workflows/pull-latest', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-
-                const data = await response.json();
-                if (data.success) {
-                    // Refresh sync status after pull
-                    fetchSyncStatus();
-                    fetchBranchesAndPRs();
-                } else {
-                    alert('Pull failed: ' + (data.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error pulling latest:', error);
-                alert('Failed to pull latest: ' + error.message);
-            } finally {
-                pullLatestBtn.disabled = false;
-                if (icon) icon.classList.remove('animate-bounce');
-            }
-        });
-    }
-
-    // Initial fetch of branches and PRs
-    fetchBranchesAndPRs();
-}
-
-/**
- * Fetch and display local sync branches and open PRs
- */
-async function fetchBranchesAndPRs() {
-    // Fetch branches
-    try {
-        const branchResponse = await fetch('/api/workflows/branches');
-        const branchData = await branchResponse.json();
-        updateBranchList(branchData.branches || []);
-    } catch (error) {
-        console.error('Error fetching branches:', error);
-    }
-
-    // Fetch PRs
-    try {
-        const prResponse = await fetch('/api/workflows/prs');
-        const prData = await prResponse.json();
-        updatePRList(prData.prs || []);
-    } catch (error) {
-        console.error('Error fetching PRs:', error);
-    }
-}
-
-function updateBranchList(branches) {
-    const container = document.getElementById('sync-local-branches');
-    const listEl = document.getElementById('sync-branch-list');
-    const countEl = document.getElementById('sync-branch-count');
-
-    if (!container || !listEl) return;
-
-    if (branches.length === 0) {
-        container.classList.add('hidden');
-        return;
-    }
-
-    container.classList.remove('hidden');
-    if (countEl) countEl.textContent = branches.length;
-
-    var html = '';
-    branches.forEach(function(branch) {
-        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30 dark:hover:bg-tertiary/30">';
-        html += '<div class="min-w-0 flex-1">';
-        html += '<div class="text-sm font-mono text-primary dark:text-primary truncate">' + escapeHtml(branch.name) + '</div>';
-        html += '<div class="text-xs text-tertiary dark:text-tertiary truncate">' + escapeHtml(branch.message || '') + '</div>';
-        html += '</div>';
-        html += '<button type="button" class="ml-3 btn btn-xs text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20" onclick="deleteBranch(\'' + escapeHtml(branch.name) + '\')" title="Delete branch">';
-        html += '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
-        html += '</button>';
-        html += '</li>';
-    });
-    listEl.innerHTML = html;
-}
-
-function updatePRList(prs) {
-    const container = document.getElementById('sync-open-prs');
-    const listEl = document.getElementById('sync-pr-list');
-    const countEl = document.getElementById('sync-pr-count');
-
-    if (!container || !listEl) return;
-
-    if (prs.length === 0) {
-        container.classList.add('hidden');
-        return;
-    }
-
-    container.classList.remove('hidden');
-    if (countEl) countEl.textContent = prs.length;
-
-    var html = '';
-    prs.forEach(function(pr) {
-        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30 dark:hover:bg-tertiary/30">';
-        html += '<div class="min-w-0 flex-1">';
-        html += '<a href="' + escapeHtml(pr.url) + '" target="_blank" class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">';
-        html += '#' + pr.number + ' ' + escapeHtml(pr.title);
-        html += '</a>';
-        html += '<div class="text-xs text-tertiary dark:text-tertiary">' + escapeHtml(pr.head_branch) + ' → ' + escapeHtml(pr.base_branch) + '</div>';
-        html += '</div>';
-        html += '<button type="button" class="ml-3 btn btn-xs btn-primary" onclick="mergePR(' + pr.number + ')" title="Merge PR">';
-        html += '<svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>';
-        html += 'Merge';
-        html += '</button>';
-        html += '</li>';
-    });
-    listEl.innerHTML = html;
-}
-
-async function deleteBranch(branchName) {
-    if (!confirm('Delete branch "' + branchName + '"? This cannot be undone.')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/workflows/branches/' + encodeURIComponent(branchName), {
-            method: 'DELETE'
-        });
-        const data = await response.json();
-        if (data.success) {
-            fetchBranchesAndPRs();
-        } else {
-            alert('Failed to delete branch: ' + (data.error || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Error deleting branch:', error);
-        alert('Failed to delete branch: ' + error.message);
-    }
-}
-
-async function mergePR(prNumber) {
-    if (!confirm('Merge PR #' + prNumber + '? This will merge and delete the remote branch.')) {
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/workflows/prs/' + prNumber + '/merge', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const data = await response.json();
-        if (data.success) {
-            // Pull latest after merge
-            await fetch('/api/workflows/pull-latest', { method: 'POST' });
-            fetchBranchesAndPRs();
-            fetchSyncStatus();
-        } else {
-            alert('Failed to merge PR: ' + (data.error || 'Unknown error'));
-        }
-    } catch (error) {
-        console.error('Error merging PR:', error);
-        alert('Failed to merge PR: ' + error.message);
-    }
-}
-
-/**
- * Sync Status Module
- * Fetches and displays git sync status information
- */
-async function fetchSyncStatus() {
-    const syncButton = document.getElementById('sync-remote-btn');
-    const fileCountEl = document.getElementById('sync-file-count');
-    const fileListEl = document.getElementById('sync-file-list');
-    const branchInfoEl = document.getElementById('sync-branch');
-    const loadingEl = document.getElementById('sync-status-loading');
-    const contentEl = document.getElementById('sync-status-content');
-    const noChangesEl = document.getElementById('sync-no-changes');
-    const stagedCountEl = document.getElementById('sync-staged-count');
-    const unstagedCountEl = document.getElementById('sync-unstaged-count');
-
-    // Show loading state
-    if (loadingEl) loadingEl.style.display = 'block';
-    if (contentEl) contentEl.style.display = 'none';
-    if (noChangesEl) noChangesEl.style.display = 'none';
-
-    try {
-        const response = await fetch('/api/workflows/sync-status');
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        // Hide loading
-        if (loadingEl) loadingEl.style.display = 'none';
-
-        // Check if there are changes to sync
-        const totalFiles = data.file_count || 0;
-
-        if (totalFiles === 0 || !data.has_changes) {
-            // No changes to sync
-            if (noChangesEl) noChangesEl.style.display = 'block';
-            if (contentEl) contentEl.style.display = 'none';
-            if (syncButton) {
-                syncButton.disabled = true;
-                syncButton.title = 'No changes to sync';
-            }
-        } else {
-            // Show content
-            if (contentEl) contentEl.style.display = 'block';
-            if (noChangesEl) noChangesEl.style.display = 'none';
-            if (syncButton) {
-                syncButton.disabled = false;
-                syncButton.title = '';
-            }
-
-            // Update file count badge
-            if (fileCountEl) {
-                fileCountEl.textContent = totalFiles;
-            }
-
-            // Update branch info
-            if (branchInfoEl) {
-                branchInfoEl.textContent = data.branch || '--';
-            }
-
-            // Update staged/unstaged counts
-            if (stagedCountEl) {
-                stagedCountEl.textContent = data.staged_count || 0;
-            }
-            if (unstagedCountEl) {
-                unstagedCountEl.textContent = data.unstaged_count || 0;
-            }
-
-            // Update file list (collapsible)
-            if (fileListEl) {
-                var listContainer = fileListEl.querySelector('ul');
-                var emptyMsg = document.getElementById('sync-file-list-empty');
-
-                if (data.files && data.files.length > 0) {
-                    if (emptyMsg) emptyMsg.style.display = 'none';
-                    if (listContainer) {
-                        var listHtml = '';
-                        data.files.forEach(function(file) {
-                            listHtml += '<li class="px-4 py-2 flex items-center text-sm text-secondary dark:text-secondary">';
-                            listHtml += '<svg class="h-4 w-4 mr-2 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
-                            listHtml += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>';
-                            listHtml += '</svg>';
-                            listHtml += '<span class="truncate">' + escapeHtml(file) + '</span></li>';
-                        });
-                        listContainer.innerHTML = listHtml;
-                    }
-                } else {
-                    if (emptyMsg) emptyMsg.style.display = 'block';
-                    if (listContainer) listContainer.innerHTML = '';
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Error fetching sync status:', error);
-        if (loadingEl) loadingEl.style.display = 'none';
-        if (noChangesEl) {
-            noChangesEl.style.display = 'block';
-            noChangesEl.textContent = 'Failed to load sync status';
-        }
-    }
-}
-
-function toggleSyncFileList() {
-    const fileListEl = document.getElementById('sync-file-list');
-    const toggleBtn = document.getElementById('sync-file-list-toggle');
-    const chevron = document.getElementById('sync-file-list-chevron');
-    if (!fileListEl) return;
-
-    const isHidden = fileListEl.classList.contains('hidden');
-    if (isHidden) {
-        fileListEl.classList.remove('hidden');
-        if (chevron) chevron.style.transform = 'rotate(180deg)';
-    } else {
-        fileListEl.classList.add('hidden');
-        if (chevron) chevron.style.transform = 'rotate(0deg)';
-    }
-}
-
-function initSyncFileListToggle() {
-    const toggleBtn = document.getElementById('sync-file-list-toggle');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', toggleSyncFileList);
-    }
-}
 
 /**
  * Live Builds Module
  * Handles real-time build progress updates via polling and SSE
+ * Uses SSEConnectionManager for robust connection handling
  */
 let liveBuildsState = {
     pollTimer: null,
     elapsedTimer: null,
-    eventSources: {},
+    sseConnections: {},  // SSEConnectionManager instances keyed by runId
     POLL_INTERVAL: 2000, // 2 seconds
     ELAPSED_INTERVAL: 1000
 };
@@ -515,9 +133,11 @@ function updateLiveBuildsUI(runs) {
 
     // Remove cards for runs no longer active
     document.querySelectorAll('.live-build-card').forEach(function(card) {
-        const runId = card.dataset.runId;
-        const stillActive = runs.some(function(r) { return r.id === runId; });
+        var runId = card.dataset.runId;
+        var stillActive = runs.some(function(r) { return r.id === runId; });
         if (!stillActive) {
+            // Clean up SSE connection before removing card
+            disconnectSSE(runId, card);
             card.classList.add('opacity-50');
             setTimeout(function() { card.remove(); }, 1000);
         }
@@ -607,50 +227,178 @@ function updateBuildCardProgress(card, run) {
     }
 }
 
+/**
+ * Connect to SSE for a specific run using SSEConnectionManager
+ * @param {string} runId - The run ID to connect to
+ * @param {HTMLElement} card - The build card element
+ */
 function connectSSE(runId, card) {
     // Close existing connection if any
-    if (liveBuildsState.eventSources[runId]) {
-        liveBuildsState.eventSources[runId].close();
+    if (liveBuildsState.sseConnections[runId]) {
+        liveBuildsState.sseConnections[runId].disconnect();
+        delete liveBuildsState.sseConnections[runId];
     }
 
-    const es = new EventSource('/api/runs/' + runId + '/events');
+    // Check if SSEConnectionManager is available
+    if (typeof SSEConnectionManager === 'undefined') {
+        console.warn('SSEConnectionManager not available, using fallback polling');
+        return;
+    }
 
-    es.onmessage = function(e) {
-        try {
-            const event = JSON.parse(e.data);
-            handleSSEEvent(card, event);
-        } catch (err) {
-            console.error('SSE parse error:', err);
+    var url = '/api/runs/' + runId + '/events';
+    var manager = new SSEConnectionManager(url, {
+        maxReconnectAttempts: 5,
+        heartbeatTimeout: 45000,
+        enablePollingFallback: true,
+        pollingInterval: 2000
+    });
+
+    // Set up polling fallback
+    manager.setPollingFallback(function() {
+        return fetchRunStatus(runId).then(function(run) {
+            if (run) {
+                updateBuildCardProgress(card, run);
+                // Clean up if terminal state
+                if (run.status === 'completed' || run.status === 'failed' || run.status === 'error') {
+                    disconnectSSE(runId, card);
+                }
+            }
+        });
+    });
+
+    // Handle connection state changes
+    manager.onStateChange(function(newState, oldState) {
+        updateCardConnectionState(card, newState, runId);
+    });
+
+    // Handle incoming messages
+    manager.onMessage(function(data, event) {
+        handleSSEEvent(card, data);
+
+        // Clean up on terminal events
+        if (data && (data.type === 'done' || data.status === 'completed' || data.status === 'failed' || data.status === 'error')) {
+            disconnectSSE(runId, card);
         }
-    };
+    });
 
-    es.onerror = function() {
-        console.log('SSE closed for run:', runId);
-        es.close();
-        delete liveBuildsState.eventSources[runId];
-    };
+    // Store connection and connect
+    liveBuildsState.sseConnections[runId] = manager;
+    manager.connect();
+}
 
-    liveBuildsState.eventSources[runId] = es;
+/**
+ * Disconnect SSE for a specific run and clean up
+ * @param {string} runId - The run ID to disconnect
+ * @param {HTMLElement} [card] - Optional card element to update
+ */
+function disconnectSSE(runId, card) {
+    var manager = liveBuildsState.sseConnections[runId];
+    if (manager) {
+        manager.disconnect();
+        delete liveBuildsState.sseConnections[runId];
+    }
+
+    // Clear connection state indicator
+    if (card) {
+        updateCardConnectionState(card, 'disconnected', runId);
+    }
+}
+
+/**
+ * Update card UI to reflect SSE connection state
+ * @param {HTMLElement} card - The build card element
+ * @param {string} state - The connection state
+ * @param {string} runId - The run ID (for logging)
+ */
+function updateCardConnectionState(card, state, runId) {
+    if (!card) return;
+
+    // Find or create connection indicator
+    var indicator = card.querySelector('.sse-connection-indicator');
+    if (!indicator) {
+        indicator = document.createElement('span');
+        indicator.className = 'sse-connection-indicator';
+        // Insert in header area
+        var header = card.querySelector('.flex.items-center.justify-between');
+        if (header) {
+            var statusContainer = header.querySelector('.flex.items-center.space-x-3');
+            if (statusContainer) {
+                statusContainer.insertBefore(indicator, statusContainer.firstChild);
+            }
+        }
+    }
+
+    // Update indicator based on state
+    var ConnectionState = SSEConnectionManager.ConnectionState;
+    switch (state) {
+        case ConnectionState.CONNECTING:
+            indicator.innerHTML = '<span class="inline-flex items-center text-xs text-gray-400" title="Connecting..."><svg class="animate-spin h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></span>';
+            indicator.style.display = 'inline-flex';
+            break;
+
+        case ConnectionState.CONNECTED:
+            indicator.innerHTML = '<span class="inline-flex items-center text-xs text-green-500" title="Live"><span class="relative flex h-2 w-2 mr-1"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span></span></span>';
+            indicator.style.display = 'inline-flex';
+            break;
+
+        case ConnectionState.RECONNECTING:
+            indicator.innerHTML = '<span class="inline-flex items-center text-xs text-yellow-500" title="Reconnecting..."><svg class="animate-spin h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg></span>';
+            indicator.style.display = 'inline-flex';
+            card.classList.add('sse-reconnecting');
+            break;
+
+        case ConnectionState.FAILED:
+            indicator.innerHTML = '<span class="inline-flex items-center text-xs text-orange-500" title="Using polling fallback"><svg class="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg></span>';
+            indicator.style.display = 'inline-flex';
+            card.classList.remove('sse-reconnecting');
+            break;
+
+        case ConnectionState.DISCONNECTED:
+        default:
+            indicator.style.display = 'none';
+            card.classList.remove('sse-reconnecting');
+            break;
+    }
+}
+
+/**
+ * Fetch run status for polling fallback
+ * @param {string} runId - The run ID to fetch
+ * @returns {Promise<Object|null>} The run data or null on error
+ */
+async function fetchRunStatus(runId) {
+    try {
+        var response = await fetch('/api/runs/' + encodeURIComponent(runId));
+        if (!response.ok) {
+            return null;
+        }
+        return await response.json();
+    } catch (error) {
+        console.debug('fetchRunStatus error:', error);
+        return null;
+    }
 }
 
 function handleSSEEvent(card, event) {
+    if (!event || !card) return;
+
     // Update progress
     if (event.progress !== undefined) {
-        const progressBar = card.querySelector('.progress-bar');
-        const progressPercent = card.querySelector('.progress-percent');
+        var progressBar = card.querySelector('.progress-bar');
+        var progressPercent = card.querySelector('.progress-percent');
         if (progressBar) progressBar.style.width = event.progress + '%';
         if (progressPercent) progressPercent.textContent = event.progress + '%';
     }
 
     // Update current step
     if (event.step) {
-        const stepEl = card.querySelector('.current-step');
+        var stepEl = card.querySelector('.current-step');
         if (stepEl) stepEl.textContent = event.step;
     }
 
     // Update status
     if (event.status) {
-        const badge = card.querySelector('.status-badge');
+        var badge = card.querySelector('.status-badge');
         if (badge) {
             badge.textContent = event.status;
             badge.className = 'status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + getStatusClasses(event.status);
@@ -658,13 +406,17 @@ function handleSSEEvent(card, event) {
         card.dataset.runStatus = event.status;
     }
 
-    // Handle completion
-    if (event.type === 'done') {
-        const runId = card.dataset.runId;
-        if (liveBuildsState.eventSources[runId]) {
-            liveBuildsState.eventSources[runId].close();
-            delete liveBuildsState.eventSources[runId];
-        }
+    // Handle completion or failure (terminal states)
+    var isTerminal = event.type === 'done' ||
+                     event.status === 'completed' ||
+                     event.status === 'failed' ||
+                     event.status === 'error';
+
+    if (isTerminal) {
+        var runId = card.dataset.runId;
+        // Note: disconnectSSE is called by the connectSSE message handler
+        // to ensure cleanup happens in one place
+
         // Fade out after completion
         setTimeout(function() {
             card.classList.add('opacity-50');
@@ -827,11 +579,17 @@ function cleanupLiveBuilds() {
     stopLivePolling();
     if (liveBuildsState.elapsedTimer) {
         clearInterval(liveBuildsState.elapsedTimer);
+        liveBuildsState.elapsedTimer = null;
     }
-    Object.keys(liveBuildsState.eventSources).forEach(function(runId) {
-        liveBuildsState.eventSources[runId].close();
+
+    // Disconnect all SSE connections using SSEConnectionManager
+    Object.keys(liveBuildsState.sseConnections).forEach(function(runId) {
+        var manager = liveBuildsState.sseConnections[runId];
+        if (manager && typeof manager.disconnect === 'function') {
+            manager.disconnect();
+        }
     });
-    liveBuildsState.eventSources = {};
+    liveBuildsState.sseConnections = {};
 }
 
 /**
@@ -1127,12 +885,8 @@ function cleanupStuckPlans() {
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', function() {
-    initDashboard();
-    initSyncRemote();
-    initSyncFileListToggle();
     initLiveBuilds();
     initStuckPlans();
-    fetchSyncStatus();
 });
 
 // Cleanup on page unload

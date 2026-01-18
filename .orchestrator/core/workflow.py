@@ -42,7 +42,7 @@ class Workflow(ABC):
     Supports cancellation via `cancel()` method and tracks total token usage.
     """
 
-    def __init__(self, name: str, output_dir: Path):
+    def __init__(self, name: str, output_dir: Optional[Path] = None):
         self.name = name
         self.output_dir = output_dir
         self.console = Console()
@@ -154,6 +154,8 @@ class Workflow(ABC):
 
     def save_output(self, filename: str, content: str) -> Path:
         """Save workflow output to a file."""
+        if self.output_dir is None:
+            raise ValueError("Cannot save output: output_dir is not configured")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         output_path = self.output_dir / filename
         output_path.write_text(content, encoding="utf-8")

@@ -229,30 +229,25 @@ class BuildingWorkflow(Workflow):
 
     Features:
     - Incremental building with progress tracking
-    - Resume from failure (state saved in specs/state/)
+    - Resume from failure (state saved in SQLite database)
     - Parallel step execution
-    - Automatic plan file organization
+    - Goal-oriented verification loop
     """
 
     def __init__(
         self,
         project_root: Path,
-        specs_dir: Optional[Path] = None,
         max_parallel: Optional[int] = None,
     ):
         self.project_root = project_root
         self._config = get_agent_config(project_root)
         self.max_parallel = max_parallel or self._config.parallel.max_sub_features
-        self.specs_dir = specs_dir or project_root / ".orchestrator" / "specs"
 
         # Database repositories
         self._plan_repo = get_plan_repository()
         self._build_state_repo = get_build_state_repository()
 
-        # Ensure directory structure (for legacy file-based operations)
-        self._ensure_specs_structure()
-
-        super().__init__(name="Smart Building Workflow", output_dir=self.specs_dir)
+        super().__init__(name="Smart Building Workflow")
 
         # Load all agents
         self._load_agents()
@@ -264,15 +259,6 @@ class BuildingWorkflow(Workflow):
         # Async test execution
         self._test_executor: Optional[ThreadPoolExecutor] = None
         self._test_futures: list[Future] = []
-
-    def _ensure_specs_structure(self):
-        """Create the specs directory structure."""
-        # Main plan directories
-        dirs = ["pending", "completed", "failed", "state"]
-        for d in dirs:
-            (self.specs_dir / d).mkdir(parents=True, exist_ok=True)
-        # Note: "in-progress" is no longer used - plans stay in pending during build
-        # State is tracked in specs/state/{plan_id}.state.json
 
     def _load_agents(self):
         """Load all agents needed for building."""

@@ -168,3 +168,191 @@ async def get_git_statistics() -> GitStatisticsResponse:
         last_commit_hash=last_commit_hash,
         last_commit_message=last_commit_message,
     )
+
+
+@router.get("/branches")
+async def list_local_branches():
+    """List local sync branches (branches starting with 'sync/').
+
+    Returns list of local branches that were created by the sync workflow,
+    along with their last commit info.
+    """
+    import subprocess
+
+    branches = []
+    try:
+        # Get all local branches
+        result = subprocess.run(
+            ["git", "branch", "--format=%(refname:short)|%(committerdate:iso8601)|%(subject)"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode == 0:
+            for line in result.stdout.strip().split("\n"):
+                if line and "|" in line:
+                    parts = line.split("|", 2)
+                    branch_name = parts[0].strip()
+                    # Only include sync/ branches
+                    if branch_name.startswith("sync/"):
+                        branches.append({
+                            "name": branch_name,
+                            "date": parts[1].strip() if len(parts) > 1 else "",
+                            "message": parts[2].strip() if len(parts) > 2 else "",
+                        })
+    except Exception as e:
+        return {"branches": [], "error": str(e)}
+
+    return {"branches": branches}
+
+
+@router.delete("/branches/{branch_name:path}")
+async def delete_local_branch(branch_name: str):
+    """Delete a local branch.
+
+    Args:
+        branch_name: Name of the branch to delete (must be a sync/ branch)
+    """
+    import subprocess
+
+    # Safety check: only allow deleting sync/ branches
+    if not branch_name.startswith("sync/"):
+        return {"success": False, "error": "Can only delete sync/ branches"}
+
+    try:
+        # Force delete the branch
+        result = subprocess.run(
+            ["git", "branch", "-D", branch_name],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode == 0:
+            return {"success": True, "message": f"Deleted branch {branch_name}"}
+        else:
+            return {"success": False, "error": result.stderr.strip()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/prs")
+async def list_open_prs():
+    """List open pull requests created by sync workflow.
+
+    Returns list of open PRs with their status and merge info.
+    """
+    import subprocess
+    import json as json_module
+
+    prs = []
+    try:
+        # Get open PRs from GitHub CLI
+        result = subprocess.run(
+            ["gh", "pr", "list", "--json", "number,title,state,url,headRefName,baseRefName,mergeable,isDraft"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            pr_data = json_module.loads(result.stdout)
+            for pr in pr_data:
+                # Only include PRs from sync/ branches
+                if pr.get("headRefName", "").startswith("sync/"):
+                    prs.append({
+                        "number": pr.get("number"),
+                        "title": pr.get("title", ""),
+                        "state": pr.get("state", "").lower(),
+                        "url": pr.get("url", ""),
+                        "head_branch": pr.get("headRefName", ""),
+                        "base_branch": pr.get("baseRefName", ""),
+                        "mergeable": pr.get("mergeable", "UNKNOWN"),
+                        "is_draft": pr.get("isDraft", False),
+                    })
+    except FileNotFoundError:
+        return {"prs": [], "error": "GitHub CLI not installed"}
+    except Exception as e:
+        return {"prs": [], "error": str(e)}
+
+    return {"prs": prs}
+
+
+@router.post("/prs/{pr_number}/merge")
+async def merge_pr(pr_number: int):
+    """Merge a pull request and delete its remote branch.
+
+    Args:
+        pr_number: The PR number to merge
+    """
+    import subprocess
+
+    try:
+        # Merge the PR with --merge flag and delete branch
+        result = subprocess.run(
+            ["gh", "pr", "merge", str(pr_number), "--merge", "--delete-branch"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if result.returncode == 0:
+            return {"success": True, "message": f"Merged PR #{pr_number}"}
+        else:
+            return {"success": False, "error": result.stderr.strip()}
+    except FileNotFoundError:
+        return {"success": False, "error": "GitHub CLI not installed"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+@router.post("/pull-latest")
+async def pull_latest():
+    """Pull latest changes from remote for the current branch.
+
+    Fetches and pulls the latest changes from origin for the current branch.
+    """
+    import subprocess
+
+    try:
+        # Get current branch
+        branch_result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if branch_result.returncode != 0:
+            return {"success": False, "error": "Could not determine current branch"}
+
+        current_branch = branch_result.stdout.strip()
+
+        # Fetch first
+        fetch_result = subprocess.run(
+            ["git", "fetch", "origin"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+
+        # Pull changes
+        pull_result = subprocess.run(
+            ["git", "pull", "origin", current_branch],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if pull_result.returncode == 0:
+            return {
+                "success": True,
+                "message": f"Pulled latest from origin/{current_branch}",
+                "output": pull_result.stdout.strip(),
+            }
+        else:
+            return {"success": False, "error": pull_result.stderr.strip()}
+    except Exception as e:
+        return {"success": False, "error": str(e)}

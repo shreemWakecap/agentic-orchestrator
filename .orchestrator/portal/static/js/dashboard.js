@@ -64,10 +64,15 @@ function initSyncRemote() {
         button.disabled = true;
         button.textContent = 'Syncing...';
 
+        // Get auto-merge setting
+        const autoMergeCheckbox = document.getElementById('sync-auto-merge');
+        const autoMerge = autoMergeCheckbox ? autoMergeCheckbox.checked : true;
+
         try {
             const response = await fetch('/api/workflows/sync-remote', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ auto_merge: autoMerge })
             });
 
             if (!response.ok) {
@@ -100,6 +105,173 @@ function initSyncRemote() {
                 }, 500);
             });
         });
+    }
+
+    // Setup pull latest button
+    const pullLatestBtn = document.getElementById('pull-latest-btn');
+    if (pullLatestBtn) {
+        pullLatestBtn.addEventListener('click', async function() {
+            pullLatestBtn.disabled = true;
+            const icon = pullLatestBtn.querySelector('svg');
+            if (icon) icon.classList.add('animate-bounce');
+
+            try {
+                const response = await fetch('/api/workflows/pull-latest', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // Refresh sync status after pull
+                    fetchSyncStatus();
+                    fetchBranchesAndPRs();
+                } else {
+                    alert('Pull failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error pulling latest:', error);
+                alert('Failed to pull latest: ' + error.message);
+            } finally {
+                pullLatestBtn.disabled = false;
+                if (icon) icon.classList.remove('animate-bounce');
+            }
+        });
+    }
+
+    // Initial fetch of branches and PRs
+    fetchBranchesAndPRs();
+}
+
+/**
+ * Fetch and display local sync branches and open PRs
+ */
+async function fetchBranchesAndPRs() {
+    // Fetch branches
+    try {
+        const branchResponse = await fetch('/api/workflows/branches');
+        const branchData = await branchResponse.json();
+        updateBranchList(branchData.branches || []);
+    } catch (error) {
+        console.error('Error fetching branches:', error);
+    }
+
+    // Fetch PRs
+    try {
+        const prResponse = await fetch('/api/workflows/prs');
+        const prData = await prResponse.json();
+        updatePRList(prData.prs || []);
+    } catch (error) {
+        console.error('Error fetching PRs:', error);
+    }
+}
+
+function updateBranchList(branches) {
+    const container = document.getElementById('sync-local-branches');
+    const listEl = document.getElementById('sync-branch-list');
+    const countEl = document.getElementById('sync-branch-count');
+
+    if (!container || !listEl) return;
+
+    if (branches.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    if (countEl) countEl.textContent = branches.length;
+
+    var html = '';
+    branches.forEach(function(branch) {
+        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30 dark:hover:bg-tertiary/30">';
+        html += '<div class="min-w-0 flex-1">';
+        html += '<div class="text-sm font-mono text-primary dark:text-primary truncate">' + escapeHtml(branch.name) + '</div>';
+        html += '<div class="text-xs text-tertiary dark:text-tertiary truncate">' + escapeHtml(branch.message || '') + '</div>';
+        html += '</div>';
+        html += '<button type="button" class="ml-3 btn btn-xs text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20" onclick="deleteBranch(\'' + escapeHtml(branch.name) + '\')" title="Delete branch">';
+        html += '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
+        html += '</button>';
+        html += '</li>';
+    });
+    listEl.innerHTML = html;
+}
+
+function updatePRList(prs) {
+    const container = document.getElementById('sync-open-prs');
+    const listEl = document.getElementById('sync-pr-list');
+    const countEl = document.getElementById('sync-pr-count');
+
+    if (!container || !listEl) return;
+
+    if (prs.length === 0) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    if (countEl) countEl.textContent = prs.length;
+
+    var html = '';
+    prs.forEach(function(pr) {
+        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30 dark:hover:bg-tertiary/30">';
+        html += '<div class="min-w-0 flex-1">';
+        html += '<a href="' + escapeHtml(pr.url) + '" target="_blank" class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">';
+        html += '#' + pr.number + ' ' + escapeHtml(pr.title);
+        html += '</a>';
+        html += '<div class="text-xs text-tertiary dark:text-tertiary">' + escapeHtml(pr.head_branch) + ' → ' + escapeHtml(pr.base_branch) + '</div>';
+        html += '</div>';
+        html += '<button type="button" class="ml-3 btn btn-xs btn-primary" onclick="mergePR(' + pr.number + ')" title="Merge PR">';
+        html += '<svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>';
+        html += 'Merge';
+        html += '</button>';
+        html += '</li>';
+    });
+    listEl.innerHTML = html;
+}
+
+async function deleteBranch(branchName) {
+    if (!confirm('Delete branch "' + branchName + '"? This cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/workflows/branches/' + encodeURIComponent(branchName), {
+            method: 'DELETE'
+        });
+        const data = await response.json();
+        if (data.success) {
+            fetchBranchesAndPRs();
+        } else {
+            alert('Failed to delete branch: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error deleting branch:', error);
+        alert('Failed to delete branch: ' + error.message);
+    }
+}
+
+async function mergePR(prNumber) {
+    if (!confirm('Merge PR #' + prNumber + '? This will merge and delete the remote branch.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/workflows/prs/' + prNumber + '/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.success) {
+            // Pull latest after merge
+            await fetch('/api/workflows/pull-latest', { method: 'POST' });
+            fetchBranchesAndPRs();
+            fetchSyncStatus();
+        } else {
+            alert('Failed to merge PR: ' + (data.error || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Error merging PR:', error);
+        alert('Failed to merge PR: ' + error.message);
     }
 }
 

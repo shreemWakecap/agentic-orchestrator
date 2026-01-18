@@ -2,10 +2,11 @@
 import uuid
 from fastapi import APIRouter, Depends
 
+from core.exceptions import GitRemoteNotConfiguredError
 from db import RunRepository
 from portal.dependencies import get_run_repo
 from portal.schemas.requests import PlanRequest, BuildRequest, SyncRemoteRequest, ImproveRequestRequest
-from portal.schemas.responses import WorkflowStartResponse, SyncStatusResponse, GitStatisticsResponse, ImproveRequestResponse
+from portal.schemas.responses import WorkflowStartResponse, SyncStatusResponse, GitStatisticsResponse, ImproveRequestResponse, RemoteConfigResponse
 from portal.services.task_manager import TaskManager, get_task_manager
 
 router = APIRouter(prefix="/api/workflows", tags=["workflows"])
@@ -76,7 +77,20 @@ async def sync_remote(
     request: SyncRemoteRequest = None,
 ) -> WorkflowStartResponse:
     """Start a sync-remote workflow to commit changes and create PR."""
+    from portal.services.git_service import GitStatusService
     from portal.services.workflow_runner import run_syncing_workflow_sync
+
+    # Validate git remote is configured before starting workflow
+    git_service = GitStatusService()
+    remote_config = git_service.validate_remote_configuration()
+    if not remote_config.get("is_configured", False):
+        # Get configuration help from git service for user-friendly error
+        config_help = git_service.get_remote_configuration_help("origin")
+        reason = remote_config.get("error") or remote_config.get("format_error")
+        error = GitRemoteNotConfiguredError(remote_name="origin", reason=reason)
+        # Attach configuration help to the exception details
+        error.details["configuration_help"] = config_help
+        raise error
 
     run_id = str(uuid.uuid4())[:8]
     auto_merge = request.auto_merge if request else True
@@ -136,6 +150,77 @@ async def get_sync_status() -> SyncStatusResponse:
         diff_summary=status.get("diff_summary", ""),
         staged_count=staged_count,
         unstaged_count=unstaged_count,
+    )
+
+
+@router.get("/remote-config", response_model=RemoteConfigResponse)
+async def get_remote_config() -> RemoteConfigResponse:
+    """Get remote repository configuration status.
+
+    Returns information about whether a git remote is configured,
+    allowing frontend to check configuration before attempting sync.
+    """
+    from portal.services.git_service import GitStatusService
+
+    git_service = GitStatusService()
+    config = git_service.validate_remote_configuration()
+
+    is_configured = config.get("is_configured", False)
+    url_valid = config.get("url_valid", False)
+    format_error = config.get("format_error")
+    configuration_help = None
+    setup_instructions = []
+
+    # Get setup instructions from git service help
+    help_info = git_service.get_remote_configuration_help(config.get("remote_name", "origin"))
+
+    if not is_configured or not url_valid:
+        error = config.get("error", "")
+        if "Not a git repository" in error:
+            configuration_help = (
+                "This directory is not a git repository. To initialize git and add a remote:\n\n"
+                "  git init\n"
+                "  git remote add origin <repository-url>\n\n"
+                "Replace <repository-url> with your repository URL, for example:\n"
+                "  - HTTPS: https://github.com/username/repo.git\n"
+                "  - SSH: git@github.com:username/repo.git"
+            )
+            setup_instructions = [
+                "git init",
+                "git remote add origin <repository-url>",
+                "git remote -v  # Verify the remote was added",
+            ]
+        else:
+            configuration_help = (
+                "No git remote is configured. To add a remote repository:\n\n"
+                "  git remote add origin <repository-url>\n\n"
+                "Replace <repository-url> with your repository URL, for example:\n"
+                "  - HTTPS: https://github.com/username/repo.git\n"
+                "  - SSH: git@github.com:username/repo.git\n\n"
+                "To verify the remote was added:\n"
+                "  git remote -v"
+            )
+            # Build setup_instructions from help_info
+            if help_info.get("instructions"):
+                # Use the "Add a new remote" instructions
+                for section in help_info["instructions"]:
+                    if section.get("title") == "Add a new remote":
+                        setup_instructions = section.get("steps", [])
+                        break
+                # If no specific section found, use first instruction set
+                if not setup_instructions and help_info["instructions"]:
+                    setup_instructions = help_info["instructions"][0].get("steps", [])
+
+    return RemoteConfigResponse(
+        is_configured=is_configured,
+        remote_name=config.get("remote_name", "origin"),
+        fetch_url=config.get("fetch_url"),
+        push_url=config.get("push_url"),
+        url_valid=url_valid,
+        format_error=format_error,
+        error=config.get("error"),
+        configuration_help=configuration_help,
+        setup_instructions=setup_instructions,
     )
 
 

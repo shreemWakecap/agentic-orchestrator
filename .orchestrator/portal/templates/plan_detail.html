@@ -595,12 +595,12 @@
                 <span id="plan-status-badge" class="status-badge
                     {% if plan.state == 'completed' %}status-completed
                     {% elif plan.state == 'pending' %}status-pending
-                    {% elif plan.state == 'in-progress' %}status-in-progress
+                    {% elif plan.state in ['in-progress', 'in_progress', 'building'] %}status-in-progress
                     {% elif plan.state == 'paused' %}status-paused
                     {% elif plan.state == 'failed' %}status-failed
                     {% else %}bg-gray-100 text-gray-800{% endif %}">
                     <span class="flex items-center">
-                        {% if plan.state == 'in-progress' %}
+                        {% if plan.state in ['in-progress', 'in_progress', 'building'] %}
                         <span class="w-2 h-2 bg-blue-500 rounded-full mr-2 animate-pulse"></span>
                         {% elif plan.state == 'completed' %}
                         <svg class="w-3.5 h-3.5 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
@@ -637,7 +637,7 @@
                         </svg>
                         Start Build
                     </button>
-                    {% elif plan.state == 'paused' or plan.state == 'failed' %}
+                    {% elif plan.state in ['paused', 'failed', 'building', 'in_progress'] %}
                     <button id="resume-build-btn" onclick="PlanDetail.resumeBuild('{{ plan.id }}')"
                             class="btn-warning inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
                         <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -645,7 +645,7 @@
                         </svg>
                         Resume Build
                     </button>
-                    {% elif plan.state == 'in-progress' %}
+                    {% elif plan.state in ['in-progress', 'in_progress', 'building'] %}
                     <button id="pause-build-btn" onclick="PlanDetail.pauseBuild()"
                             class="btn-warning inline-flex items-center px-5 py-2.5 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500">
                         <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -907,33 +907,28 @@
 
 {% block scripts %}
 <script src="/static/js/toast.js"></script>
-<script src="/static/js/build-progress.js"></script>
 <script src="/static/js/plan-recovery.js"></script>
 <script src="/static/js/plan-detail.js"></script>
 <script>
-    // Initialize plan recovery module for stuck/failed plans
+    // Initialize plan recovery module
+    // Note: Stuck detection is now server-side via /api/plans/{id}/build-progress
+    // plan-detail.js polls this endpoint and calls showRecoveryOptions() when is_stuck=true
     document.addEventListener('DOMContentLoaded', function() {
         if (window.PLAN_DATA && window.PlanRecovery) {
-            // Check if plan is in a recoverable state
-            var recoverableStates = ['in-progress', 'building', 'failed', 'stuck', 'paused'];
-            if (recoverableStates.includes(window.PLAN_DATA.state)) {
-                // Initialize recovery module
-                PlanRecovery.init(window.PLAN_DATA.id, {
-                    lastUpdate: window.PLAN_DATA.lastUpdate
+            // Initialize recovery module with plan ID
+            PlanRecovery.init(window.PLAN_DATA.id);
+
+            // Show recovery options immediately for failed plans
+            if (window.PLAN_DATA.state === 'failed') {
+                PlanRecovery.showRecoveryOptions({
+                    isStuck: false,
+                    lastError: window.PLAN_DATA.errorMessage,
+                    canResume: true
                 });
-
-                // Show recovery options automatically for failed/stuck plans
-                if (['failed', 'stuck'].includes(window.PLAN_DATA.state)) {
-                    PlanRecovery.showRecoveryOptions();
-                }
-
-                // For in-progress plans, check if stuck (no update for 5+ minutes)
-                if (['in-progress', 'building'].includes(window.PLAN_DATA.state)) {
-                    if (PlanRecovery.isPlanStuck()) {
-                        PlanRecovery.showRecoveryOptions();
-                    }
-                }
             }
+
+            // For in-progress/building plans, plan-detail.js polling will
+            // call showRecoveryOptions() when server reports is_stuck=true
         }
     });
 </script>

@@ -5,8 +5,11 @@
  * - Show recovery options UI with status indicator
  * - Resume plan from current step
  * - Restart plan from beginning
- * - Display elapsed time since last update
  * - Confirmation dialogs for destructive actions
+ *
+ * NOTE: Stuck detection is now SERVER-SIDE. The server returns is_stuck and
+ * minutes_since_update via the /api/plans/{id}/build-progress endpoint.
+ * plan-detail.js polls this endpoint and calls showRecoveryOptions() when needed.
  *
  * Dependencies:
  * - Toast (toast.js) - For notifications
@@ -19,13 +22,7 @@
 const PlanRecovery = (function() {
     'use strict';
 
-    // Configuration
-    const STUCK_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes without update = stuck
-    const UPDATE_INTERVAL_MS = 1000; // Update elapsed time every second
-
     // State
-    let updateInterval = null;
-    let lastUpdateTime = null;
     let currentPlanId = null;
     let resumeShortcutId = null;
 
@@ -48,25 +45,14 @@ const PlanRecovery = (function() {
     /**
      * Initialize the module
      * @param {string} planId - The plan identifier
-     * @param {Object} options - Configuration options
      */
-    function init(planId, options) {
-        options = options || {};
+    function init(planId) {
         currentPlanId = planId;
-
         cacheElements();
 
-        // Get last update time from plan data
-        if (window.PLAN_DATA && window.PLAN_DATA.lastUpdate) {
-            lastUpdateTime = new Date(window.PLAN_DATA.lastUpdate);
-        } else if (options.lastUpdate) {
-            lastUpdateTime = new Date(options.lastUpdate);
-        }
-
-        // Check if plan is in a recoverable state
-        if (isPlanRecoverable()) {
-            showRecoveryOptions();
-        }
+        // Note: We no longer check isPlanStuck() on init
+        // The server will tell us via the build-progress endpoint
+        // plan-detail.js will call showRecoveryOptions() when needed
     }
 
     /**
@@ -81,22 +67,15 @@ const PlanRecovery = (function() {
     }
 
     /**
-     * Check if the plan appears to be stuck
-     * @returns {boolean} True if plan seems stuck
+     * Show recovery options - now driven by server data
+     * @param {Object} serverData - Data from build-progress endpoint
+     * @param {boolean} serverData.isStuck - Whether server thinks build is stuck
+     * @param {number} serverData.minutesSinceUpdate - Minutes since last update
+     * @param {boolean} serverData.canResume - Whether resume is available
+     * @param {string} serverData.lastError - Last error message
      */
-    function isPlanStuck() {
-        if (!lastUpdateTime) return false;
-
-        const elapsed = Date.now() - lastUpdateTime.getTime();
-        return elapsed > STUCK_THRESHOLD_MS;
-    }
-
-    /**
-     * Show recovery options UI
-     * @param {Object} options - Display options
-     */
-    function showRecoveryOptions(options) {
-        options = options || {};
+    function showRecoveryOptions(serverData) {
+        serverData = serverData || {};
 
         // Create recovery UI if it doesn't exist
         if (!elements.recoverySection) {
@@ -105,21 +84,35 @@ const PlanRecovery = (function() {
         }
 
         if (!elements.recoverySection) {
-            console.error('Failed to create recovery UI');
+            console.warn('[PlanRecovery] Could not find or create recovery section');
             return;
         }
 
-        // Show the section
-        elements.recoverySection.classList.remove('hidden');
-
-        // Update status indicator
-        updateStatusIndicator();
+        // Update status indicator based on server data
+        if (serverData.isStuck) {
+            updateStatusIndicatorFromServer('stuck', serverData.minutesSinceUpdate);
+        } else if (window.PLAN_DATA && window.PLAN_DATA.state === 'failed') {
+            updateStatusIndicatorFromServer('failed', null, serverData.lastError);
+        } else {
+            updateStatusIndicatorFromServer('recoverable');
+        }
 
         // Update last step info
         updateLastStepInfo();
 
-        // Start elapsed time updates
-        startElapsedTimeUpdates();
+        // Enable/disable resume button based on server data
+        if (elements.resumeBtn) {
+            const canResume = serverData.canResume !== false; // default to true if not specified
+            elements.resumeBtn.disabled = !canResume;
+            if (!canResume) {
+                elements.resumeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                elements.resumeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Show the section
+        elements.recoverySection.classList.remove('hidden');
 
         // Set up event listeners
         setupEventListeners();
@@ -184,28 +177,44 @@ const PlanRecovery = (function() {
     }
 
     /**
-     * Update the status indicator based on plan state
+     * Update status indicator based on server-provided data
+     * @param {string} status - 'stuck', 'failed', or 'recoverable'
+     * @param {number} minutesSinceUpdate - Optional minutes since update (from server)
+     * @param {string} errorMessage - Optional error message
      */
-    function updateStatusIndicator() {
+    function updateStatusIndicatorFromServer(status, minutesSinceUpdate, errorMessage) {
         if (!elements.recoveryIndicator || !elements.recoveryStatus) return;
-
-        const isStuck = isPlanStuck();
-        const state = window.PLAN_DATA ? window.PLAN_DATA.state : 'unknown';
 
         let indicatorClass, iconHtml, statusText, sectionClass;
 
-        if (state === 'failed') {
+        if (status === 'failed') {
             indicatorClass = 'bg-red-100';
             sectionClass = 'bg-red-50 border-red-200';
             iconHtml = '<svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>';
             statusText = 'Build Failed';
             elements.recoveryStatus.className = 'text-lg font-semibold text-red-800';
-        } else if (isStuck) {
+
+            // Show error message if available
+            if (elements.elapsedTime && errorMessage) {
+                elements.elapsedTime.textContent = errorMessage;
+            }
+        } else if (status === 'stuck') {
             indicatorClass = 'bg-orange-100';
             sectionClass = 'bg-orange-50 border-orange-200';
             iconHtml = '<svg class="w-6 h-6 text-orange-600 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
             statusText = 'Plan Appears Stuck';
             elements.recoveryStatus.className = 'text-lg font-semibold text-orange-800';
+
+            // Show elapsed time from server data
+            if (elements.elapsedTime && minutesSinceUpdate !== undefined) {
+                const mins = Math.round(minutesSinceUpdate);
+                if (mins < 60) {
+                    elements.elapsedTime.textContent = 'No updates for ' + mins + ' minute' + (mins !== 1 ? 's' : '');
+                } else {
+                    const hours = Math.floor(mins / 60);
+                    elements.elapsedTime.textContent = 'No updates for ' + hours + ' hour' + (hours !== 1 ? 's' : '');
+                }
+            }
         } else {
             indicatorClass = 'bg-yellow-100';
             sectionClass = 'bg-yellow-50 border-yellow-200';
@@ -262,74 +271,6 @@ const PlanRecovery = (function() {
         }
 
         elements.lastStep.textContent = stepInfo;
-    }
-
-    /**
-     * Start updating elapsed time display
-     */
-    function startElapsedTimeUpdates() {
-        // Clear any existing interval
-        stopElapsedTimeUpdates();
-
-        // Update immediately
-        updateElapsedTime();
-
-        // Then update every second
-        updateInterval = setInterval(updateElapsedTime, UPDATE_INTERVAL_MS);
-    }
-
-    /**
-     * Stop updating elapsed time display
-     */
-    function stopElapsedTimeUpdates() {
-        if (updateInterval) {
-            clearInterval(updateInterval);
-            updateInterval = null;
-        }
-    }
-
-    /**
-     * Update the elapsed time display
-     */
-    function updateElapsedTime() {
-        if (!elements.elapsedTime || !lastUpdateTime) {
-            if (elements.elapsedTime) {
-                elements.elapsedTime.textContent = 'Last update: unknown';
-            }
-            return;
-        }
-
-        const elapsed = Date.now() - lastUpdateTime.getTime();
-        const formattedTime = formatElapsedTime(elapsed);
-
-        elements.elapsedTime.textContent = 'Last update: ' + formattedTime + ' ago';
-
-        // Update status indicator if plan becomes stuck
-        if (isPlanStuck()) {
-            updateStatusIndicator();
-        }
-    }
-
-    /**
-     * Format elapsed time in human-readable format
-     * @param {number} ms - Elapsed time in milliseconds
-     * @returns {string} Formatted time string
-     */
-    function formatElapsedTime(ms) {
-        const seconds = Math.floor(ms / 1000);
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-
-        if (days > 0) {
-            return days + ' day' + (days > 1 ? 's' : '') + ', ' + (hours % 24) + 'h';
-        } else if (hours > 0) {
-            return hours + 'h ' + (minutes % 60) + 'm';
-        } else if (minutes > 0) {
-            return minutes + 'm ' + (seconds % 60) + 's';
-        } else {
-            return seconds + 's';
-        }
     }
 
     /**
@@ -463,9 +404,6 @@ const PlanRecovery = (function() {
             // Hide recovery options
             hideRecoveryOptions();
 
-            // Stop elapsed time updates
-            stopElapsedTimeUpdates();
-
             // Trigger page refresh or event for UI update
             if (typeof PlanDetail !== 'undefined' && data.run_id) {
                 window.location.reload();
@@ -550,9 +488,6 @@ const PlanRecovery = (function() {
             // Hide recovery options
             hideRecoveryOptions();
 
-            // Stop elapsed time updates
-            stopElapsedTimeUpdates();
-
             // Refresh the page to show new build progress
             window.location.reload();
 
@@ -572,7 +507,6 @@ const PlanRecovery = (function() {
         if (elements.recoverySection) {
             elements.recoverySection.classList.add('hidden');
         }
-        stopElapsedTimeUpdates();
         unregisterResumeShortcut();
     }
 
@@ -628,13 +562,11 @@ const PlanRecovery = (function() {
      * Clean up module resources
      */
     function destroy() {
-        stopElapsedTimeUpdates();
         unregisterResumeShortcut();
         if (elements.recoverySection) {
             elements.recoverySection.remove();
         }
         currentPlanId = null;
-        lastUpdateTime = null;
     }
 
     // Public API
@@ -644,15 +576,7 @@ const PlanRecovery = (function() {
         hideRecoveryOptions: hideRecoveryOptions,
         resumePlan: resumePlan,
         restartPlan: restartPlan,
-        isPlanStuck: isPlanStuck,
         isPlanRecoverable: isPlanRecoverable,
-        setLastUpdateTime: function(time) {
-            lastUpdateTime = time instanceof Date ? time : new Date(time);
-            updateElapsedTime();
-        },
-        getElapsedTime: function() {
-            return lastUpdateTime ? Date.now() - lastUpdateTime.getTime() : null;
-        },
         destroy: destroy
     };
 })();

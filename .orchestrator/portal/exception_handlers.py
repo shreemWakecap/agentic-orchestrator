@@ -20,6 +20,7 @@ from core.exceptions import (
     BuildStateError,
     DatabaseError,
     RecordNotFoundError,
+    GitRemoteNotConfiguredError,
 )
 
 logger = logging.getLogger(__name__)
@@ -164,6 +165,34 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "error": "invalid_build_state",
                 "message": exc.message,
                 "details": exc.details,
+            },
+        )
+
+    @app.exception_handler(GitRemoteNotConfiguredError)
+    async def git_remote_not_configured_handler(
+        request: Request, exc: GitRemoteNotConfiguredError
+    ) -> JSONResponse:
+        """Handle git remote not configured errors."""
+        logger.warning(f"Git remote not configured: {exc.remote_name}")
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "git_remote_not_configured",
+                "message": exc.message,
+                "details": exc.details,
+                "configuration_help": (
+                    f"The git remote '{exc.remote_name}' is not configured or is invalid. "
+                    f"To fix this:\n\n"
+                    f"1. Add a new remote:\n"
+                    f"   git remote add {exc.remote_name} <repository-url>\n\n"
+                    f"2. Or update an existing remote:\n"
+                    f"   git remote set-url {exc.remote_name} <repository-url>\n\n"
+                    f"3. Verify the remote is configured correctly:\n"
+                    f"   git remote -v\n\n"
+                    f"Example repository URLs:\n"
+                    f"  - HTTPS: https://github.com/username/repo.git\n"
+                    f"  - SSH: git@github.com:username/repo.git"
+                ),
             },
         )
 

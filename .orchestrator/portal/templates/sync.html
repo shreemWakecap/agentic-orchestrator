@@ -111,6 +111,113 @@
             </div>
         </div>
 
+        <!-- Error Banner (hidden initially, shown when sync operations fail) -->
+        <div id="sync-error-banner" class="hidden glass rounded-xl p-4 mb-5 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <div class="ml-3 flex-1">
+                    <h3 class="text-sm font-medium text-red-800 dark:text-red-300">Sync Failed</h3>
+                    <p id="sync-error-message" class="mt-1 text-sm text-red-700 dark:text-red-400">An error occurred during the sync operation.</p>
+                </div>
+                <div class="ml-4 flex-shrink-0 flex items-center gap-2">
+                    <button type="button" id="sync-error-retry-btn" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors">
+                        <svg class="h-3.5 w-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Retry
+                    </button>
+                    <button type="button" id="sync-error-dismiss-btn" class="inline-flex items-center p-1.5 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 focus:outline-none transition-colors" title="Dismiss">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Remote Not Configured Banner (hidden initially, shown when git remote is missing) -->
+        <div id="sync-remote-not-configured" class="hidden glass rounded-xl p-6 mb-5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4 flex-1">
+                    <h3 class="text-lg font-semibold text-amber-800 dark:text-amber-300 flex items-center">
+                        <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        Git Remote Not Configured
+                    </h3>
+                    <p id="sync-remote-error-message" class="mt-2 text-sm text-amber-700 dark:text-amber-400">
+                        No remote repository is configured for this project. You need to add a remote origin to sync changes.
+                    </p>
+
+                    <!-- Configuration Steps -->
+                    <div class="mt-4 space-y-3">
+                        <p class="text-sm font-medium text-amber-800 dark:text-amber-300">To configure a remote repository:</p>
+
+                        <!-- Step 1 -->
+                        <div class="glass rounded-lg p-3 bg-white/50 dark:bg-gray-800/50">
+                            <p class="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">Step 1: Add a remote origin</p>
+                            <div class="flex items-center gap-2">
+                                <code id="sync-remote-command" class="flex-1 block text-xs font-mono bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 px-3 py-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">git remote add origin https://github.com/username/repository.git</code>
+                                <button type="button" id="copy-remote-command-btn" class="flex-shrink-0 inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md text-amber-700 bg-amber-100 hover:bg-amber-200 dark:text-amber-400 dark:bg-amber-900/50 dark:hover:bg-amber-900/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors" title="Copy command">
+                                    <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Step 2 -->
+                        <div class="glass rounded-lg p-3 bg-white/50 dark:bg-gray-800/50">
+                            <p class="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">Step 2: Verify the configuration</p>
+                            <div class="flex items-center gap-2">
+                                <code class="flex-1 block text-xs font-mono bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 px-3 py-2 rounded border border-gray-200 dark:border-gray-700">git remote -v</code>
+                                <button type="button" class="copy-command-btn flex-shrink-0 inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md text-amber-700 bg-amber-100 hover:bg-amber-200 dark:text-amber-400 dark:bg-amber-900/50 dark:hover:bg-amber-900/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors" data-command="git remote -v" title="Copy command">
+                                    <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Copy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Help Links -->
+                    <div class="mt-4 flex items-center gap-4 text-xs">
+                        <a href="https://docs.github.com/en/get-started/getting-started-with-git/managing-remote-repositories" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 transition-colors">
+                            <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                            </svg>
+                            GitHub Documentation
+                        </a>
+                        <a href="https://git-scm.com/book/en/v2/Git-Basics-Working-with-Remotes" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 transition-colors">
+                            <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path>
+                            </svg>
+                            Git Remote Guide
+                        </a>
+                    </div>
+                </div>
+                <div class="ml-4 flex-shrink-0">
+                    <button type="button" id="sync-remote-config-dismiss-btn" class="inline-flex items-center p-1.5 text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 focus:outline-none transition-colors" title="Dismiss">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- No Changes Message (hidden initially) -->
         <div id="sync-no-changes" class="hidden glass rounded-xl p-6 mb-5 text-center">
             <svg class="h-10 w-10 mx-auto mb-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -279,8 +386,14 @@
      * Initialize the sync page
      */
     function init() {
+        // Check remote configuration first (shows banner immediately if not configured)
+        checkRemoteOnLoad();
+
         loadSyncStatus();
         setupEventListeners();
+        setupErrorBannerListeners();
+        setupRemoteConfigBannerListeners();
+        setupCopyCommandListeners();
     }
 
     /**
@@ -288,14 +401,56 @@
      */
     async function loadSyncStatus() {
         try {
-            const response = await fetch('/api/sync/status');
+            const response = await fetch('/api/workflows/sync-status');
             if (!response.ok) {
-                throw new Error('Failed to load sync status');
+                // Handle different HTTP error status codes
+                const errorData = await response.json().catch(() => ({}));
+                const errorMsg = errorData.detail || 'Request failed';
+
+                if (response.status === 404) {
+                    showSyncError('Sync endpoint not found', {
+                        statusCode: 404,
+                        message: 'not found',
+                        retryContext: { action: 'loadSyncStatus' }
+                    });
+                    throw new Error('Sync endpoint not found (404)');
+                } else if (response.status >= 500) {
+                    showSyncError('Server error while loading sync status', {
+                        statusCode: response.status,
+                        message: 'server error',
+                        retryContext: { action: 'loadSyncStatus' }
+                    });
+                    throw new Error('Server error (' + response.status + ')');
+                } else {
+                    // Other HTTP errors (4xx except 404)
+                    showSyncError(errorMsg, {
+                        statusCode: response.status,
+                        message: errorMsg,
+                        retryContext: { action: 'loadSyncStatus' }
+                    });
+                    throw new Error(errorMsg);
+                }
             }
             const data = await response.json();
+            // Hide any previous error banner on success
+            hideSyncError();
             updateSyncUI(data);
         } catch (error) {
-            console.error('Error loading sync status:', error);
+            // Check if this is a network error (fetch failed before response)
+            if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch'))) {
+                showSyncError('Unable to connect to server', {
+                    isNetworkError: true,
+                    message: error.message,
+                    retryContext: { action: 'loadSyncStatus' }
+                });
+            } else if (!error.message.includes('404') && !error.message.includes('Server error') && !error.message.includes('Request failed')) {
+                // Generic error that wasn't already handled above
+                showSyncError('Failed to load sync status', {
+                    message: error.message,
+                    retryContext: { action: 'loadSyncStatus' }
+                });
+            }
+
             showError('Failed to load sync status');
         }
     }
@@ -504,11 +659,263 @@
     }
 
     /**
+     * Check if the API server is reachable
+     * @returns {Promise<boolean>} True if server is reachable, false otherwise
+     */
+    async function checkConnectivity() {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+            const response = await fetch('/api/health', {
+                method: 'GET',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (!response.ok) {
+                Toast.show('Cannot connect to server: Server responded with status ' + response.status, 'error', { duration: 5000 });
+                return false;
+            }
+
+            const data = await response.json();
+            if (data.status !== 'healthy' && data.status !== 'ok') {
+                Toast.show('Cannot connect to server: Server is not healthy', 'error', { duration: 5000 });
+                return false;
+            }
+
+            return true;
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                Toast.show('Cannot connect to server: Connection timed out. Please check if the server is running.', 'error', { duration: 6000 });
+            } else {
+                Toast.show('Cannot connect to server: ' + (error.message || 'Network error'), 'error', { duration: 6000 });
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Check if remote repository is configured
+     * @returns {Promise<{configured: boolean, urlValid: boolean, config: Object|null, error: string|null, formatError: string|null}>}
+     */
+    async function checkRemoteConfig() {
+        try {
+            const response = await fetch('/api/workflows/remote-config');
+            if (!response.ok) {
+                if (response.status === 404) {
+                    return { configured: false, urlValid: false, config: null, error: 'Remote config endpoint not found', formatError: null };
+                }
+                const errorData = await response.json().catch(() => ({}));
+                return { configured: false, urlValid: false, config: null, error: errorData.detail || 'Failed to check remote config', formatError: null };
+            }
+            const config = await response.json();
+
+            // Check is_configured and url_valid from API response
+            const isConfigured = config && config.is_configured === true;
+            const urlValid = config && config.url_valid === true;
+            const formatError = config.format_error || null;
+
+            // Remote is fully configured only if both is_configured and url_valid are true
+            const fullyConfigured = isConfigured && urlValid;
+
+            // Build error message based on validation results
+            let errorMsg = null;
+            if (!isConfigured) {
+                errorMsg = config.error || 'Git remote not configured. Run: git remote add origin <repository-url>';
+            } else if (!urlValid) {
+                errorMsg = formatError || 'Remote URL format is invalid';
+            }
+
+            return {
+                configured: fullyConfigured,
+                urlValid: urlValid,
+                config: config,
+                error: errorMsg,
+                formatError: formatError
+            };
+        } catch (error) {
+            return { configured: false, urlValid: false, config: null, error: error.message, formatError: null };
+        }
+    }
+
+    /**
+     * Show the remote not configured banner with instructions from API
+     * @param {Object} config - Remote config response from API
+     * @param {string|null} formatError - Format error message if URL is invalid
+     */
+    function showRemoteNotConfigured(config, formatError = null) {
+        const banner = document.getElementById('sync-remote-not-configured');
+        const errorMsgEl = document.getElementById('sync-remote-error-message');
+        const commandEl = document.getElementById('sync-remote-command');
+
+        if (!banner) return;
+
+        // Update error message based on the situation
+        if (errorMsgEl) {
+            if (formatError) {
+                errorMsgEl.innerHTML = `
+                    <span class="font-semibold text-red-700 dark:text-red-400">URL Format Error:</span>
+                    ${escapeHtml(formatError)}
+                    <br><span class="text-amber-600 dark:text-amber-300 mt-1 block">Please update the remote URL with a valid format.</span>
+                `;
+            } else if (config && !config.is_configured) {
+                errorMsgEl.textContent = config.error || 'No remote repository is configured for this project. You need to add a remote origin to sync changes.';
+            } else {
+                errorMsgEl.textContent = 'No remote repository is configured for this project. You need to add a remote origin to sync changes.';
+            }
+        }
+
+        // Update the command example based on current URL if present but invalid
+        if (commandEl && config && config.fetch_url && formatError) {
+            // Show command to update the remote instead of add
+            commandEl.textContent = 'git remote set-url origin https://github.com/username/repository.git';
+        }
+
+        // Dynamically build setup instructions from API response
+        const instructionsContainer = banner.querySelector('.space-y-3');
+        if (instructionsContainer && config && config.setup_instructions && config.setup_instructions.length > 0) {
+            // Clear existing static instructions and rebuild from API
+            const existingInstructions = instructionsContainer.querySelectorAll('.glass.rounded-lg');
+
+            // Keep the header paragraph
+            const headerParagraph = instructionsContainer.querySelector('p.text-sm.font-medium');
+
+            // Remove existing instruction steps
+            existingInstructions.forEach(el => el.remove());
+
+            // Add new instructions from API
+            config.setup_instructions.forEach((instruction, index) => {
+                const stepDiv = document.createElement('div');
+                stepDiv.className = 'glass rounded-lg p-3 bg-white/50 dark:bg-gray-800/50';
+                stepDiv.innerHTML = `
+                    <p class="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-1">Step ${index + 1}</p>
+                    <div class="flex items-center gap-2">
+                        <code class="flex-1 block text-xs font-mono bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 px-3 py-2 rounded border border-gray-200 dark:border-gray-700 overflow-x-auto">${escapeHtml(instruction)}</code>
+                        <button type="button" class="copy-command-btn flex-shrink-0 inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md text-amber-700 bg-amber-100 hover:bg-amber-200 dark:text-amber-400 dark:bg-amber-900/50 dark:hover:bg-amber-900/70 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors" data-command="${escapeHtml(instruction)}" title="Copy command">
+                            <svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                            </svg>
+                            Copy
+                        </button>
+                    </div>
+                `;
+                instructionsContainer.appendChild(stepDiv);
+            });
+
+            // Setup copy button listeners for new instructions
+            setupCopyCommandListeners();
+        }
+
+        // Show the banner
+        banner.classList.remove('hidden');
+    }
+
+    /**
+     * Hide the remote not configured banner
+     */
+    function hideRemoteNotConfigured() {
+        const banner = document.getElementById('sync-remote-not-configured');
+        if (banner) {
+            banner.classList.add('hidden');
+        }
+    }
+
+    /**
+     * Setup copy command button listeners
+     */
+    function setupCopyCommandListeners() {
+        document.querySelectorAll('.copy-command-btn').forEach(btn => {
+            // Remove existing listeners by cloning
+            const newBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(newBtn, btn);
+
+            newBtn.addEventListener('click', function() {
+                const command = this.dataset.command || this.previousElementSibling?.textContent || '';
+                navigator.clipboard.writeText(command).then(() => {
+                    Toast.show('Command copied to clipboard', 'success', { duration: 2000 });
+                }).catch(() => {
+                    Toast.show('Failed to copy command', 'error', { duration: 2000 });
+                });
+            });
+        });
+
+        // Also setup the main copy button
+        const copyBtn = document.getElementById('copy-remote-command-btn');
+        if (copyBtn) {
+            const newCopyBtn = copyBtn.cloneNode(true);
+            copyBtn.parentNode.replaceChild(newCopyBtn, copyBtn);
+
+            newCopyBtn.addEventListener('click', function() {
+                const commandEl = document.getElementById('sync-remote-command');
+                const command = commandEl ? commandEl.textContent : '';
+                navigator.clipboard.writeText(command).then(() => {
+                    Toast.show('Command copied to clipboard', 'success', { duration: 2000 });
+                }).catch(() => {
+                    Toast.show('Failed to copy command', 'error', { duration: 2000 });
+                });
+            });
+        }
+    }
+
+    /**
+     * Check remote configuration on page load and show banner if needed
+     */
+    async function checkRemoteOnLoad() {
+        const remoteCheck = await checkRemoteConfig();
+
+        if (!remoteCheck.configured) {
+            showRemoteNotConfigured(remoteCheck.config, remoteCheck.formatError);
+        } else {
+            hideRemoteNotConfigured();
+        }
+
+        return remoteCheck;
+    }
+
+    /**
      * Handle sync remote action
      */
     async function handleSyncRemote() {
         const btn = document.getElementById('sync-remote-btn');
         const autoMerge = document.getElementById('sync-auto-merge')?.checked ?? true;
+
+        // Check server connectivity before starting sync
+        const isConnected = await checkConnectivity();
+        if (!isConnected) {
+            showSyncError('Cannot connect to server', {
+                isNetworkError: true,
+                message: 'connection failed',
+                retryContext: { action: 'handleSyncRemote', autoMerge: autoMerge }
+            });
+            return;
+        }
+
+        // Check if remote is configured before attempting sync
+        const remoteCheck = await checkRemoteConfig();
+        if (!remoteCheck.configured) {
+            const errorMsg = remoteCheck.formatError || remoteCheck.error || 'Git remote is not configured';
+            showSyncError(errorMsg, {
+                statusCode: 400,
+                message: remoteCheck.formatError ? 'invalid url format' : 'not configured',
+                retryContext: { action: 'handleSyncRemote', autoMerge: autoMerge }
+            });
+
+            // Show the remote not configured banner with instructions from API
+            showRemoteNotConfigured(remoteCheck.config, remoteCheck.formatError);
+
+            // Show additional guidance in console
+            console.info('To configure git remote, run: git remote add origin <repository-url>');
+            console.info('Example: git remote add origin https://github.com/username/repo.git');
+            if (remoteCheck.formatError) {
+                console.warn('URL Format Error:', remoteCheck.formatError);
+            }
+            return;
+        } else {
+            // Remote is properly configured, hide the banner if it was shown
+            hideRemoteNotConfigured();
+        }
 
         if (btn) {
             btn.disabled = true;
@@ -516,23 +923,66 @@
         }
 
         try {
-            const response = await fetch('/api/sync/remote', {
+            const response = await fetch('/api/workflows/sync-remote', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ auto_merge: autoMerge })
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.detail || 'Sync failed');
+            // Parse response body for error details
+            let data = {};
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                // Response body is not JSON or empty
+                data = {};
             }
 
+            if (!response.ok) {
+                // Handle specific HTTP status codes with context-specific messages
+                if (response.status === 404) {
+                    showSyncError('Remote repository not configured', {
+                        statusCode: 404,
+                        message: 'not configured',
+                        retryContext: { action: 'handleSyncRemote', autoMerge: autoMerge }
+                    });
+                    throw new Error('Remote repository not configured');
+                } else if (response.status >= 500) {
+                    const serverMsg = data.detail || 'Internal server error';
+                    showSyncError(serverMsg, {
+                        statusCode: response.status,
+                        message: 'server error',
+                        retryContext: { action: 'handleSyncRemote', autoMerge: autoMerge }
+                    });
+                    throw new Error(serverMsg);
+                } else {
+                    // Other HTTP errors (4xx except 404)
+                    const errorMsg = data.detail || 'Request failed with status ' + response.status;
+                    showSyncError(errorMsg, {
+                        statusCode: response.status,
+                        message: errorMsg,
+                        retryContext: { action: 'handleSyncRemote', autoMerge: autoMerge }
+                    });
+                    throw new Error(errorMsg);
+                }
+            }
+
+            // Hide error banner on success
+            hideSyncError();
             Toast.show('Sync completed successfully!', 'success');
             loadSyncStatus();
         } catch (error) {
             console.error('Sync error:', error);
-            Toast.show('Sync failed: ' + error.message, 'error');
+
+            // Check if this is a network error (fetch failed before response)
+            if (error.name === 'TypeError' && (error.message.includes('fetch') || error.message.includes('network') || error.message.includes('Failed to fetch'))) {
+                showSyncError('Network connection failed', {
+                    isNetworkError: true,
+                    message: error.message,
+                    retryContext: { action: 'handleSyncRemote', autoMerge: autoMerge }
+                });
+            }
+            // Other errors are already handled via showSyncError in the response.ok block
         } finally {
             if (btn) {
                 btn.disabled = false;
@@ -553,7 +1003,7 @@
         }
 
         try {
-            const response = await fetch('/api/sync/pull', {
+            const response = await fetch('/api/workflows/pull-latest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -586,7 +1036,7 @@
         }
 
         try {
-            const response = await fetch('/api/sync/branches/' + encodeURIComponent(branchName), {
+            const response = await fetch('/api/workflows/branches/' + encodeURIComponent(branchName), {
                 method: 'DELETE'
             });
 
@@ -604,7 +1054,7 @@
     };
 
     /**
-     * Show error message
+     * Show error message (legacy function)
      */
     function showError(message) {
         Toast.show(message, 'error');
@@ -613,6 +1063,209 @@
         document.getElementById('sync-status-loading').classList.add('hidden');
         document.getElementById('sync-prs-loading').classList.add('hidden');
         document.getElementById('sync-branches-loading').classList.add('hidden');
+    }
+
+    /**
+     * Classify error type based on error details
+     * @param {Object} details - Error details object
+     * @returns {Object} Classification with type, label, and description
+     */
+    function classifyError(details) {
+        const statusCode = details.statusCode || 0;
+        const errorMessage = (details.message || '').toLowerCase();
+
+        // Network errors
+        if (details.isNetworkError ||
+            errorMessage.includes('network') ||
+            errorMessage.includes('fetch') ||
+            errorMessage.includes('connection') ||
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('abort')) {
+            return {
+                type: 'network',
+                label: 'Network Error',
+                description: 'Unable to connect to the server. Check your internet connection and ensure the server is running.',
+                icon: 'wifi-off'
+            };
+        }
+
+        // Configuration errors (404 typically means endpoint or resource not configured)
+        if (statusCode === 404 ||
+            errorMessage.includes('not found') ||
+            errorMessage.includes('not configured') ||
+            errorMessage.includes('missing') ||
+            errorMessage.includes('invalid url') ||
+            errorMessage.includes('remote repository')) {
+            return {
+                type: 'config',
+                label: 'Configuration Error',
+                description: 'The requested resource or endpoint is not configured correctly. Check your remote repository settings.',
+                icon: 'cog'
+            };
+        }
+
+        // Server errors (5xx)
+        if (statusCode >= 500 ||
+            errorMessage.includes('server error') ||
+            errorMessage.includes('internal error')) {
+            return {
+                type: 'server',
+                label: 'Server Error',
+                description: 'The server encountered an error processing your request. Please try again later.',
+                icon: 'server'
+            };
+        }
+
+        // Authentication/authorization errors
+        if (statusCode === 401 || statusCode === 403 ||
+            errorMessage.includes('unauthorized') ||
+            errorMessage.includes('forbidden') ||
+            errorMessage.includes('authentication') ||
+            errorMessage.includes('permission')) {
+            return {
+                type: 'auth',
+                label: 'Authentication Error',
+                description: 'Access denied. Check your credentials and permissions.',
+                icon: 'lock'
+            };
+        }
+
+        // Default/unknown error
+        return {
+            type: 'unknown',
+            label: 'Sync Error',
+            description: 'An unexpected error occurred during the sync operation.',
+            icon: 'exclamation'
+        };
+    }
+
+    /**
+     * Get SVG icon markup for error type
+     * @param {string} iconType - Icon type identifier
+     * @returns {string} SVG markup
+     */
+    function getErrorIcon(iconType) {
+        const icons = {
+            'wifi-off': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3"></path>',
+            'cog': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>',
+            'server': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path>',
+            'lock': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>',
+            'exclamation': '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>'
+        };
+        return icons[iconType] || icons['exclamation'];
+    }
+
+    /**
+     * Show sync error in the error banner with classification
+     * @param {string} message - User-friendly error message
+     * @param {Object} details - Error details for classification and logging
+     */
+    function showSyncError(message, details = {}) {
+        // Log detailed error to console for debugging
+        console.error('Sync Error:', {
+            message: message,
+            details: details,
+            timestamp: new Date().toISOString()
+        });
+
+        // Classify the error
+        const classification = classifyError(details);
+
+        // Get DOM elements
+        const banner = document.getElementById('sync-error-banner');
+        const messageEl = document.getElementById('sync-error-message');
+        const bannerTitle = banner ? banner.querySelector('h3') : null;
+        const iconContainer = banner ? banner.querySelector('.flex-shrink-0') : null;
+
+        if (!banner || !messageEl) {
+            // Fallback to Toast if banner elements not found
+            Toast.show(message, 'error', { duration: 6000 });
+            return;
+        }
+
+        // Update banner title with classification
+        if (bannerTitle) {
+            bannerTitle.textContent = classification.label;
+        }
+
+        // Update icon based on error type
+        if (iconContainer) {
+            iconContainer.innerHTML = `
+                <svg class="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    ${getErrorIcon(classification.icon)}
+                </svg>
+            `;
+        }
+
+        // Build error message with type badge
+        const typeColors = {
+            'network': 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+            'config': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            'server': 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            'auth': 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+            'unknown': 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+        };
+
+        const typeBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${typeColors[classification.type]} mr-2">${classification.type.toUpperCase()}</span>`;
+
+        // Update message with classification details
+        messageEl.innerHTML = `
+            <div class="flex items-start gap-2 mb-1">
+                ${typeBadge}
+                <span class="font-medium">${escapeHtml(message)}</span>
+            </div>
+            <p class="text-xs text-red-600 dark:text-red-500 mt-1">${escapeHtml(classification.description)}</p>
+            ${details.statusCode ? `<p class="text-xs text-red-500/70 dark:text-red-400/70 mt-1">Status Code: ${details.statusCode}</p>` : ''}
+        `;
+
+        // Show the banner
+        banner.classList.remove('hidden');
+
+        // Also show Toast notification
+        Toast.show(`${classification.label}: ${message}`, 'error', { duration: 5000 });
+
+        // Store retry context for the retry button
+        banner.dataset.retryContext = JSON.stringify(details.retryContext || {});
+    }
+
+    /**
+     * Hide the sync error banner
+     */
+    function hideSyncError() {
+        const banner = document.getElementById('sync-error-banner');
+        if (banner) {
+            banner.classList.add('hidden');
+        }
+    }
+
+    // Setup error banner event listeners
+    function setupErrorBannerListeners() {
+        // Dismiss button
+        const dismissBtn = document.getElementById('sync-error-dismiss-btn');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', hideSyncError);
+        }
+
+        // Retry button
+        const retryBtn = document.getElementById('sync-error-retry-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', function() {
+                hideSyncError();
+                // Trigger refresh to retry the last operation
+                loadSyncStatus();
+            });
+        }
+    }
+
+    /**
+     * Setup remote config banner event listeners
+     */
+    function setupRemoteConfigBannerListeners() {
+        // Dismiss button for remote not configured banner
+        const dismissBtn = document.getElementById('sync-remote-config-dismiss-btn');
+        if (dismissBtn) {
+            dismissBtn.addEventListener('click', hideRemoteNotConfigured);
+        }
     }
 
     /**

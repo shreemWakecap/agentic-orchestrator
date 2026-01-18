@@ -2,103 +2,31 @@
  * Plan Detail Page Module
  *
  * Handles build/review workflow initiation and inline progress tracking.
- * Uses SSE (Server-Sent Events) for real-time progress updates.
+ * Uses simple HTTP polling for real-time progress updates (server is source of truth).
  *
  * Dependencies:
  * - Toast (toast.js) - For notifications
- * - SSEConnectionManager (sse-manager.js) - For SSE handling with reconnection
  */
 
 const PlanDetail = (function() {
     'use strict';
 
+    // Polling configuration
+    const POLL_INTERVAL_MS = 2500; // Poll every 2.5 seconds
+
     // State
+    let currentPlanId = null;
     let currentRunId = null;
-    let sseManager = null;
+    let pollTimer = null;
     let buildStartTime = null;
     let steps = [];
     let stepStartTimes = {};
     let expandedSteps = new Set();
-    let pollingTimer = null;
-    let cleanupFunctions = [];
 
     // Progress tracking state
     let completedStepCount = 0;
     let totalStepCount = 0;
     let stepDurations = []; // Array of step durations in milliseconds
-
-    // LocalStorage key for persisting active build state
-    const ACTIVE_BUILD_STORAGE_KEY = 'planDetail_activeBuild';
-
-    /**
-     * Save active build state to localStorage
-     * @param {string} planId - The plan ID
-     * @param {string} runId - The run ID
-     * @param {Object} progress - Current progress state
-     */
-    function saveActiveBuild(planId, runId, progress) {
-        if (!planId || !runId) return;
-        try {
-            const buildState = {
-                plan_id: planId,
-                run_id: runId,
-                last_progress: progress || {},
-                timestamp: Date.now()
-            };
-            localStorage.setItem(ACTIVE_BUILD_STORAGE_KEY, JSON.stringify(buildState));
-        } catch (e) {
-            console.warn('Failed to save active build to localStorage:', e);
-        }
-    }
-
-    /**
-     * Load active build state from localStorage
-     * @returns {Object|null} Saved build state or null
-     */
-    function loadActiveBuild() {
-        try {
-            const stored = localStorage.getItem(ACTIVE_BUILD_STORAGE_KEY);
-            if (!stored) return null;
-            const buildState = JSON.parse(stored);
-            // Expire after 24 hours
-            if (Date.now() - buildState.timestamp > 24 * 60 * 60 * 1000) {
-                clearActiveBuild();
-                return null;
-            }
-            return buildState;
-        } catch (e) {
-            console.warn('Failed to load active build from localStorage:', e);
-            return null;
-        }
-    }
-
-    /**
-     * Clear active build state from localStorage
-     */
-    function clearActiveBuild() {
-        try {
-            localStorage.removeItem(ACTIVE_BUILD_STORAGE_KEY);
-        } catch (e) {
-            console.warn('Failed to clear active build from localStorage:', e);
-        }
-    }
-
-    /**
-     * Update the stored progress for the active build
-     * @param {Object} progressUpdate - Progress data to merge
-     */
-    function updateStoredProgress(progressUpdate) {
-        const stored = loadActiveBuild();
-        if (stored) {
-            stored.last_progress = Object.assign({}, stored.last_progress, progressUpdate);
-            stored.timestamp = Date.now();
-            try {
-                localStorage.setItem(ACTIVE_BUILD_STORAGE_KEY, JSON.stringify(stored));
-            } catch (e) {
-                console.debug('Failed to update stored progress:', e);
-            }
-        }
-    }
 
     // DOM element cache
     const elements = {};
@@ -196,257 +124,179 @@ const PlanDetail = (function() {
      */
     function init() {
         cacheElements();
+        currentPlanId = window.PLAN_DATA && window.PLAN_DATA.id;
 
-        // First, check localStorage for a persisted active build for this plan
-        const currentPlanId = window.PLAN_DATA && window.PLAN_DATA.id;
-        const storedBuild = loadActiveBuild();
-
-        if (storedBuild && storedBuild.plan_id === currentPlanId && storedBuild.run_id) {
-            console.log('Found persisted active build in localStorage:', storedBuild);
-            // Restore from localStorage and attempt reconnection
-            currentRunId = storedBuild.run_id;
-            attemptBuildReconnection(storedBuild);
-        } else if (window.PLAN_DATA) {
-            // Check if there's an active or previous build for this plan via API
-            // Trigger for any state that might have build progress to restore
+        // Check if plan is in a state that needs polling
+        if (window.PLAN_DATA) {
             const planState = window.PLAN_DATA.state || window.PLAN_DATA.status;
-            const progressStates = ['in-progress', 'building', 'in_progress', 'failed', 'paused'];
-            if (progressStates.includes(planState)) {
-                checkForActiveRun();
+            const activeStates = ['in-progress', 'building', 'in_progress', 'failed', 'paused'];
+
+            if (activeStates.includes(planState)) {
+                // Plan has build activity - start polling to get current state
+                showProgressSection();
+                startPolling();
             }
         }
 
         // Clean up on page unload
         window.addEventListener('beforeunload', function() {
-            stopEventStream();
-        });
-
-        // Clean up on visibility change (tab hidden)
-        document.addEventListener('visibilitychange', function() {
-            if (document.hidden && sseManager) {
-                // Optionally pause connection when tab is hidden
-                console.log('Tab hidden, SSE connection maintained');
-            }
+            stopPolling();
         });
     }
 
     /**
-     * Attempt to reconnect to an active build from localStorage state
-     * @param {Object} storedBuild - The stored build state from localStorage
+     * Start simple HTTP polling for build progress
      */
-    async function attemptBuildReconnection(storedBuild) {
+    function startPolling() {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+        }
+
+        // Immediate first fetch
+        fetchBuildProgress();
+
+        // Then poll every 2.5 seconds
+        pollTimer = setInterval(fetchBuildProgress, POLL_INTERVAL_MS);
+        console.log('[PlanDetail] Started polling for build progress');
+    }
+
+    /**
+     * Stop polling
+     */
+    function stopPolling() {
+        if (pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+            console.log('[PlanDetail] Stopped polling');
+        }
+        hideConnectionStatus();
+    }
+
+    /**
+     * Fetch build progress from server - SINGLE SOURCE OF TRUTH
+     */
+    async function fetchBuildProgress() {
+        if (!currentPlanId) {
+            currentPlanId = window.PLAN_DATA && window.PLAN_DATA.id;
+        }
+        if (!currentPlanId) return;
+
         try {
-            // Show progress section immediately with cached progress
-            showProgressSection();
-
-            if (storedBuild.last_progress) {
-                // Restore cached progress immediately for instant feedback
-                if (storedBuild.last_progress.progress !== undefined) {
-                    updateProgress(storedBuild.last_progress.progress);
-                }
-                if (storedBuild.last_progress.current_step) {
-                    updateCurrentStep(storedBuild.last_progress.current_step);
-                }
-            }
-
-            addLogEntry('Restoring build from previous session...', 'info');
-
-            // Verify the run is still active by fetching current status
-            const response = await fetch('/api/runs/' + storedBuild.run_id);
+            const response = await fetch('/api/plans/' + encodeURIComponent(currentPlanId) + '/build-progress');
             if (!response.ok) {
-                console.warn('Stored run not found, clearing localStorage');
-                clearActiveBuild();
+                console.warn('[PlanDetail] Failed to fetch build progress:', response.status);
                 return;
             }
 
             const data = await response.json();
-            const run = data.run || data;
 
-            if (run.status === 'running' || run.status === 'in_progress') {
-                // Run is still active, reconnect to SSE stream
-                addLogEntry('Reconnecting to active build...', 'info');
-                startEventStream(storedBuild.run_id);
-            } else if (run.status === 'completed') {
-                // Run completed while we were away
-                clearActiveBuild();
-                handleBuildComplete('completed');
-            } else if (run.status === 'failed') {
-                // Run failed while we were away
-                clearActiveBuild();
-                handleBuildComplete('failed');
-            } else if (run.status === 'paused' || run.status === 'cancelled') {
-                // Run was paused
-                clearActiveBuild();
-                updateStatusBadge('paused');
-                addLogEntry('Build was paused', 'warning');
-            } else {
-                // Unknown status, clear and fall back to normal check
-                clearActiveBuild();
-                checkForActiveRun();
-            }
-        } catch (error) {
-            console.error('Failed to reconnect to active build:', error);
-            clearActiveBuild();
-            // Fall back to normal active run check
-            checkForActiveRun();
-        }
-    }
-
-    /**
-     * Check for an active run for this plan and restore progress state
-     */
-    async function checkForActiveRun() {
-        try {
-            // Get plan_id from PLAN_DATA
-            const planId = window.PLAN_DATA && window.PLAN_DATA.id;
-            if (!planId) {
-                console.warn('No plan ID available for progress check');
-                return;
+            // Store run_id if available
+            if (data.run_id) {
+                currentRunId = data.run_id;
             }
 
-            // Fetch build progress from the dedicated endpoint
-            const progressResponse = await fetch('/api/plans/' + encodeURIComponent(planId) + '/build-progress');
-            if (!progressResponse.ok) {
-                console.warn('Failed to fetch build progress:', progressResponse.status);
-                return;
-            }
+            // Update UI based on server response
+            updateUIFromProgress(data);
 
-            const progressData = await progressResponse.json();
+            // Handle terminal states - stop polling
+            if (['completed', 'failed', 'cancelled'].includes(data.status)) {
+                stopPolling();
 
-            // Check if there's actual progress to restore
-            if (!progressData || progressData.status === 'pending') {
-                console.log('No active build progress to restore');
-                return;
-            }
-
-            // Restore run ID if available
-            if (progressData.run_id) {
-                currentRunId = progressData.run_id;
-            }
-
-            // Show progress section and initialize steps
-            showProgressSection();
-
-            // Initialize steps with restored status from API
-            if (progressData.steps && progressData.steps.length > 0) {
-                initializeStepsFromProgress(progressData.steps, progressData.current_step);
-            }
-
-            // Update overall progress bar
-            if (progressData.progress_percentage !== undefined) {
-                updateProgress(progressData.progress_percentage);
-            }
-
-            // Update current step label
-            if (progressData.current_step) {
-                updateCurrentStep(progressData.current_step);
-            }
-
-            // Add log entry about restoration
-            addLogEntry('Restored build progress from previous session', 'info');
-
-            // If build is still running, connect to SSE stream
-            if (progressData.status === 'running' && progressData.run_id) {
-                addLogEntry('Reconnecting to build stream...', 'info');
-                startEventStream(progressData.run_id);
-            } else if (progressData.status === 'completed') {
-                handleBuildComplete('completed');
-            } else if (progressData.status === 'failed') {
-                addLogEntry('Build failed - check error details above', 'error');
-                updateStatusBadge('failed');
-            } else if (progressData.status === 'cancelled') {
-                addLogEntry('Build was paused', 'warning');
-                updateStatusBadge('paused');
-            }
-
-        } catch (error) {
-            console.error('Error checking for active run:', error);
-            // Fall back to legacy run check
-            await checkForActiveRunLegacy();
-        }
-    }
-
-    /**
-     * Initialize steps from progress API response with pre-existing statuses
-     * @param {Array} progressSteps - Steps from build-progress API
-     * @param {string} currentStepId - ID of the currently running step
-     */
-    function initializeStepsFromProgress(progressSteps, currentStepId) {
-        if (!elements.stepsList || !progressSteps) return;
-
-        // Clear placeholder and existing steps
-        elements.stepsList.innerHTML = '';
-        steps = [];
-        stepStartTimes = {};
-        expandedSteps.clear();
-
-        // Handle empty steps array
-        if (progressSteps.length === 0) {
-            elements.stepsList.innerHTML = '<div class="text-sm text-gray-500 italic">No steps defined in plan</div>';
-            initializeProgressTracking(0, 0);
-            return;
-        }
-
-        let initialCompletedCount = 0;
-        progressSteps.forEach(function(step, index) {
-            // Map API status to UI status
-            let status = step.status || 'pending';
-
-            // If this is the current step, mark it as running
-            if (step.id === currentStepId && status === 'pending') {
-                status = 'running';
-            }
-
-            const stepData = {
-                id: step.id || 'step-' + (index + 1),
-                label: step.label || step.title || step.name || 'Step ' + (index + 1),
-                description: step.description || step.action || step.do || '',
-                status: status,
-                output: step.output || '',
-                error: step.error || '',
-                duration: step.duration || null
-            };
-
-            steps.push(stepData);
-            renderStepElement(stepData, index);
-
-            // Track start time for running steps
-            if (status === 'running') {
-                stepStartTimes[stepData.id] = new Date();
-            }
-
-            // Count already completed steps
-            if (status === 'completed') {
-                initialCompletedCount++;
-            }
-        });
-
-        // Initialize progress tracking with step counts
-        initializeProgressTracking(progressSteps.length, initialCompletedCount);
-    }
-
-    /**
-     * Legacy fallback: Check for active run using runs API
-     */
-    async function checkForActiveRunLegacy() {
-        try {
-            const response = await fetch('/api/runs?status=running');
-            const data = await response.json();
-
-            if (data.runs && data.runs.length > 0) {
-                const planRun = data.runs.find(function(r) {
-                    return r.plan_path === window.PLAN_DATA.file ||
-                           r.plan_id === window.PLAN_DATA.id;
-                });
-
-                if (planRun) {
-                    currentRunId = planRun.id;
-                    showProgressSection();
-                    startEventStream(planRun.id);
+                if (data.status === 'completed') {
+                    handleBuildComplete('completed');
+                } else if (data.status === 'failed') {
+                    handleBuildFailed(data.last_error || 'Build failed');
                 }
+                return;
             }
+
+            // Handle stuck detection FROM SERVER (not client-side)
+            if (data.is_stuck && typeof PlanRecovery !== 'undefined') {
+                PlanRecovery.showRecoveryOptions({
+                    isStuck: true,
+                    minutesSinceUpdate: data.minutes_since_update,
+                    canResume: data.can_resume,
+                    lastError: data.last_error
+                });
+            }
+
         } catch (error) {
-            console.error('Error checking for active run (legacy):', error);
+            console.debug('[PlanDetail] Poll error (will retry):', error.message);
+            // Don't stop polling on transient errors - just log and continue
+        }
+    }
+
+    /**
+     * Update all UI elements from server progress data
+     */
+    function updateUIFromProgress(data) {
+        // Update progress bar
+        if (data.progress_percentage !== undefined) {
+            updateProgress(data.progress_percentage);
+        }
+
+        // Update current step label
+        if (data.current_step) {
+            updateCurrentStep(data.current_step);
+        }
+
+        // Update steps list from server
+        if (data.steps && data.steps.length > 0) {
+            updateStepsFromServer(data.steps, data.current_step);
+        }
+
+        // Update completed count
+        if (data.steps) {
+            const completed = data.steps.filter(function(s) { return s.status === 'completed'; }).length;
+            updateCompletedCount(completed, data.steps.length);
+        }
+
+        // Update connection status to show "Live" (we're actively polling)
+        updateConnectionStatus('connected', false);
+    }
+
+    /**
+     * Update steps list from server data
+     */
+    function updateStepsFromServer(serverSteps, currentStepId) {
+        // Clear placeholder on first update
+        clearStepsPlaceholder();
+
+        serverSteps.forEach(function(step, index) {
+            addOrUpdateStep(step.id, step.status, step.label || step.id, {
+                description: step.description || ''
+            });
+        });
+    }
+
+    /**
+     * Update completed steps count display
+     */
+    function updateCompletedCount(completed, total) {
+        if (elements.stepsCompletedCount) {
+            elements.stepsCompletedCount.textContent = completed + ' of ' + total + ' steps completed';
+        }
+        // Also update internal tracking
+        completedStepCount = completed;
+        totalStepCount = total;
+    }
+
+    /**
+     * Handle build failure
+     * @param {string} message - Error message
+     */
+    function handleBuildFailed(message) {
+        stopPolling();
+        updateStatusBadge('failed');
+        addLogEntry('Build failed: ' + message, 'error');
+
+        // Show recovery options if PlanRecovery is available
+        if (typeof PlanRecovery !== 'undefined') {
+            PlanRecovery.showRecoveryOptions({
+                isStuck: false,
+                lastError: message,
+                canResume: true
+            });
         }
     }
 
@@ -472,15 +322,15 @@ const PlanDetail = (function() {
 
             if (data.run_id) {
                 currentRunId = data.run_id;
+                currentPlanId = planId;
                 buildStartTime = new Date();
-
-                // Save to localStorage for persistence across page refresh
-                saveActiveBuild(planId, data.run_id, { progress: 0, current_step: 'Initializing...' });
 
                 showProgressSection();
                 hideFailedStepInfo();
                 updateStatusBadge('in-progress');
-                startEventStream(data.run_id);
+
+                // Start polling for progress (replaces SSE)
+                startPolling();
 
                 Toast.success('Build started');
             }
@@ -517,15 +367,15 @@ const PlanDetail = (function() {
 
             if (data.run_id) {
                 currentRunId = data.run_id;
+                currentPlanId = planId;
                 buildStartTime = new Date();
-
-                // Save to localStorage for persistence across page refresh
-                saveActiveBuild(planId, data.run_id, { progress: 0, current_step: 'Resuming...' });
 
                 showProgressSection();
                 hideFailedStepInfo();
                 updateStatusBadge('in-progress');
-                startEventStream(data.run_id);
+
+                // Start polling for progress (replaces SSE)
+                startPolling();
 
                 Toast.success('Build resumed');
             }
@@ -558,11 +408,7 @@ const PlanDetail = (function() {
             }
 
             Toast.warning('Build paused');
-            stopEventStream();
-
-            // Clear localStorage since build is paused
-            clearActiveBuild();
-
+            stopPolling();
             updateStatusBadge('paused');
         } catch (error) {
             console.error('Error pausing build:', error);
@@ -597,232 +443,6 @@ const PlanDetail = (function() {
         } catch (error) {
             console.error('Error starting review:', error);
             Toast.error('Failed to start review: ' + error.message);
-        }
-    }
-
-    /**
-     * Start SSE event stream for real-time updates using SSEConnectionManager
-     * @param {string} runId - The run ID to stream events from
-     */
-    function startEventStream(runId) {
-        // Clean up any existing connection
-        stopEventStream();
-
-        currentRunId = runId;
-        const url = '/api/runs/' + runId + '/events';
-
-        // Check if SSEConnectionManager is available
-        if (typeof SSEConnectionManager === 'undefined') {
-            console.warn('SSEConnectionManager not available, falling back to polling');
-            startPollingFallback(runId);
-            return;
-        }
-
-        // Create new SSE connection manager with configuration
-        sseManager = new SSEConnectionManager(url, {
-            maxReconnectAttempts: 5,
-            initialReconnectDelay: 1000,
-            maxReconnectDelay: 15000,
-            heartbeatTimeout: 45000,
-            enablePollingFallback: true,
-            pollingInterval: 3000
-        });
-
-        // Set up polling fallback function
-        sseManager.setPollingFallback(function() {
-            return pollRunStatus(runId);
-        });
-
-        // Track cleanup functions
-        cleanupFunctions = [];
-
-        // Handle connection state changes
-        var stateCleanup = sseManager.onStateChange(function(newState, oldState) {
-            console.log('PlanDetail SSE state: ' + oldState + ' -> ' + newState);
-            updateConnectionStatus(newState, sseManager.isPollingMode());
-
-            if (newState === 'connected') {
-                if (sseManager.isPollingMode()) {
-                    addLogEntry('Using polling fallback for updates', 'warning');
-                } else {
-                    addLogEntry('Connected to build stream', 'info');
-                }
-            } else if (newState === 'reconnecting') {
-                addLogEntry('Connection lost, reconnecting...', 'warning');
-            } else if (newState === 'failed') {
-                addLogEntry('Connection failed, using polling fallback', 'error');
-            }
-        });
-        cleanupFunctions.push(stateCleanup);
-
-        // Handle incoming messages
-        var messageCleanup = sseManager.onMessage(function(data, event) {
-            if (data && typeof data === 'object') {
-                handleEvent(data);
-            }
-        });
-        cleanupFunctions.push(messageCleanup);
-
-        // Connect
-        sseManager.connect();
-        updateConnectionStatus('connecting', false);
-    }
-
-    /**
-     * Stop SSE event stream and clean up
-     */
-    function stopEventStream() {
-        // Stop polling if active
-        if (pollingTimer) {
-            clearInterval(pollingTimer);
-            pollingTimer = null;
-        }
-
-        // Clean up SSE manager
-        if (sseManager) {
-            sseManager.disconnect();
-            sseManager = null;
-        }
-
-        // Run cleanup functions
-        cleanupFunctions.forEach(function(fn) {
-            try {
-                fn();
-            } catch (e) {
-                console.debug('Cleanup error:', e);
-            }
-        });
-        cleanupFunctions = [];
-
-        hideConnectionStatus();
-    }
-
-    /**
-     * Start polling fallback when SSE is not available
-     * @param {string} runId - The run ID to poll
-     */
-    function startPollingFallback(runId) {
-        console.log('Starting polling fallback for run:', runId);
-        updateConnectionStatus('connected', true);
-        addLogEntry('Using polling mode (SSE unavailable)', 'warning');
-
-        // Initial poll
-        pollRunStatus(runId);
-
-        // Start polling interval
-        pollingTimer = setInterval(function() {
-            pollRunStatus(runId);
-        }, 3000);
-    }
-
-    /**
-     * Poll run status endpoint as fallback
-     * @param {string} runId - The run ID to poll
-     * @returns {Promise} Promise resolving when poll completes
-     */
-    async function pollRunStatus(runId) {
-        try {
-            const response = await fetch('/api/runs/' + runId);
-            if (!response.ok) {
-                throw new Error('Failed to fetch run status');
-            }
-
-            const data = await response.json();
-
-            // Convert run status to events
-            if (data.run) {
-                const run = data.run;
-
-                // Update progress if available
-                if (run.progress !== undefined) {
-                    handleEvent({ type: 'progress', progress: run.progress });
-                }
-
-                // Update current step
-                if (run.current_step) {
-                    handleEvent({ type: 'step', step: run.current_step });
-                }
-
-                // Check for completion
-                if (run.status === 'completed') {
-                    handleEvent({ type: 'done', status: 'completed' });
-                    stopEventStream();
-                } else if (run.status === 'failed') {
-                    handleEvent({ type: 'error', message: run.error || 'Build failed' });
-                    stopEventStream();
-                } else if (run.status === 'paused') {
-                    stopEventStream();
-                }
-            }
-        } catch (error) {
-            console.debug('Poll error:', error);
-        }
-    }
-
-    /**
-     * Handle incoming SSE event
-     * @param {Object} event - The event data
-     */
-    function handleEvent(event) {
-        // Update progress bar
-        if (event.progress !== undefined) {
-            updateProgress(event.progress);
-            // Update stored progress for persistence
-            updateStoredProgress({ progress: event.progress });
-        }
-
-        // Update current step
-        if (event.step) {
-            updateCurrentStep(event.step);
-            // Update stored progress for persistence
-            updateStoredProgress({ current_step: event.step });
-        }
-
-        // Handle steps initialization from event
-        if (event.type === 'init' && event.steps) {
-            initializeSteps(event.steps);
-        }
-
-        // Handle step updates with extra data
-        if (event.type === 'step_start') {
-            addOrUpdateStep(event.step_id || event.step, 'running', event.step, {
-                description: event.description || event.action || ''
-            });
-        } else if (event.type === 'step_complete') {
-            addOrUpdateStep(event.step_id || event.step, 'completed', event.step, {
-                output: event.output || event.result || '',
-                description: event.description || ''
-            });
-        } else if (event.type === 'step_failed') {
-            addOrUpdateStep(event.step_id || event.step, 'failed', event.step, {
-                error: event.error || event.message || 'Step failed',
-                output: event.output || ''
-            });
-        } else if (event.type === 'step_output') {
-            // Partial output update
-            const stepIndex = steps.findIndex(function(s) {
-                return s.id === (event.step_id || event.step);
-            });
-            if (stepIndex >= 0) {
-                steps[stepIndex].output = (steps[stepIndex].output || '') + (event.output || '');
-                const stepEl = document.getElementById('step-' + steps[stepIndex].id);
-                if (stepEl) {
-                    updateStepElementContent(stepEl, steps[stepIndex], stepIndex);
-                }
-            }
-        }
-
-        // Add to log
-        addLogEntry(event.message || event.step || event.type, event.type);
-
-        // Handle completion
-        if (event.type === 'done' || event.type === 'complete') {
-            handleBuildComplete(event.status || 'completed');
-        }
-
-        // Handle errors
-        if (event.type === 'error') {
-            handleBuildError(event.message || 'Unknown error');
         }
     }
 
@@ -1250,10 +870,12 @@ const PlanDetail = (function() {
      * @param {string} status - Final status
      */
     function handleBuildComplete(status) {
-        stopEventStream();
+        stopPolling();
 
-        // Clear localStorage since build is complete
-        clearActiveBuild();
+        // Hide any recovery UI that might be showing
+        if (typeof PlanRecovery !== 'undefined') {
+            PlanRecovery.hideRecoveryOptions();
+        }
 
         const duration = buildStartTime ? formatDuration(new Date() - buildStartTime) : '';
 
@@ -1284,10 +906,12 @@ const PlanDetail = (function() {
      * @param {string} message - Error message
      */
     function handleBuildError(message) {
-        stopEventStream();
+        stopPolling();
 
-        // Clear localStorage since build has errored
-        clearActiveBuild();
+        // Hide any existing recovery UI before showing error state
+        if (typeof PlanRecovery !== 'undefined') {
+            PlanRecovery.hideRecoveryOptions();
+        }
 
         updateStatusBadge('failed');
         Toast.error('Build error: ' + message);
@@ -1540,6 +1164,8 @@ const PlanDetail = (function() {
         resumeBuild: resumeBuild,
         pauseBuild: pauseBuild,
         startReview: startReview,
+        startPolling: startPolling,
+        stopPolling: stopPolling,
         clearLog: clearLog,
         initializeSteps: initializeSteps,
         toggleStepDetails: toggleStepDetails,

@@ -218,6 +218,51 @@ class BuildStateError(BuildError):
         )
 
 
+# ============== Git Errors ==============
+
+
+class GitRemoteError(OrchestratorError):
+    """Base exception for git remote-related errors.
+
+    HTTP Status: 500
+    """
+
+    pass
+
+
+class GitRemoteNotConfiguredError(GitRemoteError):
+    """Raised when git remote is not configured or invalid.
+
+    HTTP Status: 400
+
+    This error provides guidance on how to configure the git remote.
+    """
+
+    def __init__(self, remote_name: str = "origin", reason: str = None):
+        self.remote_name = remote_name
+        self.reason = reason
+        message = f"Git remote '{remote_name}' is not configured"
+        if reason:
+            message += f": {reason}"
+        guidance = (
+            f"\n\nTo configure the remote, run:\n"
+            f"  git remote add {remote_name} <repository-url>\n"
+            f"Or update an existing remote:\n"
+            f"  git remote set-url {remote_name} <repository-url>"
+        )
+        super().__init__(
+            message + guidance,
+            details={
+                "remote_name": remote_name,
+                "reason": reason,
+                "guidance": {
+                    "add_remote": f"git remote add {remote_name} <repository-url>",
+                    "update_remote": f"git remote set-url {remote_name} <repository-url>",
+                },
+            },
+        )
+
+
 # ============== Database Errors ==============
 
 

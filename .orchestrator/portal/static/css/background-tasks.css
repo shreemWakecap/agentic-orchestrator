@@ -1,0 +1,547 @@
+/* Background Tasks CSS - Floating Panel with Glassmorphism */
+/* Matches existing modern.css design patterns */
+
+/* ============================================
+   TASK INDICATOR - Bottom Right Floating Badge
+   ============================================ */
+.task-indicator {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.75rem;
+    pointer-events: none;
+}
+
+.task-indicator > * {
+    pointer-events: auto;
+}
+
+/* Collapsed indicator button */
+.task-indicator-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(var(--glass-blur-strong));
+    -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+    transition: all var(--transition-base);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.task-indicator-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+    background: var(--glass-bg);
+}
+
+.task-indicator-btn:active {
+    transform: translateY(0);
+}
+
+/* Task count badge */
+.task-indicator-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    padding: 0 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: var(--radius-full);
+}
+
+/* Active state with pulse animation */
+.task-indicator-btn.active .task-indicator-count {
+    animation: taskPulse 2s ease-in-out infinite;
+}
+
+.task-indicator-btn.active::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0.75rem;
+    transform: translateY(-50%);
+    width: 0.5rem;
+    height: 0.5rem;
+    background: #10b981;
+    border-radius: var(--radius-full);
+    animation: taskDot 1.5s ease-in-out infinite;
+}
+
+/* Icon in button */
+.task-indicator-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--color-primary-500);
+    transition: transform var(--transition-base);
+}
+
+.task-indicator-btn.active .task-indicator-icon {
+    animation: spin 2s linear infinite;
+}
+
+/* ============================================
+   TASK PANEL - Expanded View
+   ============================================ */
+.task-panel {
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    z-index: 1001;
+    width: 22rem;
+    max-width: calc(100vw - 3rem);
+    max-height: 70vh;
+    background: var(--glass-bg-strong);
+    backdrop-filter: blur(var(--glass-blur-strong));
+    -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-2xl);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    transform-origin: bottom right;
+    transition: all var(--transition-smooth);
+}
+
+/* Panel collapsed state */
+.task-panel.collapsed {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+    pointer-events: none;
+}
+
+/* Panel expanded state */
+.task-panel.expanded {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+/* Panel header */
+.task-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border-light);
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+}
+
+.task-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.task-panel-title-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--color-primary-500);
+}
+
+.task-panel-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.task-panel-close:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.task-panel-close svg {
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+/* Panel body - task list container */
+.task-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.75rem;
+}
+
+/* Empty state */
+.task-panel-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    text-align: center;
+}
+
+.task-panel-empty-icon {
+    width: 3rem;
+    height: 3rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+}
+
+.task-panel-empty-text {
+    font-size: 0.875rem;
+    color: var(--text-tertiary);
+}
+
+/* ============================================
+   TASK ITEM - Individual Task Entry
+   ============================================ */
+.task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem;
+    background: var(--glass-bg);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    margin-bottom: 0.5rem;
+    transition: all var(--transition-fast);
+    animation: taskItemSlideIn 0.3s ease-out;
+}
+
+.task-item:last-child {
+    margin-bottom: 0;
+}
+
+.task-item:hover {
+    background: var(--bg-secondary);
+    border-color: var(--border-default);
+}
+
+/* Task item with running state */
+.task-item.running {
+    border-left: 3px solid var(--color-primary-500);
+    background: linear-gradient(90deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+}
+
+/* Task item with completed state */
+.task-item.completed {
+    opacity: 0.7;
+}
+
+/* Task item with failed state */
+.task-item.failed {
+    border-left: 3px solid var(--color-danger-500);
+    background: linear-gradient(90deg, rgba(239, 68, 68, 0.05) 0%, transparent 100%);
+}
+
+/* Task icon container */
+.task-item-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+}
+
+.task-item-icon svg {
+    width: 1rem;
+    height: 1rem;
+    color: var(--text-tertiary);
+}
+
+.task-item.running .task-item-icon {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+}
+
+.task-item.running .task-item-icon svg {
+    color: #fff;
+    animation: spin 1.5s linear infinite;
+}
+
+.task-item.completed .task-item-icon {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+}
+
+.task-item.completed .task-item-icon svg {
+    color: #fff;
+}
+
+.task-item.failed .task-item-icon {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+}
+
+.task-item.failed .task-item-icon svg {
+    color: #fff;
+}
+
+/* Task content area */
+.task-item-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-item-name {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.25rem;
+}
+
+.task-item-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+}
+
+.task-item-time {
+    font-family: ui-monospace, monospace;
+}
+
+/* Task progress bar */
+.task-item-progress {
+    margin-top: 0.5rem;
+    height: 0.25rem;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.task-item-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: var(--radius-full);
+    transition: width var(--transition-smooth);
+}
+
+/* ============================================
+   TASK STATUS BADGE
+   ============================================ */
+.task-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+}
+
+/* Badge variants */
+.task-status-badge.pending {
+    background: linear-gradient(135deg, rgba(251, 191, 36, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%);
+    color: #b45309;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.dark .task-status-badge.pending {
+    color: #fcd34d;
+}
+
+.task-status-badge.running {
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%);
+    color: #1d4ed8;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.dark .task-status-badge.running {
+    color: #93c5fd;
+}
+
+.task-status-badge.completed {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+    color: #047857;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.dark .task-status-badge.completed {
+    color: #6ee7b7;
+}
+
+.task-status-badge.failed {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%);
+    color: #b91c1c;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.dark .task-status-badge.failed {
+    color: #fca5a5;
+}
+
+/* Badge dot indicator */
+.task-status-badge-dot {
+    width: 0.375rem;
+    height: 0.375rem;
+    border-radius: var(--radius-full);
+}
+
+.task-status-badge.pending .task-status-badge-dot {
+    background: #f59e0b;
+}
+
+.task-status-badge.running .task-status-badge-dot {
+    background: #3b82f6;
+    animation: taskDot 1.5s ease-in-out infinite;
+}
+
+.task-status-badge.completed .task-status-badge-dot {
+    background: #10b981;
+}
+
+.task-status-badge.failed .task-status-badge-dot {
+    background: #ef4444;
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+@keyframes taskPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+    }
+}
+
+@keyframes taskDot {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(0.8);
+    }
+}
+
+@keyframes taskItemSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Panel slide/scale animation */
+@keyframes panelExpand {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+@keyframes panelCollapse {
+    from {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: scale(0.9) translateY(10px);
+    }
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+@media (max-width: 640px) {
+    .task-indicator {
+        bottom: 1rem;
+        right: 1rem;
+    }
+
+    .task-panel {
+        bottom: 1rem;
+        right: 1rem;
+        width: calc(100vw - 2rem);
+        max-height: 60vh;
+    }
+
+    .task-indicator-btn {
+        padding: 0.625rem 0.875rem;
+        font-size: 0.8125rem;
+    }
+}
+
+/* ============================================
+   SCROLLBAR STYLING FOR TASK PANEL
+   ============================================ */
+.task-panel-body::-webkit-scrollbar {
+    width: 6px;
+}
+
+.task-panel-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.task-panel-body::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: var(--radius-full);
+}
+
+.task-panel-body::-webkit-scrollbar-thumb:hover {
+    background: var(--border-dark);
+}
+
+/* ============================================
+   KEYBOARD SHORTCUT HINT HIGHLIGHT
+   ============================================ */
+.shortcut-hint-active {
+    background: rgba(59, 130, 246, 0.4) !important;
+    animation: shortcutHintFlash 0.3s ease-out;
+}
+
+@keyframes shortcutHintFlash {
+    0% {
+        background: rgba(59, 130, 246, 0.6);
+        transform: scale(1.02);
+    }
+    100% {
+        background: transparent;
+        transform: scale(1);
+    }
+}

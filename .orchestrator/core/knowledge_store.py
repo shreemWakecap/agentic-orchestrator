@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from db import get_knowledge_repository, KnowledgeRepository
+from db import get_knowledge_repository, KnowledgeRepository, get_file_knowledge_repository, FileKnowledgeRepository
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,40 @@ class ScanMeta:
     scan_type: str = "full"  # full, quick
     trigger: str = "manual"  # manual, auto
     experts_generated: list[str] = field(default_factory=list)
+
+
+# --- File-Level Knowledge Data Models ---
+
+@dataclass
+class FileKnowledge:
+    """File-level knowledge from targeted scouting."""
+    file_path: str
+    file_name: str = ""
+    language: str = ""
+    size_bytes: int = 0
+    line_count: int = 0
+    last_modified: str = ""
+    content_hash: str = ""
+    imports: list[str] = field(default_factory=list)
+    exports: list[str] = field(default_factory=list)
+    classes: list[dict] = field(default_factory=list)
+    functions: list[dict] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    domain_hints: list[str] = field(default_factory=list)
+    notes: str = ""
+    scouted_at: str = ""
+
+
+@dataclass
+class FileScanResult:
+    """Result of a file-level scan operation."""
+    scan_id: str
+    file_path: str
+    success: bool = False
+    started_at: str = ""
+    completed_at: str = ""
+    duration_seconds: float = 0
+    error: Optional[str] = None
 
 
 # --- Knowledge Store ---
@@ -515,3 +549,201 @@ Reference: Trace the Knowledge module to see this pattern in action.""")
     def clear(self) -> None:
         """Clear all knowledge data from database."""
         self._repo.clear()
+
+
+# --- File Knowledge Store ---
+
+class FileKnowledgeStore:
+    """
+    Manages file-level knowledge for targeted scouting.
+
+    Stores individual file analysis results separately from bulk scans.
+
+    Usage:
+        store = FileKnowledgeStore(project_root)
+
+        # Save file knowledge
+        store.save(file_knowledge)
+
+        # Load file knowledge
+        knowledge = store.load("path/to/file.py")
+
+        # Check if knowledge exists
+        if store.exists("path/to/file.py"):
+            ...
+
+        # Get all scanned files
+        all_files = store.get_all()
+    """
+
+    def __init__(self, project_root: Path):
+        self.project_root = project_root.resolve()
+        self._repo = get_file_knowledge_repository()
+
+    def exists(self, file_path: str) -> bool:
+        """Check if knowledge exists for a specific file."""
+        return self._repo.exists(file_path)
+
+    def load(self, file_path: str) -> Optional[FileKnowledge]:
+        """Load knowledge for a specific file."""
+        data = self._repo.load_file_knowledge(file_path)
+        if not data:
+            return None
+
+        try:
+            return self._dict_to_file_knowledge(data)
+        except Exception as e:
+            logger.warning(f"Error loading file knowledge for {file_path}: {e}")
+            return None
+
+    def save(self, knowledge: FileKnowledge) -> bool:
+        """Save file knowledge to database."""
+        try:
+            knowledge.scouted_at = datetime.now().isoformat()
+
+            # Extract metadata for storage
+            metadata = {
+                "file_name": knowledge.file_name,
+                "last_modified": knowledge.last_modified,
+                "content_hash": knowledge.content_hash,
+                "domain_hints": knowledge.domain_hints,
+                "notes": knowledge.notes,
+            }
+
+            self._repo.save_file_knowledge(
+                file_path=knowledge.file_path,
+                file_type=self._detect_file_type(knowledge.file_path, knowledge.language),
+                language=knowledge.language,
+                size_bytes=knowledge.size_bytes,
+                line_count=knowledge.line_count,
+                imports=knowledge.imports,
+                exports=knowledge.exports,
+                classes=knowledge.classes,
+                functions=knowledge.functions,
+                dependencies=knowledge.dependencies,
+                metadata=metadata,
+                summary=knowledge.notes,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error saving file knowledge for {knowledge.file_path}: {e}")
+            return False
+
+    def delete(self, file_path: str) -> bool:
+        """Delete knowledge for a specific file."""
+        return self._repo.delete_file_knowledge(file_path)
+
+    def get_all(self) -> list[FileKnowledge]:
+        """Get knowledge for all scanned files."""
+        data_list = self._repo.get_all_file_knowledge()
+        result = []
+        for data in data_list:
+            try:
+                result.append(self._dict_to_file_knowledge(data))
+            except Exception as e:
+                logger.warning(f"Error loading file knowledge: {e}")
+        return result
+
+    def save_scan_result(self, result: FileScanResult, knowledge_id: int = None) -> bool:
+        """Save a file scan result."""
+        try:
+            status = "completed" if result.success else "failed"
+            self._repo.save_file_scan(
+                scan_id=result.scan_id,
+                file_path=result.file_path,
+                scan_type="single",
+                trigger="manual",
+                started_at=result.started_at,
+                completed_at=result.completed_at,
+                duration_seconds=result.duration_seconds,
+                status=status,
+                error_message=result.error,
+                knowledge_id=knowledge_id,
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Error saving scan result for {result.file_path}: {e}")
+            return False
+
+    def get_scan_history(self, file_path: str, limit: int = 10) -> list[FileScanResult]:
+        """Get scan history for a specific file."""
+        rows = self._repo.get_file_scan_history(file_path, limit)
+        result = []
+        for row in rows:
+            try:
+                result.append(FileScanResult(
+                    scan_id=row.get("scan_id", ""),
+                    file_path=row.get("file_path", ""),
+                    success=row.get("status") == "completed",
+                    started_at=row.get("started_at", ""),
+                    completed_at=row.get("completed_at", ""),
+                    duration_seconds=row.get("duration_seconds", 0),
+                    error=row.get("error_message"),
+                ))
+            except Exception as e:
+                logger.warning(f"Error loading scan history: {e}")
+        return result
+
+    def clear(self) -> int:
+        """Clear all file knowledge data from database."""
+        return self._repo.clear_all_file_knowledge()
+
+    def _dict_to_file_knowledge(self, data: dict) -> FileKnowledge:
+        """Convert database dict to FileKnowledge dataclass."""
+        metadata = data.get("metadata", {}) or {}
+        return FileKnowledge(
+            file_path=data.get("file_path", ""),
+            file_name=metadata.get("file_name", Path(data.get("file_path", "")).name),
+            language=data.get("language", ""),
+            size_bytes=data.get("size_bytes", 0),
+            line_count=data.get("line_count", 0),
+            last_modified=metadata.get("last_modified", ""),
+            content_hash=metadata.get("content_hash", ""),
+            imports=data.get("imports", []),
+            exports=data.get("exports", []),
+            classes=data.get("classes", []),
+            functions=data.get("functions", []),
+            dependencies=data.get("dependencies", []),
+            domain_hints=metadata.get("domain_hints", []),
+            notes=data.get("summary", "") or metadata.get("notes", ""),
+            scouted_at=data.get("last_scanned", ""),
+        )
+
+    def _detect_file_type(self, file_path: str, language: str) -> str:
+        """Detect file type from path and language."""
+        path = Path(file_path)
+        ext = path.suffix.lower()
+
+        # Map extensions to types
+        type_map = {
+            ".py": "python",
+            ".js": "javascript",
+            ".ts": "typescript",
+            ".jsx": "javascript",
+            ".tsx": "typescript",
+            ".java": "java",
+            ".go": "go",
+            ".rs": "rust",
+            ".rb": "ruby",
+            ".php": "php",
+            ".c": "c",
+            ".cpp": "cpp",
+            ".h": "header",
+            ".hpp": "header",
+            ".cs": "csharp",
+            ".swift": "swift",
+            ".kt": "kotlin",
+            ".sql": "sql",
+            ".html": "html",
+            ".css": "css",
+            ".scss": "scss",
+            ".json": "config",
+            ".yaml": "config",
+            ".yml": "config",
+            ".toml": "config",
+            ".xml": "config",
+            ".md": "markdown",
+            ".txt": "text",
+        }
+
+        return type_map.get(ext, language or "unknown")

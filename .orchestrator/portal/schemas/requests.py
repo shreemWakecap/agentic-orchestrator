@@ -68,6 +68,11 @@ class KeywordScoutRequest(BaseModel):
     keywords: str = Field(..., min_length=1, description="Keywords to search for during scouting")
 
 
+class FileScoutRequest(BaseModel):
+    """Request to scout a single file for knowledge extraction."""
+    file_path: str = Field(..., min_length=1, description="Path to the file to scout for knowledge")
+
+
 class SyncRemoteRequest(BaseModel):
     """Request to sync with remote repository."""
     auto_merge: Optional[bool] = Field(
@@ -102,112 +107,87 @@ class RecoverPlanRequest(BaseModel):
     )
 
 
-class CreateQuestionRequest(BaseModel):
-    """Request to create a new question."""
-    question: str = Field(..., min_length=1, max_length=2000, description="The question text to ask")
-    source_preference: Optional[str] = Field(
-        "auto",
-        pattern="^(knowledge_base|code_exploration|auto)$",
-        description="Preferred source for answer: 'knowledge_base' for scouting results, 'code_exploration' for codebase analysis, 'auto' for automatic selection"
-    )
-    tags: Optional[List[str]] = Field(
-        None,
-        description="Optional tags for categorizing the question"
-    )
+# ==================== Codebase Exploration Schemas ====================
 
-
-class UpdateQuestionRequest(BaseModel):
-    """Request to update an existing question."""
-    question: Optional[str] = Field(None, min_length=1, max_length=2000, description="Updated question text")
-    status: Optional[str] = Field(
-        None,
-        pattern="^(pending|answered|archived)$",
-        description="Question status: 'pending', 'answered', or 'archived'"
+class ExploreCodebaseRequest(BaseModel):
+    """Request to explore and understand the codebase."""
+    query: str = Field(..., min_length=1, max_length=2000, description="The exploration query/question about the codebase")
+    scope: Optional[str] = Field(
+        "all",
+        pattern="^(architecture|files|patterns|dependencies|all)$",
+        description="Exploration scope: 'architecture' for system design, 'files' for file-level analysis, 'patterns' for code patterns, 'dependencies' for dependency analysis, 'all' for comprehensive exploration"
     )
-    tags: Optional[List[str]] = Field(
-        None,
-        description="Updated tags for the question"
+    include_snippets: Optional[bool] = Field(
+        True,
+        description="Whether to include code snippets in the response"
+    )
+    max_results: Optional[int] = Field(
+        10,
+        ge=1,
+        le=50,
+        description="Maximum number of results to return (1-50)"
     )
 
 
-class CreateAnswerRequest(BaseModel):
-    """Request to create an answer for a question."""
-    content: str = Field(..., min_length=1, max_length=10000, description="The answer content")
-    source: str = Field(
-        ...,
-        pattern="^(knowledge_base|code_exploration|manual)$",
-        description="Answer source: 'knowledge_base', 'code_exploration', or 'manual'"
-    )
-    source_references: Optional[List[str]] = Field(
-        None,
-        description="References to source files or knowledge entries used for the answer"
-    )
-    confidence: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=1.0,
-        description="Confidence score for the answer (0.0 to 1.0)"
-    )
+class CodeSnippet(BaseModel):
+    """A code snippet extracted from the codebase."""
+    file_path: str = Field(..., description="Path to the source file")
+    start_line: int = Field(..., description="Starting line number of the snippet")
+    end_line: int = Field(..., description="Ending line number of the snippet")
+    content: str = Field(..., description="The code snippet content")
+    language: Optional[str] = Field(None, description="Programming language of the snippet")
+    relevance_score: Optional[float] = Field(None, ge=0.0, le=1.0, description="Relevance score (0.0 to 1.0)")
 
 
-class UpdateAnswerRequest(BaseModel):
-    """Request to update an existing answer."""
-    content: Optional[str] = Field(None, min_length=1, max_length=10000, description="Updated answer content")
-    is_obsolete: Optional[bool] = Field(None, description="Mark the answer as obsolete/outdated")
-    obsolete_reason: Optional[str] = Field(None, max_length=500, description="Reason why the answer is marked obsolete")
+class FileReference(BaseModel):
+    """A reference to a file in the codebase."""
+    file_path: str = Field(..., description="Path to the file")
+    description: str = Field(..., description="Brief description of the file's purpose or relevance")
+    file_type: Optional[str] = Field(None, description="Type of file (e.g., 'module', 'config', 'test')")
+    relevance: Optional[str] = Field(None, description="Why this file is relevant to the query")
 
 
-class AnswerResponse(BaseModel):
-    """Response model for a single answer."""
-    id: str = Field(..., description="Unique answer identifier")
-    question_id: str = Field(..., description="ID of the parent question")
-    content: str = Field(..., description="The answer content")
-    source: str = Field(..., description="Answer source: 'knowledge_base', 'code_exploration', or 'manual'")
-    source_references: List[str] = Field(default_factory=list, description="References to source files or knowledge entries")
-    confidence: Optional[float] = Field(None, description="Confidence score for the answer (0.0 to 1.0)")
-    is_obsolete: bool = Field(False, description="Whether the answer is marked as obsolete")
-    obsolete_reason: Optional[str] = Field(None, description="Reason why the answer is obsolete")
-    created_at: str = Field(..., description="ISO timestamp when answer was created")
-    updated_at: Optional[str] = Field(None, description="ISO timestamp when answer was last updated")
+class RelatedTopic(BaseModel):
+    """A related topic for further exploration."""
+    topic: str = Field(..., description="The related topic or concept")
+    description: str = Field(..., description="Brief description of the topic")
+    suggested_query: Optional[str] = Field(None, description="Suggested query to explore this topic")
+
+
+class ExplorationResultResponse(BaseModel):
+    """Response model for codebase exploration results."""
+    id: str = Field(..., description="Unique exploration result identifier")
+    query: str = Field(..., description="The original exploration query")
+    scope: str = Field(..., description="The scope used for exploration")
+    explanation: str = Field(..., description="Detailed explanation answering the query")
+    file_references: List[FileReference] = Field(default_factory=list, description="Relevant files in the codebase")
+    code_snippets: List[CodeSnippet] = Field(default_factory=list, description="Relevant code snippets")
+    related_topics: List[RelatedTopic] = Field(default_factory=list, description="Related topics for further exploration")
+    confidence: Optional[float] = Field(None, ge=0.0, le=1.0, description="Confidence score for the exploration result")
+    sources_used: List[str] = Field(default_factory=list, description="Knowledge sources used to generate the response")
+    created_at: str = Field(..., description="ISO timestamp when exploration was performed")
 
     class Config:
         from_attributes = True
 
 
-class QuestionResponse(BaseModel):
-    """Response model for a single question (summary view)."""
-    id: str = Field(..., description="Unique question identifier")
-    question: str = Field(..., description="The question text")
-    status: str = Field(..., description="Question status: 'pending', 'answered', or 'archived'")
-    source_preference: str = Field("auto", description="Preferred source for answer")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorizing the question")
-    answer_count: int = Field(0, description="Number of answers for this question")
-    created_at: str = Field(..., description="ISO timestamp when question was created")
-    updated_at: Optional[str] = Field(None, description="ISO timestamp when question was last updated")
+class ExplorationHistoryResponse(BaseModel):
+    """Response model for a single exploration history entry (summary view)."""
+    id: str = Field(..., description="Unique exploration identifier")
+    query: str = Field(..., description="The exploration query")
+    scope: str = Field(..., description="The scope used for exploration")
+    file_count: int = Field(0, description="Number of files referenced")
+    snippet_count: int = Field(0, description="Number of code snippets included")
+    created_at: str = Field(..., description="ISO timestamp when exploration was performed")
 
     class Config:
         from_attributes = True
 
 
-class QuestionDetailResponse(BaseModel):
-    """Response model for a single question with full details including answers."""
-    id: str = Field(..., description="Unique question identifier")
-    question: str = Field(..., description="The question text")
-    status: str = Field(..., description="Question status: 'pending', 'answered', or 'archived'")
-    source_preference: str = Field("auto", description="Preferred source for answer")
-    tags: List[str] = Field(default_factory=list, description="Tags for categorizing the question")
-    answers: List[AnswerResponse] = Field(default_factory=list, description="List of answers for this question")
-    created_at: str = Field(..., description="ISO timestamp when question was created")
-    updated_at: Optional[str] = Field(None, description="ISO timestamp when question was last updated")
-
-    class Config:
-        from_attributes = True
-
-
-class QuestionListResponse(BaseModel):
-    """Response model for listing questions with pagination."""
-    questions: List[QuestionResponse] = Field(default_factory=list, description="List of questions")
-    total: int = Field(0, description="Total number of questions matching filters")
+class ExplorationListResponse(BaseModel):
+    """Response model for listing exploration history with pagination."""
+    explorations: List[ExplorationHistoryResponse] = Field(default_factory=list, description="List of exploration results")
+    total: int = Field(0, description="Total number of explorations matching filters")
     page: int = Field(1, description="Current page number")
     page_size: int = Field(20, description="Number of items per page")
     has_more: bool = Field(False, description="Whether there are more pages available")

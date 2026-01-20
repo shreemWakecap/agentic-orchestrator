@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}Questions - SDLC Orchestrator{% endblock %}
+{% block title %}Codebase Explorer - SDLC Orchestrator{% endblock %}
 
 {% block head %}
 <style>
-    /* Question Status Badge Styles */
+    /* Exploration Status Badge Styles */
     .status-badge {
         display: inline-flex;
         align-items: center;
@@ -37,145 +37,149 @@
         color: #991B1B;
     }
 
-    /* Source Badge Styles */
-    .source-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.375rem;
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.375rem;
-        font-size: 0.75rem;
-        font-weight: 500;
-    }
-
-    .source-knowledge {
-        background: linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%);
-        color: #5B21B6;
-    }
-
-    .source-codebase {
-        background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
-        color: #047857;
-    }
-
-    /* Question Card Styles */
-    .question-card {
+    /* Quick Link Card Styles */
+    .quick-link-card {
         background: white;
         border: 1px solid #E5E7EB;
         border-radius: 0.75rem;
         padding: 1.25rem;
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
         cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        gap: 0.75rem;
     }
 
-    .question-card:hover {
+    .quick-link-card:hover {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         transform: translateY(-2px);
-        border-color: #D1D5DB;
-    }
-
-    .question-card.expanded {
         border-color: #3B82F6;
-        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
     }
 
-    .dark .question-card {
+    .dark .quick-link-card {
         background: #1E293B;
         border-color: #334155;
     }
 
-    .dark .question-card:hover {
+    .dark .quick-link-card:hover {
+        background: #1E293B;
+        border-color: #3B82F6;
+    }
+
+    .quick-link-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Exploration Result Card Styles */
+    .result-card {
+        background: white;
+        border: 1px solid #E5E7EB;
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .result-card:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        border-color: #D1D5DB;
+    }
+
+    .dark .result-card {
+        background: #1E293B;
+        border-color: #334155;
+    }
+
+    .dark .result-card:hover {
         background: #1E293B;
         border-color: #475569;
     }
 
-    .dark .question-card.expanded {
-        border-color: #3B82F6;
-    }
-
-    /* Answer Item Styles */
-    .answer-item {
-        background: #F9FAFB;
-        border: 1px solid #E5E7EB;
+    /* Code Snippet Styles */
+    .code-snippet {
+        background: #1F2937;
         border-radius: 0.5rem;
         padding: 1rem;
         margin-top: 0.75rem;
-        transition: all 0.2s ease;
+        overflow-x: auto;
+        font-family: 'JetBrains Mono', 'Fira Code', monospace;
+        font-size: 0.8125rem;
+        line-height: 1.6;
+        color: #E5E7EB;
     }
 
-    .answer-item:hover {
-        background: #F3F4F6;
+    .code-snippet .line-number {
+        color: #6B7280;
+        margin-right: 1rem;
+        user-select: none;
     }
 
-    .answer-item.obsolete {
-        opacity: 0.6;
-        border-style: dashed;
+    .code-snippet .code-line {
+        display: block;
     }
 
-    .dark .answer-item {
+    .code-snippet .code-line:hover {
+        background: rgba(59, 130, 246, 0.1);
+    }
+
+    .dark .code-snippet {
         background: #0F172A;
-        border-color: #334155;
     }
 
-    .dark .answer-item:hover {
-        background: #1E293B;
-    }
-
-    /* Obsolete Badge */
-    .obsolete-badge {
+    /* File Reference Badge */
+    .file-ref {
         display: inline-flex;
         align-items: center;
-        gap: 0.25rem;
-        padding: 0.125rem 0.5rem;
-        background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
-        color: #92400E;
-        border-radius: 9999px;
-        font-size: 0.6875rem;
-        font-weight: 600;
-        text-transform: uppercase;
+        gap: 0.375rem;
+        padding: 0.25rem 0.625rem;
+        background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+        color: #1E40AF;
+        border-radius: 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        font-family: 'JetBrains Mono', monospace;
+        cursor: pointer;
+        transition: all 0.15s ease;
     }
 
-    /* Expand/Collapse Answers */
-    .answers-container {
-        max-height: 0;
-        overflow: hidden;
-        transition: max-height 0.3s ease-out, padding 0.3s ease-out, margin 0.3s ease-out;
+    .file-ref:hover {
+        background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%);
     }
 
-    .answers-container.expanded {
-        max-height: 2000px;
-        padding-top: 1rem;
-        margin-top: 1rem;
-        border-top: 1px solid #E5E7EB;
+    .dark .file-ref {
+        background: linear-gradient(135deg, #1E3A5F 0%, #1E40AF40 100%);
+        color: #93C5FD;
     }
 
-    .dark .answers-container.expanded {
-        border-top-color: #334155;
-    }
-
-    .expand-arrow {
-        transition: transform 0.3s ease;
-    }
-
-    .expand-arrow.rotated {
-        transform: rotate(180deg);
+    .dark .file-ref:hover {
+        background: linear-gradient(135deg, #1E40AF40 0%, #1E40AF60 100%);
     }
 
     /* Search and Filter Styles */
+    .search-container {
+        position: relative;
+    }
+
     .search-input {
-        padding: 0.75rem 1rem 0.75rem 2.75rem;
-        border: 1px solid #D1D5DB;
-        border-radius: 0.5rem;
-        font-size: 0.875rem;
+        padding: 1rem 1.25rem 1rem 3rem;
+        border: 2px solid #E5E7EB;
+        border-radius: 0.75rem;
+        font-size: 1rem;
         background: white;
-        transition: all 0.15s ease;
+        transition: all 0.2s ease;
         width: 100%;
     }
 
     .search-input:focus {
         outline: none;
         border-color: #3B82F6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
     }
 
     .dark .search-input {
@@ -184,32 +188,44 @@
         color: #E2E8F0;
     }
 
-    .filter-select {
-        padding: 0.625rem 2rem 0.625rem 0.875rem;
-        border: 1px solid #D1D5DB;
+    .dark .search-input:focus {
+        border-color: #3B82F6;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #9CA3AF;
+        pointer-events: none;
+    }
+
+    .search-btn {
+        position: absolute;
+        right: 0.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    /* Recent Exploration Item */
+    .recent-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
         border-radius: 0.5rem;
-        font-size: 0.875rem;
-        background: white;
         cursor: pointer;
-        appearance: none;
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-        background-position: right 0.5rem center;
-        background-repeat: no-repeat;
-        background-size: 1.5em 1.5em;
         transition: all 0.15s ease;
     }
 
-    .filter-select:focus {
-        outline: none;
-        border-color: #3B82F6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    .recent-item:hover {
+        background: #F3F4F6;
     }
 
-    .dark .filter-select {
-        background-color: #1E293B;
-        border-color: #475569;
-        color: #E2E8F0;
-        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    .dark .recent-item:hover {
+        background: #334155;
     }
 
     /* Empty State */
@@ -226,222 +242,6 @@
         border-color: #334155;
     }
 
-    /* Modal Styles */
-    .modal-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(4px);
-        z-index: 40;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.3s ease;
-    }
-
-    .modal-overlay.active {
-        opacity: 1;
-        visibility: visible;
-    }
-
-    .modal-container {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) scale(0.95);
-        background: white;
-        border-radius: 0.75rem;
-        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-        z-index: 50;
-        width: 100%;
-        max-width: 32rem;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .modal-container.active {
-        opacity: 1;
-        visibility: visible;
-        transform: translate(-50%, -50%) scale(1);
-    }
-
-    .dark .modal-container {
-        background: #1E293B;
-    }
-
-    .modal-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1.25rem 1.5rem;
-        border-bottom: 1px solid #E5E7EB;
-    }
-
-    .dark .modal-header {
-        border-color: #334155;
-    }
-
-    .modal-body {
-        padding: 1.5rem;
-    }
-
-    .modal-footer {
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.75rem;
-        padding: 1rem 1.5rem;
-        border-top: 1px solid #E5E7EB;
-        background: #F9FAFB;
-        border-radius: 0 0 0.75rem 0.75rem;
-    }
-
-    .dark .modal-footer {
-        border-color: #334155;
-        background: #0F172A;
-    }
-
-    /* Form Styles */
-    .form-group {
-        margin-bottom: 1.25rem;
-    }
-
-    .form-label {
-        display: block;
-        font-size: 0.875rem;
-        font-weight: 600;
-        color: #374151;
-        margin-bottom: 0.5rem;
-    }
-
-    .dark .form-label {
-        color: #E2E8F0;
-    }
-
-    .form-hint {
-        font-size: 0.75rem;
-        color: #6B7280;
-        margin-top: 0.25rem;
-    }
-
-    .dark .form-hint {
-        color: #94A3B8;
-    }
-
-    .form-textarea {
-        width: 100%;
-        padding: 0.75rem 1rem;
-        border: 1px solid #D1D5DB;
-        border-radius: 0.5rem;
-        font-size: 0.875rem;
-        background: white;
-        resize: vertical;
-        min-height: 6rem;
-        transition: all 0.15s ease;
-    }
-
-    .form-textarea:focus {
-        outline: none;
-        border-color: #3B82F6;
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-    }
-
-    .dark .form-textarea {
-        background: #0F172A;
-        border-color: #475569;
-        color: #E2E8F0;
-    }
-
-    .form-radio-group {
-        display: flex;
-        gap: 1rem;
-    }
-
-    .form-radio-item {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1rem;
-        border: 1px solid #E5E7EB;
-        border-radius: 0.5rem;
-        cursor: pointer;
-        transition: all 0.15s ease;
-        flex: 1;
-    }
-
-    .form-radio-item:hover {
-        border-color: #3B82F6;
-        background: #F0F9FF;
-    }
-
-    .form-radio-item.selected {
-        border-color: #3B82F6;
-        background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
-    }
-
-    .dark .form-radio-item {
-        border-color: #334155;
-        background: #1E293B;
-    }
-
-    .dark .form-radio-item:hover {
-        border-color: #3B82F6;
-        background: #1E3A5F;
-    }
-
-    .dark .form-radio-item.selected {
-        border-color: #3B82F6;
-        background: linear-gradient(135deg, #1E3A5F 0%, #1E40AF40 100%);
-    }
-
-    .form-radio-item input[type="radio"] {
-        accent-color: #3B82F6;
-    }
-
-    .form-radio-item span {
-        font-size: 0.875rem;
-        font-weight: 500;
-        color: #374151;
-    }
-
-    .dark .form-radio-item span {
-        color: #E2E8F0;
-    }
-
-    /* Confirmation Dialog */
-    .confirm-dialog {
-        text-align: center;
-    }
-
-    .confirm-dialog .icon-container {
-        width: 4rem;
-        height: 4rem;
-        margin: 0 auto 1rem;
-        border-radius: 9999px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .confirm-dialog .icon-container.danger {
-        background: linear-gradient(135deg, #FEE2E2 0%, #FECACA 100%);
-    }
-
-    .confirm-dialog .icon-container.warning {
-        background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
-    }
-
-    /* Answer Content Styles */
-    .answer-content {
-        font-size: 0.9375rem;
-        line-height: 1.6;
-        color: #374151;
-        white-space: pre-wrap;
-    }
-
-    .dark .answer-content {
-        color: #E2E8F0;
-    }
-
     /* Timestamp Styles */
     .timestamp {
         font-size: 0.75rem;
@@ -451,20 +251,64 @@
     .dark .timestamp {
         color: #64748B;
     }
+
+    /* Loading Spinner */
+    .explore-spinner {
+        display: inline-block;
+        width: 1.25rem;
+        height: 1.25rem;
+        border: 2px solid #E5E7EB;
+        border-top-color: #3B82F6;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Results Container */
+    .results-container {
+        min-height: 200px;
+    }
+
+    /* Exploration answer content */
+    .exploration-content {
+        font-size: 0.9375rem;
+        line-height: 1.7;
+        color: #374151;
+    }
+
+    .dark .exploration-content {
+        color: #E2E8F0;
+    }
+
+    .exploration-content p {
+        margin-bottom: 0.75rem;
+    }
+
+    .exploration-content ul, .exploration-content ol {
+        margin-left: 1.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .exploration-content li {
+        margin-bottom: 0.25rem;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="px-4 py-8 sm:px-0">
     <!-- Header with Gradient Background -->
-    <div class="relative mb-12 overflow-hidden">
+    <div class="relative mb-8 overflow-hidden">
         <div class="absolute inset-0 gradient-mesh opacity-50"></div>
         <div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
                 <h1 class="text-4xl font-bold text-primary dark:text-primary">
-                    <span class="text-gradient-primary">Questions & Answers</span>
+                    <span class="text-gradient-primary">Codebase Explorer</span>
                 </h1>
-                <p class="mt-3 text-lg text-secondary dark:text-secondary">Ask questions about your codebase and knowledge base</p>
+                <p class="mt-3 text-lg text-secondary dark:text-secondary">Understand your codebase architecture, patterns, and implementation details</p>
             </div>
             <div class="flex items-center gap-3">
                 <a href="/knowledge" class="btn btn-secondary group">
@@ -473,53 +317,108 @@
                     </svg>
                     Back to Knowledge
                 </a>
-                <button id="ask-question-btn" type="button" class="btn btn-primary btn-modern group">
-                    <svg class="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Ask Question
-                </button>
             </div>
         </div>
     </div>
 
-    <!-- Search and Filters -->
+    <!-- Search Section -->
     <div class="glass-card p-6 mb-8">
-        <div class="flex flex-col lg:flex-row gap-4">
-            <!-- Search Input -->
-            <div class="flex-1 relative">
-                <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        <form id="explore-form" class="search-container">
+            <svg class="search-icon h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+            <input type="text" id="explore-query" name="query" placeholder="Ask about architecture, patterns, dependencies, or any codebase question..." class="search-input" autocomplete="off">
+            <button type="submit" id="explore-btn" class="search-btn btn btn-primary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
                 </svg>
-                <input type="text" id="search-input" placeholder="Search questions..." class="search-input">
-            </div>
+                Explore
+            </button>
+        </form>
+    </div>
 
-            <!-- Filters -->
-            <div class="flex gap-3">
-                <select id="status-filter" class="filter-select">
-                    <option value="">All Statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="exploring">Exploring</option>
-                    <option value="answered">Answered</option>
-                    <option value="failed">Failed</option>
-                </select>
+    <!-- Quick Links -->
+    <div class="mb-8">
+        <h2 class="text-lg font-semibold text-primary dark:text-primary mb-4">Quick Explorations</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <button type="button" class="quick-link-card" onclick="exploreQuickLink('architecture')">
+                <div class="quick-link-icon bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-900 dark:to-indigo-800">
+                    <svg class="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                </div>
+                <span class="font-medium text-primary dark:text-primary">Architecture Overview</span>
+                <span class="text-xs text-secondary dark:text-secondary">System structure & layers</span>
+            </button>
 
-                <select id="source-filter" class="filter-select">
-                    <option value="">All Sources</option>
-                    <option value="knowledge_base">Knowledge Base</option>
-                    <option value="codebase">Codebase</option>
-                </select>
-            </div>
+            <button type="button" class="quick-link-card" onclick="exploreQuickLink('patterns')">
+                <div class="quick-link-icon bg-gradient-to-br from-purple-100 to-violet-200 dark:from-purple-900 dark:to-violet-800">
+                    <svg class="h-6 w-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"></path>
+                    </svg>
+                </div>
+                <span class="font-medium text-primary dark:text-primary">Design Patterns</span>
+                <span class="text-xs text-secondary dark:text-secondary">Conventions & best practices</span>
+            </button>
+
+            <button type="button" class="quick-link-card" onclick="exploreQuickLink('domains')">
+                <div class="quick-link-icon bg-gradient-to-br from-emerald-100 to-teal-200 dark:from-emerald-900 dark:to-teal-800">
+                    <svg class="h-6 w-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <span class="font-medium text-primary dark:text-primary">Domain Models</span>
+                <span class="text-xs text-secondary dark:text-secondary">Business entities & logic</span>
+            </button>
+
+            <button type="button" class="quick-link-card" onclick="exploreQuickLink('dependencies')">
+                <div class="quick-link-icon bg-gradient-to-br from-orange-100 to-amber-200 dark:from-orange-900 dark:to-amber-800">
+                    <svg class="h-6 w-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path>
+                    </svg>
+                </div>
+                <span class="font-medium text-primary dark:text-primary">Dependencies</span>
+                <span class="text-xs text-secondary dark:text-secondary">Libraries & integrations</span>
+            </button>
         </div>
     </div>
 
-    <!-- Questions List -->
-    <div id="questions-container">
+    <!-- Results Section -->
+    <div id="results-section" class="mb-8 hidden">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-lg font-semibold text-primary dark:text-primary">Exploration Results</h2>
+            <button type="button" id="clear-results-btn" onclick="clearResults()" class="btn btn-secondary btn-sm">
+                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+                Clear
+            </button>
+        </div>
+        <div id="results-container" class="results-container space-y-4">
+            <!-- Results will be populated here -->
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading-section" class="mb-8 hidden">
+        <div class="glass-card p-8 text-center">
+            <div class="explore-spinner mx-auto mb-4"></div>
+            <p class="text-secondary dark:text-secondary">Exploring the codebase...</p>
+            <p class="text-xs text-tertiary dark:text-tertiary mt-2" id="loading-query"></p>
+        </div>
+    </div>
+
+    <!-- Recent Explorations / Explorations List -->
+    <div id="explorations-container">
         {% if questions %}
-        <div class="space-y-4" id="questions-list">
+        <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-primary dark:text-primary">Recent Explorations</h2>
+            <span class="text-sm text-tertiary dark:text-tertiary">{{ questions|length }} exploration{{ 's' if questions|length != 1 else '' }}</span>
+        </div>
+        <div class="space-y-4" id="explorations-list">
             {% for question in questions %}
-            <div class="question-card" data-question-id="{{ question.id }}" data-status="{{ question.status }}" data-source="{{ question.source }}">
-                <div class="flex items-start justify-between gap-4" onclick="toggleAnswers('{{ question.id }}')">
+            <div class="result-card" data-exploration-id="{{ question.id }}" data-status="{{ question.status }}">
+                <div class="flex items-start justify-between gap-4">
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-3 mb-2">
                             <span class="status-badge status-{{ question.status }}">
@@ -542,83 +441,45 @@
                                 {% endif %}
                                 {{ question.status }}
                             </span>
-                            <span class="source-badge source-{{ 'knowledge' if question.source == 'knowledge_base' else 'codebase' }}">
-                                {% if question.source == 'knowledge_base' %}
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                                </svg>
-                                {% else %}
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                                </svg>
-                                {% endif %}
-                                {{ 'Knowledge Base' if question.source == 'knowledge_base' else 'Codebase' }}
-                            </span>
                             <span class="timestamp">{{ question.created_at }}</span>
                         </div>
-                        <p class="text-primary dark:text-primary font-medium text-lg">{{ question.question_text }}</p>
+                        <p class="text-primary dark:text-primary font-medium">{{ question.question_text }}</p>
+
+                        {% if question.answers and question.answers|length > 0 %}
+                        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                            {% for answer in question.answers %}
+                            <div class="exploration-content">
+                                {{ answer.answer_text }}
+                            </div>
+                            {% if answer.file_references %}
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                {% for ref in answer.file_references %}
+                                <span class="file-ref" onclick="copyFilePath('{{ ref.path }}')">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                    </svg>
+                                    {{ ref.path }}{% if ref.line_number %}:{{ ref.line_number }}{% endif %}
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                            {% if answer.code_snippets %}
+                            {% for snippet in answer.code_snippets %}
+                            <div class="code-snippet">
+                                <div class="text-xs text-gray-400 mb-2">{{ snippet.file_path }}{% if snippet.start_line %} (lines {{ snippet.start_line }}-{{ snippet.end_line }}){% endif %}</div>
+                                <pre><code>{{ snippet.code }}</code></pre>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="text-sm text-tertiary dark:text-tertiary">
-                            {{ question.answers|length if question.answers else 0 }} answer{{ 's' if not question.answers or question.answers|length != 1 else '' }}
-                        </span>
-                        <svg class="expand-arrow w-5 h-5 text-gray-400" id="arrow-{{ question.id }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </div>
-                </div>
-
-                <!-- Answers Container (Expandable) -->
-                <div class="answers-container" id="answers-{{ question.id }}">
-                    {% if question.answers %}
-                    {% for answer in question.answers %}
-                    <div class="answer-item {% if answer.is_obsolete %}obsolete{% endif %}" data-answer-id="{{ answer.id }}">
-                        <div class="flex items-start justify-between gap-3 mb-2">
-                            <div class="flex items-center gap-2">
-                                {% if answer.is_obsolete %}
-                                <span class="obsolete-badge">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                                    </svg>
-                                    Obsolete
-                                </span>
-                                {% endif %}
-                                <span class="timestamp">{{ answer.created_at }}</span>
-                            </div>
-                            <div class="flex items-center gap-1">
-                                {% if not answer.is_obsolete %}
-                                <button type="button" onclick="event.stopPropagation(); markAnswerObsolete('{{ answer.id }}')" class="p-1.5 rounded-md hover:bg-yellow-100 dark:hover:bg-yellow-900/30 text-gray-400 hover:text-yellow-600 transition-colors" title="Mark as obsolete">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                                    </svg>
-                                </button>
-                                {% endif %}
-                                <button type="button" onclick="event.stopPropagation(); confirmDeleteAnswer('{{ answer.id }}')" class="p-1.5 rounded-md hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-400 hover:text-red-600 transition-colors" title="Delete answer">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="answer-content">{{ answer.answer_text }}</div>
-                    </div>
-                    {% endfor %}
-                    {% else %}
-                    <div class="text-center py-4 text-tertiary dark:text-tertiary">
-                        <svg class="w-8 h-8 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
-                        </svg>
-                        <p class="text-sm">No answers yet</p>
-                    </div>
-                    {% endif %}
-
-                    <!-- Question Actions -->
-                    <div class="flex items-center justify-end gap-2 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <button type="button" onclick="event.stopPropagation(); confirmDeleteQuestion('{{ question.id }}')" class="btn btn-danger btn-sm">
-                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        <button type="button" onclick="rerunExploration('{{ question.question_text|e }}')" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-blue-600 transition-colors" title="Re-run exploration">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                             </svg>
-                            Delete Question
                         </button>
                     </div>
                 </div>
@@ -630,155 +491,23 @@
         <div class="empty-state-card">
             <div class="w-20 h-20 mx-auto bg-gradient-to-br from-blue-100 to-indigo-200 dark:from-blue-900 dark:to-indigo-800 rounded-2xl flex items-center justify-center mb-5 shadow-lg">
                 <svg class="h-10 w-10 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
                 </svg>
             </div>
-            <h3 class="text-xl font-semibold text-primary dark:text-primary mb-2">No Questions Yet</h3>
+            <h3 class="text-xl font-semibold text-primary dark:text-primary mb-2">Start Exploring Your Codebase</h3>
             <p class="text-secondary dark:text-secondary mb-6 max-w-md mx-auto">
-                Ask questions about your codebase or leverage the knowledge base to get instant answers.
+                Ask questions about architecture, patterns, dependencies, or any aspect of your codebase to gather context before planning features.
             </p>
-            <button id="ask-question-empty-btn" type="button" class="btn btn-primary btn-lg group">
-                <svg class="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                Ask Your First Question
-            </button>
+            <div class="flex flex-wrap justify-center gap-2">
+                <button type="button" onclick="exploreQuickLink('architecture')" class="btn btn-secondary btn-sm">
+                    Architecture Overview
+                </button>
+                <button type="button" onclick="exploreQuickLink('patterns')" class="btn btn-secondary btn-sm">
+                    Design Patterns
+                </button>
+            </div>
         </div>
         {% endif %}
-    </div>
-</div>
-
-<!-- Ask Question Modal -->
-<div id="ask-modal-overlay" class="modal-overlay" onclick="closeAskModal()"></div>
-<div id="ask-modal" class="modal-container">
-    <div class="modal-header">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-                <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-            </div>
-            <div>
-                <h3 class="text-lg font-semibold text-primary dark:text-primary">Ask a Question</h3>
-                <p class="text-xs text-secondary dark:text-secondary">Get answers from knowledge base or codebase</p>
-            </div>
-        </div>
-        <button type="button" onclick="closeAskModal()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-            <svg class="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-            </svg>
-        </button>
-    </div>
-    <form id="ask-question-form">
-        <div class="modal-body">
-            <div class="form-group">
-                <label class="form-label" for="question-text">Your Question</label>
-                <textarea id="question-text" name="question_text" class="form-textarea" placeholder="What would you like to know about the codebase?" required></textarea>
-                <p class="form-hint">Be specific to get better answers</p>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Answer Source</label>
-                <div class="form-radio-group">
-                    <label class="form-radio-item selected" data-value="knowledge_base">
-                        <input type="radio" name="source" value="knowledge_base" checked>
-                        <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                        </svg>
-                        <span>Knowledge Base</span>
-                    </label>
-                    <label class="form-radio-item" data-value="codebase">
-                        <input type="radio" name="source" value="codebase">
-                        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                        </svg>
-                        <span>Codebase</span>
-                    </label>
-                </div>
-                <p class="form-hint">Knowledge Base uses scouting results; Codebase explores code directly</p>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button type="button" onclick="closeAskModal()" class="btn btn-secondary">Cancel</button>
-            <button type="submit" id="submit-question-btn" class="btn btn-primary">
-                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                </svg>
-                Submit Question
-            </button>
-        </div>
-    </form>
-</div>
-
-<!-- Delete Question Confirmation Modal -->
-<div id="delete-question-modal-overlay" class="modal-overlay" onclick="closeDeleteQuestionModal()"></div>
-<div id="delete-question-modal" class="modal-container">
-    <div class="modal-body confirm-dialog">
-        <div class="icon-container danger">
-            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-        </div>
-        <h3 class="text-lg font-semibold text-primary dark:text-primary mb-2">Delete Question?</h3>
-        <p class="text-secondary dark:text-secondary mb-1">This will permanently delete the question and all its answers.</p>
-        <p class="text-sm text-tertiary dark:text-tertiary">This action cannot be undone.</p>
-    </div>
-    <div class="modal-footer">
-        <button type="button" onclick="closeDeleteQuestionModal()" class="btn btn-secondary">Cancel</button>
-        <button type="button" id="confirm-delete-question-btn" class="btn btn-danger">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-            Delete Question
-        </button>
-    </div>
-</div>
-
-<!-- Delete Answer Confirmation Modal -->
-<div id="delete-answer-modal-overlay" class="modal-overlay" onclick="closeDeleteAnswerModal()"></div>
-<div id="delete-answer-modal" class="modal-container">
-    <div class="modal-body confirm-dialog">
-        <div class="icon-container danger">
-            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-        </div>
-        <h3 class="text-lg font-semibold text-primary dark:text-primary mb-2">Delete Answer?</h3>
-        <p class="text-secondary dark:text-secondary mb-1">This will permanently delete this answer.</p>
-        <p class="text-sm text-tertiary dark:text-tertiary">This action cannot be undone.</p>
-    </div>
-    <div class="modal-footer">
-        <button type="button" onclick="closeDeleteAnswerModal()" class="btn btn-secondary">Cancel</button>
-        <button type="button" id="confirm-delete-answer-btn" class="btn btn-danger">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg>
-            Delete Answer
-        </button>
-    </div>
-</div>
-
-<!-- Mark Obsolete Confirmation Modal -->
-<div id="obsolete-modal-overlay" class="modal-overlay" onclick="closeObsoleteModal()"></div>
-<div id="obsolete-modal" class="modal-container">
-    <div class="modal-body confirm-dialog">
-        <div class="icon-container warning">
-            <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-        </div>
-        <h3 class="text-lg font-semibold text-primary dark:text-primary mb-2">Mark as Obsolete?</h3>
-        <p class="text-secondary dark:text-secondary mb-1">This answer will be marked as outdated.</p>
-        <p class="text-sm text-tertiary dark:text-tertiary">It will still be visible but shown as obsolete.</p>
-    </div>
-    <div class="modal-footer">
-        <button type="button" onclick="closeObsoleteModal()" class="btn btn-secondary">Cancel</button>
-        <button type="button" id="confirm-obsolete-btn" class="btn btn-primary" style="background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);">
-            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-            </svg>
-            Mark Obsolete
-        </button>
     </div>
 </div>
 
@@ -793,388 +522,143 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Toast notifications -->
 <script src="/static/js/toast.js"></script>
+<!-- Codebase Explorer module -->
+<script src="/static/js/questions.js"></script>
 <script>
-/**
- * Questions Page JavaScript
- */
+// Quick link exploration queries
+const quickLinkQueries = {
+    architecture: 'What is the overall architecture of this codebase? Describe the main layers, components, and how they interact.',
+    patterns: 'What design patterns are used in this codebase? Show examples of common conventions and best practices.',
+    domains: 'What are the main domain models and business entities in this codebase? Describe the core business logic.',
+    dependencies: 'What are the main external dependencies and integrations in this codebase? List the key libraries and their purposes.'
+};
 
-// State for tracking which question/answer to delete/mark obsolete
-let pendingDeleteQuestionId = null;
-let pendingDeleteAnswerId = null;
-let pendingObsoleteAnswerId = null;
-
-// Modal Management Functions
-function openAskModal() {
-    document.getElementById('ask-modal-overlay').classList.add('active');
-    document.getElementById('ask-modal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-    document.getElementById('question-text').focus();
+function exploreQuickLink(type) {
+    const query = quickLinkQueries[type];
+    if (query) {
+        document.getElementById('explore-query').value = query;
+        document.getElementById('explore-form').dispatchEvent(new Event('submit'));
+    }
 }
 
-function closeAskModal() {
-    document.getElementById('ask-modal-overlay').classList.remove('active');
-    document.getElementById('ask-modal').classList.remove('active');
-    document.body.style.overflow = '';
-    document.getElementById('ask-question-form').reset();
-    // Reset radio button styling
-    document.querySelectorAll('.form-radio-item').forEach(item => {
-        item.classList.remove('selected');
-        if (item.dataset.value === 'knowledge_base') {
-            item.classList.add('selected');
+function rerunExploration(query) {
+    document.getElementById('explore-query').value = query;
+    document.getElementById('explore-form').dispatchEvent(new Event('submit'));
+}
+
+function clearResults() {
+    document.getElementById('results-section').classList.add('hidden');
+    document.getElementById('results-container').innerHTML = '';
+    document.getElementById('explore-query').value = '';
+    document.getElementById('explore-query').focus();
+}
+
+function copyFilePath(path) {
+    navigator.clipboard.writeText(path).then(() => {
+        if (typeof Toast !== 'undefined') {
+            Toast.show('File path copied to clipboard', 'success');
+        }
+    }).catch(() => {
+        if (typeof Toast !== 'undefined') {
+            Toast.show('Failed to copy file path', 'error');
         }
     });
 }
 
-function confirmDeleteQuestion(questionId) {
-    pendingDeleteQuestionId = questionId;
-    document.getElementById('delete-question-modal-overlay').classList.add('active');
-    document.getElementById('delete-question-modal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
+// Initialize exploration form
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('explore-form');
+    const queryInput = document.getElementById('explore-query');
+    const exploreBtn = document.getElementById('explore-btn');
+    const loadingSection = document.getElementById('loading-section');
+    const loadingQuery = document.getElementById('loading-query');
+    const resultsSection = document.getElementById('results-section');
+    const resultsContainer = document.getElementById('results-container');
 
-function closeDeleteQuestionModal() {
-    document.getElementById('delete-question-modal-overlay').classList.remove('active');
-    document.getElementById('delete-question-modal').classList.remove('active');
-    document.body.style.overflow = '';
-    pendingDeleteQuestionId = null;
-}
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
 
-function confirmDeleteAnswer(answerId) {
-    pendingDeleteAnswerId = answerId;
-    document.getElementById('delete-answer-modal-overlay').classList.add('active');
-    document.getElementById('delete-answer-modal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeDeleteAnswerModal() {
-    document.getElementById('delete-answer-modal-overlay').classList.remove('active');
-    document.getElementById('delete-answer-modal').classList.remove('active');
-    document.body.style.overflow = '';
-    pendingDeleteAnswerId = null;
-}
-
-function markAnswerObsolete(answerId) {
-    pendingObsoleteAnswerId = answerId;
-    document.getElementById('obsolete-modal-overlay').classList.add('active');
-    document.getElementById('obsolete-modal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function closeObsoleteModal() {
-    document.getElementById('obsolete-modal-overlay').classList.remove('active');
-    document.getElementById('obsolete-modal').classList.remove('active');
-    document.body.style.overflow = '';
-    pendingObsoleteAnswerId = null;
-}
-
-// Toggle Answers Visibility
-function toggleAnswers(questionId) {
-    const container = document.getElementById('answers-' + questionId);
-    const arrow = document.getElementById('arrow-' + questionId);
-    const card = container.closest('.question-card');
-
-    const isExpanded = container.classList.contains('expanded');
-
-    // Close all other expanded containers
-    document.querySelectorAll('.answers-container.expanded').forEach(el => {
-        if (el.id !== 'answers-' + questionId) {
-            el.classList.remove('expanded');
-            const otherArrow = document.getElementById('arrow-' + el.id.replace('answers-', ''));
-            if (otherArrow) otherArrow.classList.remove('rotated');
-            el.closest('.question-card').classList.remove('expanded');
-        }
-    });
-
-    // Toggle current
-    if (isExpanded) {
-        container.classList.remove('expanded');
-        arrow.classList.remove('rotated');
-        card.classList.remove('expanded');
-    } else {
-        container.classList.add('expanded');
-        arrow.classList.add('rotated');
-        card.classList.add('expanded');
-    }
-}
-
-// Search and Filter Functions
-function filterQuestions() {
-    const searchTerm = document.getElementById('search-input').value.toLowerCase();
-    const statusFilter = document.getElementById('status-filter').value;
-    const sourceFilter = document.getElementById('source-filter').value;
-
-    const questions = document.querySelectorAll('.question-card');
-
-    questions.forEach(card => {
-        const questionText = card.querySelector('.text-lg').textContent.toLowerCase();
-        const status = card.dataset.status;
-        const source = card.dataset.source;
-
-        const matchesSearch = questionText.includes(searchTerm);
-        const matchesStatus = !statusFilter || status === statusFilter;
-        const matchesSource = !sourceFilter || source === sourceFilter;
-
-        if (matchesSearch && matchesStatus && matchesSource) {
-            card.style.display = '';
-        } else {
-            card.style.display = 'none';
-        }
-    });
-}
-
-// API Functions
-async function submitQuestion(event) {
-    event.preventDefault();
-
-    const btn = document.getElementById('submit-question-btn');
-    const originalContent = btn.innerHTML;
-
-    const questionText = document.getElementById('question-text').value.trim();
-    const source = document.querySelector('input[name="source"]:checked').value;
-
-    if (!questionText) {
-        Toast.show('Please enter a question', 'warning');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Submitting...';
-
-    try {
-        const response = await fetch('/api/questions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                question_text: questionText,
-                source: source
-            })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            Toast.show('Question submitted successfully!', 'success');
-            closeAskModal();
-            setTimeout(() => window.location.reload(), 1000);
-        } else {
-            Toast.show(data.error || 'Failed to submit question', 'error');
-            btn.disabled = false;
-            btn.innerHTML = originalContent;
-        }
-    } catch (error) {
-        Toast.show('Failed to submit question: ' + error.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
-    }
-}
-
-async function deleteQuestion() {
-    if (!pendingDeleteQuestionId) return;
-
-    const btn = document.getElementById('confirm-delete-question-btn');
-    const originalContent = btn.innerHTML;
-
-    btn.disabled = true;
-    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Deleting...';
-
-    try {
-        const response = await fetch('/api/questions/' + pendingDeleteQuestionId, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            Toast.show('Question deleted successfully!', 'success');
-            closeDeleteQuestionModal();
-            // Remove the card from DOM
-            const card = document.querySelector('[data-question-id="' + pendingDeleteQuestionId + '"]');
-            if (card) {
-                card.remove();
+        const query = queryInput.value.trim();
+        if (!query) {
+            if (typeof Toast !== 'undefined') {
+                Toast.show('Please enter a question to explore', 'warning');
             }
-            // Check if no more questions
-            const remaining = document.querySelectorAll('.question-card');
-            if (remaining.length === 0) {
-                setTimeout(() => window.location.reload(), 500);
-            }
-        } else {
-            Toast.show(data.error || 'Failed to delete question', 'error');
-            btn.disabled = false;
-            btn.innerHTML = originalContent;
-        }
-    } catch (error) {
-        Toast.show('Failed to delete question: ' + error.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
-    }
-}
-
-async function deleteAnswer() {
-    if (!pendingDeleteAnswerId) return;
-
-    const btn = document.getElementById('confirm-delete-answer-btn');
-    const originalContent = btn.innerHTML;
-
-    btn.disabled = true;
-    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Deleting...';
-
-    try {
-        const response = await fetch('/api/questions/answers/' + pendingDeleteAnswerId, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            Toast.show('Answer deleted successfully!', 'success');
-            closeDeleteAnswerModal();
-            // Remove the answer from DOM
-            const answerEl = document.querySelector('[data-answer-id="' + pendingDeleteAnswerId + '"]');
-            if (answerEl) {
-                answerEl.remove();
-            }
-        } else {
-            Toast.show(data.error || 'Failed to delete answer', 'error');
-            btn.disabled = false;
-            btn.innerHTML = originalContent;
-        }
-    } catch (error) {
-        Toast.show('Failed to delete answer: ' + error.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
-    }
-}
-
-async function confirmMarkObsolete() {
-    if (!pendingObsoleteAnswerId) return;
-
-    const btn = document.getElementById('confirm-obsolete-btn');
-    const originalContent = btn.innerHTML;
-
-    btn.disabled = true;
-    btn.innerHTML = '<svg class="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Updating...';
-
-    try {
-        const response = await fetch('/api/questions/answers/' + pendingObsoleteAnswerId + '/obsolete', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            Toast.show('Answer marked as obsolete', 'success');
-            closeObsoleteModal();
-            // Update the answer styling in DOM
-            const answerEl = document.querySelector('[data-answer-id="' + pendingObsoleteAnswerId + '"]');
-            if (answerEl) {
-                answerEl.classList.add('obsolete');
-                // Add obsolete badge
-                const badgeContainer = answerEl.querySelector('.flex.items-center.gap-2');
-                if (badgeContainer && !badgeContainer.querySelector('.obsolete-badge')) {
-                    const badge = document.createElement('span');
-                    badge.className = 'obsolete-badge';
-                    badge.innerHTML = '<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>Obsolete';
-                    badgeContainer.insertBefore(badge, badgeContainer.firstChild);
-                }
-                // Remove the mark obsolete button
-                const obsoleteBtn = answerEl.querySelector('[title="Mark as obsolete"]');
-                if (obsoleteBtn) {
-                    obsoleteBtn.remove();
-                }
-            }
-        } else {
-            Toast.show(data.error || 'Failed to mark answer as obsolete', 'error');
-            btn.disabled = false;
-            btn.innerHTML = originalContent;
-        }
-    } catch (error) {
-        Toast.show('Failed to mark answer as obsolete: ' + error.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = originalContent;
-    }
-}
-
-// Initialize
-(function() {
-    'use strict';
-
-    function init() {
-        // Ask Question buttons
-        const askBtn = document.getElementById('ask-question-btn');
-        const askEmptyBtn = document.getElementById('ask-question-empty-btn');
-
-        if (askBtn) {
-            askBtn.addEventListener('click', openAskModal);
-        }
-        if (askEmptyBtn) {
-            askEmptyBtn.addEventListener('click', openAskModal);
+            return;
         }
 
-        // Form submission
-        const form = document.getElementById('ask-question-form');
-        if (form) {
-            form.addEventListener('submit', submitQuestion);
-        }
+        // Show loading state
+        loadingSection.classList.remove('hidden');
+        loadingQuery.textContent = query;
+        exploreBtn.disabled = true;
 
-        // Radio button selection styling
-        const radioItems = document.querySelectorAll('.form-radio-item');
-        radioItems.forEach(item => {
-            item.addEventListener('click', function() {
-                radioItems.forEach(r => r.classList.remove('selected'));
-                this.classList.add('selected');
-                this.querySelector('input[type="radio"]').checked = true;
+        try {
+            const response = await fetch('/api/questions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    question_text: query,
+                    source: 'codebase'
+                })
             });
-        });
 
-        // Search and filter
-        const searchInput = document.getElementById('search-input');
-        const statusFilter = document.getElementById('status-filter');
-        const sourceFilter = document.getElementById('source-filter');
-
-        if (searchInput) {
-            searchInput.addEventListener('input', filterQuestions);
-        }
-        if (statusFilter) {
-            statusFilter.addEventListener('change', filterQuestions);
-        }
-        if (sourceFilter) {
-            sourceFilter.addEventListener('change', filterQuestions);
-        }
-
-        // Delete question confirmation
-        const confirmDeleteQuestionBtn = document.getElementById('confirm-delete-question-btn');
-        if (confirmDeleteQuestionBtn) {
-            confirmDeleteQuestionBtn.addEventListener('click', deleteQuestion);
-        }
-
-        // Delete answer confirmation
-        const confirmDeleteAnswerBtn = document.getElementById('confirm-delete-answer-btn');
-        if (confirmDeleteAnswerBtn) {
-            confirmDeleteAnswerBtn.addEventListener('click', deleteAnswer);
-        }
-
-        // Mark obsolete confirmation
-        const confirmObsoleteBtn = document.getElementById('confirm-obsolete-btn');
-        if (confirmObsoleteBtn) {
-            confirmObsoleteBtn.addEventListener('click', confirmMarkObsolete);
-        }
-
-        // Close modals on Escape key
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') {
-                closeAskModal();
-                closeDeleteQuestionModal();
-                closeDeleteAnswerModal();
-                closeObsoleteModal();
+            if (!response.ok) {
+                throw new Error('Failed to submit exploration');
             }
-        });
+
+            const data = await response.json();
+
+            // Hide loading
+            loadingSection.classList.add('hidden');
+
+            // Show result
+            displayResult(query, data);
+
+            if (typeof Toast !== 'undefined') {
+                Toast.show('Exploration submitted successfully', 'success');
+            }
+        } catch (error) {
+            loadingSection.classList.add('hidden');
+            if (typeof Toast !== 'undefined') {
+                Toast.show('Failed to explore: ' + error.message, 'error');
+            }
+        } finally {
+            exploreBtn.disabled = false;
+        }
+    });
+
+    function displayResult(query, data) {
+        resultsSection.classList.remove('hidden');
+
+        const resultHtml = `
+            <div class="result-card">
+                <div class="flex items-center gap-3 mb-3">
+                    <span class="status-badge status-${data.status || 'pending'}">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        ${data.status || 'pending'}
+                    </span>
+                    <span class="timestamp">Just now</span>
+                </div>
+                <p class="text-primary dark:text-primary font-medium mb-3">${escapeHtml(query)}</p>
+                <p class="text-secondary dark:text-secondary text-sm">
+                    Exploration queued. Results will appear here once processing is complete.
+                </p>
+            </div>
+        `;
+
+        resultsContainer.innerHTML = resultHtml + resultsContainer.innerHTML;
     }
 
-    document.addEventListener('DOMContentLoaded', init);
-})();
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+});
 </script>
 {% endblock %}

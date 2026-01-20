@@ -22,7 +22,7 @@
     </div>
 
     <!-- Stats Cards - Glassmorphism with Hover Animations -->
-    <div class="grid grid-cols-2 gap-5 sm:gap-6 lg:grid-cols-4 mb-12">
+    <div class="grid grid-cols-2 gap-5 sm:gap-6 lg:grid-cols-4 mb-10">
         <!-- Pending -->
         <a href="/plans?state=pending" class="glass-card group relative overflow-hidden p-6 hover-lift cursor-pointer">
             <div class="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -81,7 +81,7 @@
     </div>
 
     <!-- Stuck Plans Section - Only shown when there are recoverable plans -->
-    <div id="stuck-plans-section" class="glass-card mb-12 hidden">
+    <div id="stuck-plans-section" class="glass-card mb-10 hidden">
         <div class="p-8">
             <div class="flex items-center justify-between mb-6">
                 <div class="flex items-center">
@@ -115,245 +115,137 @@
         </div>
     </div>
 
-    <!-- Quick Actions - Modern Glass Cards -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2 mb-12">
-        <!-- Create New Plan Card -->
-        <div class="glass-card p-8 hover:shadow-lg transition-all duration-300 relative overflow-hidden">
-            <!-- Subtle AI gradient background -->
-            <div class="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-indigo-500/5 pointer-events-none"></div>
+    <!-- PRIMARY CONTENT SECTIONS -->
 
-            <div class="relative">
-                <div class="flex items-start mb-6">
-                    <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+    <!-- Recent Plans Section - Full Width Primary -->
+    <div class="glass-card overflow-hidden mb-10">
+        <div class="p-8">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mr-4 shadow-lg">
                         <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                     </div>
-                    <div class="ml-5">
-                        <h3 class="text-xl font-semibold bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">Create New Plan</h3>
-                        <p class="text-sm text-secondary dark:text-secondary mt-1">Describe your feature - AI will automatically enhance your request</p>
-                    </div>
+                    <h2 class="text-2xl font-bold text-primary dark:text-primary">Recent Plans</h2>
                 </div>
-                <form id="plan-form" class="space-y-5">
-                    <div>
-                        <div class="flex items-center justify-between mb-2">
-                            <label for="plan-description" class="block text-sm font-medium text-secondary dark:text-secondary">
-                                Draft Your Idea
-                            </label>
-                            <span class="text-xs text-tertiary dark:text-tertiary italic">Don't worry about details - AI can help!</span>
-                        </div>
-                        <div class="enhanced-textarea-wrapper relative">
-                            <textarea id="plan-description" name="description"
-                                      class="input-modern enhanced-textarea w-full"
-                                      rows="4"
-                                      minlength="10"
-                                      maxlength="2000"
-                                      aria-label="Plan description - describe what you want to build"
-                                      aria-describedby="plan-description-hint plan-description-counter"
-                                      data-enhance-textarea="true"
-                                      data-min-rows="4"
-                                      data-max-rows="12"
-                                      placeholder="Describe what you want to build...
-
-Examples:
-• Add user authentication with email/password login
-• Create a dashboard showing sales analytics
-• Implement dark mode toggle for the entire app
-• Fix the bug where users can't upload images"></textarea>
-                            <div class="enhanced-textarea-footer flex items-center justify-between mt-2 text-xs">
-                                <span id="plan-description-hint" class="text-tertiary dark:text-tertiary">
-                                    Be specific about features, behaviors, or problems to solve
-                                </span>
-                                <span id="plan-description-counter" class="textarea-char-counter text-tertiary dark:text-tertiary font-mono" aria-live="polite">
-                                    <span class="char-current">0</span>/<span class="char-max">2000</span>
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-3">
-                        <button type="submit" class="btn btn-primary btn-modern group">
-                            <svg class="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-                            </svg>
-                            Create Plan
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Sync Changes Card -->
-        <div class="glass-card p-8 hover:shadow-lg transition-all duration-300">
-            <div class="flex items-start mb-6">
-                <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                <a href="/plans" class="btn btn-sm btn-secondary btn-modern group">
+                    View all
+                    <svg class="h-4 w-4 ml-1.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
-                </div>
-                <div class="ml-5 flex-1">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xl font-semibold text-primary dark:text-primary">Sync to Remote</h3>
-                        <button type="button" id="sync-refresh-btn" class="btn btn-sm btn-secondary btn-modern group" title="Refresh sync status">
-                            <svg class="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                            </svg>
-                        </button>
-                    </div>
-                    <p class="text-sm text-secondary dark:text-secondary mt-1">Commit local changes and create a pull request</p>
-                </div>
+                </a>
             </div>
-
-            <!-- Loading State -->
-            <div id="sync-status-loading" class="glass rounded-xl p-4 mb-5">
-                <div class="flex items-center justify-center text-sm text-secondary dark:text-secondary">
-                    <svg class="animate-spin h-5 w-5 mr-3 text-violet-500" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Loading sync status...
-                </div>
-            </div>
-
-            <!-- Sync Status Content (hidden initially, shown after loading) -->
-            <div id="sync-status-content" class="hidden">
-                <!-- Branch Info -->
-                <div class="glass rounded-xl p-4 mb-4">
-                    <div class="flex items-center text-sm text-secondary dark:text-secondary">
-                        <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                        </svg>
-                        <span class="font-medium mr-2">Branch:</span>
-                        <span id="sync-branch" class="font-mono text-primary dark:text-primary bg-tertiary dark:bg-tertiary px-2 py-0.5 rounded">--</span>
-                    </div>
-                </div>
-
-                <!-- File Count Badge and Status -->
-                <div class="glass rounded-xl p-4 mb-4">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center text-sm text-secondary dark:text-secondary">
-                            <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                            <span class="font-medium">Files to sync:</span>
+            {% if recent_plans %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {% for plan in recent_plans %}
+                <a href="/plans/{{ plan.id }}" class="glass rounded-xl p-5 hover:shadow-md transition-all duration-200 group block">
+                    <div class="flex items-start justify-between">
+                        <div class="min-w-0 flex-1">
+                            <h3 class="text-base font-semibold text-primary dark:text-primary group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors truncate">
+                                {{ plan.name }}
+                            </h3>
+                            <p class="text-sm text-tertiary dark:text-tertiary mt-1">{{ plan.modified[:10] }}</p>
                         </div>
-                        <span id="sync-file-count" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-sm">0</span>
-                    </div>
-                    <!-- Staged/Unstaged counts -->
-                    <div class="mt-3 flex items-center gap-4 text-xs text-tertiary dark:text-tertiary">
-                        <div class="flex items-center">
-                            <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
-                            <span>Staged: <span id="sync-staged-count" class="font-semibold text-emerald-600 dark:text-emerald-400">0</span></span>
-                        </div>
-                        <div class="flex items-center">
-                            <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
-                            <span>Unstaged: <span id="sync-unstaged-count" class="font-semibold text-amber-600 dark:text-amber-400">0</span></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Expandable File List -->
-                <div class="glass rounded-xl mb-5 overflow-hidden">
-                    <button type="button" id="sync-file-list-toggle" class="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-secondary dark:text-secondary hover:bg-tertiary/50 dark:hover:bg-tertiary/50 transition-colors">
-                        <span class="flex items-center">
-                            <svg class="h-4 w-4 mr-2 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
-                            </svg>
-                            View changed files
+                        <span class="status-badge pill ml-3 flex-shrink-0 {% if plan.state == 'completed' %}status-badge-completed{% elif plan.state == 'pending' %}status-badge-pending{% elif plan.state == 'in-progress' %}status-badge-in-progress{% else %}status-badge-failed{% endif %}">
+                            <span class="status-dot {% if plan.state == 'completed' %}status-dot-completed{% elif plan.state == 'pending' %}status-dot-pending{% elif plan.state == 'in-progress' %}status-dot-in-progress{% else %}status-dot-failed{% endif %}"></span>
+                            {{ plan.state }}
                         </span>
-                        <svg id="sync-file-list-chevron" class="h-4 w-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                        </svg>
-                    </button>
-                    <div id="sync-file-list" class="hidden border-t border-primary/10 dark:border-primary/10 max-h-48 overflow-y-auto">
-                        <ul class="divide-y divide-primary/5 dark:divide-primary/5 text-sm font-mono">
-                            <!-- Files populated by JS -->
-                        </ul>
-                        <div id="sync-file-list-empty" class="px-4 py-3 text-center text-tertiary dark:text-tertiary text-sm">
-                            No files to sync
-                        </div>
                     </div>
-                </div>
+                </a>
+                {% endfor %}
             </div>
-
-            <!-- No Changes Message (hidden initially) -->
-            <div id="sync-no-changes" class="hidden glass rounded-xl p-6 mb-5 text-center">
-                <svg class="h-10 w-10 mx-auto mb-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <p class="text-sm font-medium text-secondary dark:text-secondary">All changes synced</p>
-                <p class="text-xs text-tertiary dark:text-tertiary mt-1">No pending changes to push to remote</p>
-            </div>
-
-            <!-- Auto-merge Option -->
-            <div class="glass rounded-xl p-4 mb-5">
-                <label class="flex items-center justify-between cursor-pointer">
-                    <div class="flex items-center">
-                        <svg class="h-5 w-5 mr-3 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                        </svg>
-                        <div>
-                            <span class="text-sm font-medium text-secondary dark:text-secondary">Auto-merge PR</span>
-                            <p class="text-xs text-tertiary dark:text-tertiary">Automatically merge and pull changes after PR creation</p>
-                        </div>
-                    </div>
-                    <div class="relative">
-                        <input type="checkbox" id="sync-auto-merge" class="sr-only peer" checked>
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:peer-focus:ring-violet-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-violet-600"></div>
-                    </div>
-                </label>
-            </div>
-
-            <!-- Sync Actions -->
-            <div class="flex items-center gap-3 mb-5">
-                <button type="button" id="sync-remote-btn" class="btn btn-secondary btn-modern group flex-1">
-                    <svg class="h-4 w-4 mr-2 group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            {% else %}
+            <div class="text-center py-12">
+                <div class="w-16 h-16 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+                    <svg class="h-8 w-8 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
-                    Sync Remote
-                </button>
-                <button type="button" id="pull-latest-btn" class="btn btn-sm btn-secondary btn-modern group" title="Pull latest from remote">
-                    <svg class="h-4 w-4 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </div>
+                <p class="text-sm text-secondary dark:text-secondary">No plans yet. Create your first plan below!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Explorations Section - Full Width Primary -->
+    <div class="glass-card overflow-hidden mb-10">
+        <div class="p-8">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mr-4 shadow-lg">
+                        <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-primary dark:text-primary">Explore Codebase</h2>
+                        <p class="text-sm text-tertiary dark:text-tertiary mt-0.5">Understand architecture before planning</p>
+                    </div>
+                </div>
+                <a href="/questions" class="btn btn-sm btn-secondary btn-modern group">
+                    Explore
+                    <svg class="h-4 w-4 ml-1.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
                     </svg>
-                </button>
+                </a>
             </div>
-
-            <!-- Open PRs Section (hidden initially) -->
-            <div id="sync-open-prs" class="hidden glass rounded-xl mb-5 overflow-hidden">
-                <div class="px-4 py-3 border-b border-primary/10 dark:border-primary/10 flex items-center justify-between">
-                    <div class="flex items-center text-sm font-medium text-secondary dark:text-secondary">
-                        <svg class="h-4 w-4 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
-                        </svg>
-                        Open Pull Requests
+            {% if recent_explorations %}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for exploration in recent_explorations %}
+                <a href="{{ exploration.link }}" class="glass rounded-xl p-5 hover:shadow-md transition-all duration-200 group block">
+                    <div class="flex items-start">
+                        <div class="w-10 h-10 rounded-lg flex-shrink-0 flex items-center justify-center mr-4 {% if exploration.type == 'domain' %}bg-gradient-to-br from-cyan-400 to-blue-500{% else %}bg-gradient-to-br from-violet-400 to-purple-500{% endif %}">
+                            {% if exploration.type == 'domain' %}
+                            <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                            </svg>
+                            {% else %}
+                            <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                            </svg>
+                            {% endif %}
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <h3 class="text-base font-semibold text-primary dark:text-primary group-hover:text-cyan-600 dark:group-hover:text-cyan-400 transition-colors">
+                                {{ exploration.name }}
+                            </h3>
+                            <p class="text-sm text-secondary dark:text-secondary mt-1 line-clamp-1">
+                                {{ exploration.description }}
+                            </p>
+                            {% if exploration.keywords %}
+                            <div class="flex flex-wrap gap-1.5 mt-2">
+                                {% for keyword in exploration.keywords %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                                    {{ keyword }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <span class="status-badge pill ml-3 flex-shrink-0 {% if exploration.type == 'domain' %}bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300{% else %}bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300{% endif %}">
+                            {{ exploration.type|title }}
+                        </span>
                     </div>
-                    <span id="sync-pr-count" class="text-xs font-bold text-amber-600 dark:text-amber-400">0</span>
-                </div>
-                <ul id="sync-pr-list" class="divide-y divide-primary/5 dark:divide-primary/5 max-h-40 overflow-y-auto">
-                    <!-- PRs populated by JS -->
-                </ul>
+                </a>
+                {% endfor %}
             </div>
-
-            <!-- Local Sync Branches Section (hidden initially) -->
-            <div id="sync-local-branches" class="hidden glass rounded-xl overflow-hidden">
-                <div class="px-4 py-3 border-b border-primary/10 dark:border-primary/10 flex items-center justify-between">
-                    <div class="flex items-center text-sm font-medium text-secondary dark:text-secondary">
-                        <svg class="h-4 w-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
-                        </svg>
-                        Local Sync Branches
-                    </div>
-                    <span id="sync-branch-count" class="text-xs font-bold text-blue-600 dark:text-blue-400">0</span>
+            {% else %}
+            <div class="text-center py-12">
+                <div class="w-16 h-16 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+                    <svg class="h-8 w-8 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
                 </div>
-                <ul id="sync-branch-list" class="divide-y divide-primary/5 dark:divide-primary/5 max-h-40 overflow-y-auto">
-                    <!-- Branches populated by JS -->
-                </ul>
+                <p class="text-sm text-secondary dark:text-secondary">No codebase knowledge available yet.</p>
+                <p class="text-xs text-tertiary dark:text-tertiary mt-1">Run a knowledge scan to explore architecture, domains, and patterns.</p>
             </div>
+            {% endif %}
         </div>
     </div>
 
     <!-- Active Tasks Section - Real-time Task Visibility -->
-    <div class="glass-card mb-12" id="active-tasks-section">
+    <div class="glass-card mb-10" id="active-tasks-section">
         <div class="p-8">
             <div class="flex items-center justify-between mb-8">
                 <div class="flex items-center">
@@ -601,175 +493,252 @@ Examples:
         </div>
     </div>
 
-    <!-- Recent Plans & Completed Grid -->
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <!-- Recent Plans -->
-        <div class="glass-card overflow-hidden">
-            <div class="p-8">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center">
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mr-4 shadow-lg">
-                            <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                            </svg>
-                        </div>
-                        <h2 class="text-xl font-bold text-primary dark:text-primary">Recent Plans</h2>
-                    </div>
-                    <a href="/plans" class="btn btn-sm btn-secondary btn-modern group">
-                        View all
-                        <svg class="h-4 w-4 ml-1.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
-                    </a>
-                </div>
-                {% if recent_plans %}
-                <ul class="space-y-3">
-                    {% for plan in recent_plans %}
-                    <li class="glass rounded-xl p-4 hover:shadow-md transition-all duration-200 group">
-                        <div class="flex items-center justify-between">
-                            <div class="min-w-0 flex-1">
-                                <a href="/plans/{{ plan.id }}" class="text-base font-semibold text-primary dark:text-primary group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate block">
-                                    {{ plan.name }}
-                                </a>
-                                <p class="text-sm text-tertiary dark:text-tertiary mt-1">{{ plan.modified[:10] }}</p>
-                            </div>
-                            <span class="status-badge pill ml-4 {% if plan.state == 'completed' %}status-badge-completed{% elif plan.state == 'pending' %}status-badge-pending{% elif plan.state == 'in-progress' %}status-badge-in-progress{% else %}status-badge-failed{% endif %}">
-                                <span class="status-dot {% if plan.state == 'completed' %}status-dot-completed{% elif plan.state == 'pending' %}status-dot-pending{% elif plan.state == 'in-progress' %}status-dot-in-progress{% else %}status-dot-failed{% endif %}"></span>
-                                {{ plan.state }}
-                            </span>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="text-center py-10">
-                    <div class="w-14 h-14 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
-                        <svg class="h-7 w-7 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                        </svg>
-                    </div>
-                    <p class="text-sm text-secondary dark:text-secondary">No plans yet. Create your first plan above!</p>
-                </div>
-                {% endif %}
-            </div>
-        </div>
+    <!-- SECONDARY CONTENT SECTIONS -->
 
-        <!-- Recent Completed Runs -->
-        <div class="glass-card overflow-hidden">
-            <div class="p-8">
-                <div class="flex items-center justify-between mb-6">
-                    <div class="flex items-center">
-                        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mr-4 shadow-lg">
-                            <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    <!-- Collapsible Sync Section -->
+    <div class="glass-card mb-8" id="sync-section">
+        <!-- Collapsible Header -->
+        <button type="button" id="sync-section-header" class="sync-section-header w-full px-8 py-5 flex items-center justify-between cursor-pointer hover:bg-tertiary/30 dark:hover:bg-tertiary/20 transition-colors rounded-t-xl" onclick="toggleSyncSection()">
+            <div class="flex items-center">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mr-4 shadow-lg">
+                    <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                </div>
+                <div class="text-left">
+                    <h2 class="text-lg font-semibold text-primary dark:text-primary">Sync to Remote</h2>
+                    <p class="text-sm text-tertiary dark:text-tertiary">Commit local changes and create a pull request</p>
+                </div>
+            </div>
+            <svg id="sync-section-chevron" class="h-5 w-5 text-tertiary dark:text-tertiary transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+            </svg>
+        </button>
+
+        <!-- Collapsible Content -->
+        <div id="sync-section-content" class="sync-section-content">
+            <div class="px-8 pb-8 pt-4 border-t border-primary/10 dark:border-primary/10">
+                <div class="flex items-center justify-end mb-4">
+                    <button type="button" id="sync-refresh-btn" class="btn btn-sm btn-secondary btn-modern group" title="Refresh sync status">
+                        <svg class="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <span class="ml-1.5">Refresh</span>
+                    </button>
+                </div>
+
+                <!-- Loading State -->
+                <div id="sync-status-loading" class="glass rounded-xl p-4 mb-5">
+                    <div class="flex items-center justify-center text-sm text-secondary dark:text-secondary">
+                        <svg class="animate-spin h-5 w-5 mr-3 text-violet-500" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Loading sync status...
+                    </div>
+                </div>
+
+                <!-- Sync Status Content (hidden initially, shown after loading) -->
+                <div id="sync-status-content" class="hidden">
+                    <!-- Branch Info -->
+                    <div class="glass rounded-xl p-4 mb-4">
+                        <div class="flex items-center text-sm text-secondary dark:text-secondary">
+                            <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                             </svg>
+                            <span class="font-medium mr-2">Branch:</span>
+                            <span id="sync-branch" class="font-mono text-primary dark:text-primary bg-tertiary dark:bg-tertiary px-2 py-0.5 rounded">--</span>
                         </div>
-                        <h2 class="text-xl font-bold text-primary dark:text-primary">Recent Completed</h2>
                     </div>
-                    <a href="/runs" class="btn btn-sm btn-secondary btn-modern group">
-                        View all
-                        <svg class="h-4 w-4 ml-1.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                        </svg>
-                    </a>
-                </div>
-                {% if completed_runs %}
-                <ul class="space-y-3" id="completed-runs-list">
-                    {% for run in completed_runs %}
-                    <li class="glass rounded-xl p-4 hover:shadow-md transition-all duration-200 group">
+
+                    <!-- File Count Badge and Status -->
+                    <div class="glass rounded-xl p-4 mb-4">
                         <div class="flex items-center justify-between">
-                            <div class="min-w-0 flex-1">
-                                <a href="/runs/{{ run.id }}" class="text-base font-semibold text-primary dark:text-primary group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                    {{ run.workflow|title }}
-                                </a>
-                                <p class="text-sm text-tertiary dark:text-tertiary mt-1">{{ run.completed_at[:19] if run.completed_at else run.started_at[:19] }}</p>
+                            <div class="flex items-center text-sm text-secondary dark:text-secondary">
+                                <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                                </svg>
+                                <span class="font-medium">Files to sync:</span>
                             </div>
-                            <span class="status-badge pill ml-4 {% if run.status == 'completed' %}status-badge-completed{% else %}status-badge-failed{% endif %}">
-                                <span class="status-dot {% if run.status == 'completed' %}status-dot-completed{% else %}status-dot-failed{% endif %}"></span>
-                                {{ run.status|title }}
-                            </span>
+                            <span id="sync-file-count" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-sm">0</span>
                         </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="text-center py-10">
-                    <div class="w-14 h-14 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
-                        <svg class="h-7 w-7 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+                        <!-- Staged/Unstaged counts -->
+                        <div class="mt-3 flex items-center gap-4 text-xs text-tertiary dark:text-tertiary">
+                            <div class="flex items-center">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
+                                <span>Staged: <span id="sync-staged-count" class="font-semibold text-emerald-600 dark:text-emerald-400">0</span></span>
+                            </div>
+                            <div class="flex items-center">
+                                <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
+                                <span>Unstaged: <span id="sync-unstaged-count" class="font-semibold text-amber-600 dark:text-amber-400">0</span></span>
+                            </div>
+                        </div>
                     </div>
-                    <p class="text-sm text-secondary dark:text-secondary">No completed runs yet</p>
+
+                    <!-- Expandable File List -->
+                    <div class="glass rounded-xl mb-5 overflow-hidden">
+                        <button type="button" id="sync-file-list-toggle" class="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-secondary dark:text-secondary hover:bg-tertiary/50 dark:hover:bg-tertiary/50 transition-colors">
+                            <span class="flex items-center">
+                                <svg class="h-4 w-4 mr-2 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                                </svg>
+                                View changed files
+                            </span>
+                            <svg id="sync-file-list-chevron" class="h-4 w-4 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <div id="sync-file-list" class="hidden border-t border-primary/10 dark:border-primary/10 max-h-48 overflow-y-auto">
+                            <ul class="divide-y divide-primary/5 dark:divide-primary/5 text-sm font-mono">
+                                <!-- Files populated by JS -->
+                            </ul>
+                            <div id="sync-file-list-empty" class="px-4 py-3 text-center text-tertiary dark:text-tertiary text-sm">
+                                No files to sync
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                {% endif %}
+
+                <!-- No Changes Message (hidden initially) -->
+                <div id="sync-no-changes" class="hidden glass rounded-xl p-6 mb-5 text-center">
+                    <svg class="h-10 w-10 mx-auto mb-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <p class="text-sm font-medium text-secondary dark:text-secondary">All changes synced</p>
+                    <p class="text-xs text-tertiary dark:text-tertiary mt-1">No pending changes to push to remote</p>
+                </div>
+
+                <!-- Auto-merge Option -->
+                <div class="glass rounded-xl p-4 mb-5">
+                    <label class="flex items-center justify-between cursor-pointer">
+                        <div class="flex items-center">
+                            <svg class="h-5 w-5 mr-3 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                            </svg>
+                            <div>
+                                <span class="text-sm font-medium text-secondary dark:text-secondary">Auto-merge PR</span>
+                                <p class="text-xs text-tertiary dark:text-tertiary">Automatically merge and pull changes after PR creation</p>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <input type="checkbox" id="sync-auto-merge" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:peer-focus:ring-violet-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-violet-600"></div>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Sync Actions -->
+                <div class="flex items-center gap-3 mb-5">
+                    <button type="button" id="sync-remote-btn" class="btn btn-secondary btn-modern group flex-1">
+                        <svg class="h-4 w-4 mr-2 group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                        </svg>
+                        Sync Remote
+                    </button>
+                    <button type="button" id="pull-latest-btn" class="btn btn-sm btn-secondary btn-modern group" title="Pull latest from remote">
+                        <svg class="h-4 w-4 group-hover:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Open PRs Section (hidden initially) -->
+                <div id="sync-open-prs" class="hidden glass rounded-xl mb-5 overflow-hidden">
+                    <div class="px-4 py-3 border-b border-primary/10 dark:border-primary/10 flex items-center justify-between">
+                        <div class="flex items-center text-sm font-medium text-secondary dark:text-secondary">
+                            <svg class="h-4 w-4 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+                            </svg>
+                            Open Pull Requests
+                        </div>
+                        <span id="sync-pr-count" class="text-xs font-bold text-amber-600 dark:text-amber-400">0</span>
+                    </div>
+                    <ul id="sync-pr-list" class="divide-y divide-primary/5 dark:divide-primary/5 max-h-40 overflow-y-auto">
+                        <!-- PRs populated by JS -->
+                    </ul>
+                </div>
+
+                <!-- Local Sync Branches Section (hidden initially) -->
+                <div id="sync-local-branches" class="hidden glass rounded-xl overflow-hidden">
+                    <div class="px-4 py-3 border-b border-primary/10 dark:border-primary/10 flex items-center justify-between">
+                        <div class="flex items-center text-sm font-medium text-secondary dark:text-secondary">
+                            <svg class="h-4 w-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                            Local Sync Branches
+                        </div>
+                        <span id="sync-branch-count" class="text-xs font-bold text-blue-600 dark:text-blue-400">0</span>
+                    </div>
+                    <ul id="sync-branch-list" class="divide-y divide-primary/5 dark:divide-primary/5 max-h-40 overflow-y-auto">
+                        <!-- Branches populated by JS -->
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Recent Questions Section -->
-    <div class="glass-card overflow-hidden mt-6">
-        <div class="p-8">
-            <div class="flex items-center justify-between mb-6">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mr-4 shadow-lg">
-                        <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                    <h2 class="text-xl font-bold text-primary dark:text-primary">Recent Questions</h2>
-                </div>
-                <a href="/questions" class="btn btn-sm btn-secondary btn-modern group">
-                    View all
-                    <svg class="h-4 w-4 ml-1.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+    <!-- Create New Plan Section - Standalone Full Width -->
+    <div class="glass-card p-8 hover:shadow-lg transition-all duration-300 relative overflow-hidden">
+        <!-- Subtle AI gradient background -->
+        <div class="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-indigo-500/5 pointer-events-none"></div>
+
+        <div class="relative">
+            <div class="flex items-start mb-6">
+                <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
                     </svg>
-                </a>
+                </div>
+                <div class="ml-5">
+                    <h3 class="text-2xl font-semibold bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">Create New Plan</h3>
+                    <p class="text-sm text-secondary dark:text-secondary mt-1">Describe your feature - AI will automatically enhance your request</p>
+                </div>
             </div>
-            {% if recent_questions %}
-            <ul class="space-y-3">
-                {% for question in recent_questions %}
-                <li class="glass rounded-xl p-4 hover:shadow-md transition-all duration-200 group">
-                    <div class="flex items-center justify-between">
-                        <div class="min-w-0 flex-1">
-                            <a href="/questions/{{ question.id }}" class="text-base font-semibold text-primary dark:text-primary group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate block">
-                                {{ question.question_text[:80] }}{% if question.question_text|length > 80 %}...{% endif %}
-                            </a>
-                            <div class="flex items-center mt-1 text-sm text-tertiary dark:text-tertiary">
-                                <span>{{ question.created_at[:10] }}</span>
-                                <span class="mx-2">·</span>
-                                <span class="flex items-center">
-                                    {% if question.source == 'knowledge_base' %}
-                                    <svg class="h-3.5 w-3.5 mr-1 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-                                    </svg>
-                                    Knowledge Base
-                                    {% else %}
-                                    <svg class="h-3.5 w-3.5 mr-1 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
-                                    </svg>
-                                    Code Exploration
-                                    {% endif %}
-                                </span>
-                            </div>
+            <form id="plan-form" class="space-y-5">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label for="plan-description" class="block text-sm font-medium text-secondary dark:text-secondary">
+                            Draft Your Idea
+                        </label>
+                        <span class="text-xs text-tertiary dark:text-tertiary italic">Don't worry about details - AI can help!</span>
+                    </div>
+                    <div class="enhanced-textarea-wrapper relative">
+                        <textarea id="plan-description" name="description"
+                                  class="input-modern enhanced-textarea w-full"
+                                  rows="4"
+                                  minlength="10"
+                                  maxlength="2000"
+                                  aria-label="Plan description - describe what you want to build"
+                                  aria-describedby="plan-description-hint plan-description-counter"
+                                  data-enhance-textarea="true"
+                                  data-min-rows="4"
+                                  data-max-rows="12"
+                                  placeholder="Describe what you want to build...
+
+Examples:
+• Add user authentication with email/password login
+• Create a dashboard showing sales analytics
+• Implement dark mode toggle for the entire app
+• Fix the bug where users can't upload images"></textarea>
+                        <div class="enhanced-textarea-footer flex items-center justify-between mt-2 text-xs">
+                            <span id="plan-description-hint" class="text-tertiary dark:text-tertiary">
+                                Be specific about features, behaviors, or problems to solve
+                            </span>
+                            <span id="plan-description-counter" class="textarea-char-counter text-tertiary dark:text-tertiary font-mono" aria-live="polite">
+                                <span class="char-current">0</span>/<span class="char-max">2000</span>
+                            </span>
                         </div>
-                        <span class="status-badge pill ml-4 {% if question.status == 'answered' %}status-badge-completed{% elif question.status == 'pending' %}status-badge-pending{% elif question.status == 'processing' %}status-badge-running{% else %}status-badge-failed{% endif %}">
-                            <span class="status-dot {% if question.status == 'answered' %}status-dot-completed{% elif question.status == 'pending' %}status-dot-pending{% elif question.status == 'processing' %}status-dot-running{% else %}status-dot-failed{% endif %}"></span>
-                            {{ question.status|title }}
-                        </span>
                     </div>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <div class="text-center py-10">
-                <div class="w-14 h-14 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
-                    <svg class="h-7 w-7 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
                 </div>
-                <p class="text-sm text-secondary dark:text-secondary">No questions yet. Ask a question to get answers from the knowledge base!</p>
-            </div>
-            {% endif %}
+                <div class="flex flex-wrap items-center gap-3">
+                    <button type="submit" class="btn btn-primary btn-modern group">
+                        <svg class="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                        Create Plan
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
@@ -821,8 +790,57 @@ Examples:
 <script src="/static/js/task-activity-panel.js"></script>
 <script src="/static/js/textarea-enhancer.js"></script>
 <script>
+/**
+ * Sync Section Toggle Functionality
+ * Manages collapsible state with localStorage persistence
+ */
+const SYNC_COLLAPSED_KEY = 'dashboard-sync-collapsed';
+
+function toggleSyncSection() {
+    const section = document.getElementById('sync-section');
+    const content = document.getElementById('sync-section-content');
+
+    if (!section || !content) return;
+
+    const isCollapsed = section.classList.contains('collapsed');
+
+    if (isCollapsed) {
+        // Expand
+        section.classList.remove('collapsed');
+        content.classList.remove('collapsed');
+        localStorage.setItem(SYNC_COLLAPSED_KEY, 'false');
+    } else {
+        // Collapse
+        section.classList.add('collapsed');
+        content.classList.add('collapsed');
+        localStorage.setItem(SYNC_COLLAPSED_KEY, 'true');
+    }
+}
+
+function initSyncSectionState() {
+    const section = document.getElementById('sync-section');
+    const content = document.getElementById('sync-section-content');
+
+    if (!section || !content) return;
+
+    // Check localStorage for saved state, default to collapsed
+    const savedState = localStorage.getItem(SYNC_COLLAPSED_KEY);
+    const shouldBeCollapsed = savedState === null ? true : savedState === 'true';
+
+    if (shouldBeCollapsed) {
+        section.classList.add('collapsed');
+        content.classList.add('collapsed');
+    } else {
+        section.classList.remove('collapsed');
+        content.classList.remove('collapsed');
+    }
+}
+
 // Initialize keyboard shortcuts for plan management on dashboard
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize sync section collapse state
+    initSyncSectionState();
+
     // Check if page has plan-related elements (recent plans, plan form, etc.)
     var hasPlanElements = document.getElementById('plan-form') ||
                           document.querySelector('.plan-item') ||

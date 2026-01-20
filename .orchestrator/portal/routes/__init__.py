@@ -10,9 +10,10 @@ from .cost import router as cost_router
 from .pages import router as pages_router
 from .health import router as health_router
 from .knowledge import router as knowledge_router
-from .questions import router as questions_router
+from .questions import router as explore_router  # Codebase exploration (refactored from questions)
 from .background_tasks import router as background_tasks_router
 from .websocket import router as websocket_router
+from .file_knowledge import router as file_knowledge_router
 
 __all__ = [
     "plans_router",
@@ -22,7 +23,8 @@ __all__ = [
     "pages_router",
     "health_router",
     "knowledge_router",
-    "questions_router",
+    "explore_router",
     "background_tasks_router",
     "websocket_router",
+    "file_knowledge_router",
 ]

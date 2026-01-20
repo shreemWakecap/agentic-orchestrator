@@ -16,17 +16,18 @@ from db import (
     get_run_repository,
     get_cost_repository,
     get_knowledge_repository,
-    get_question_repository,
+    get_file_knowledge_repository,
     PlanRepository,
     BuildStateRepository,
     RunRepository,
     CostRepository,
     KnowledgeRepository,
-    QuestionRepository,
+    FileKnowledgeRepository,
 )
 from portal.services.task_manager import TaskManager, get_task_manager as _get_task_manager
 from portal.services.recovery_service import RecoveryService, get_recovery_service as _get_recovery_service
 from portal.services.plan_status_service import PlanStatusService
+from portal.services.codebase_explorer_service import CodebaseExplorerService
 
 # Project paths
 PORTAL_DIR = Path(__file__).parent
@@ -59,9 +60,9 @@ def get_knowledge_repo() -> KnowledgeRepository:
     return get_knowledge_repository()
 
 
-def get_question_repo() -> QuestionRepository:
-    """Get question repository instance for dependency injection."""
-    return get_question_repository()
+def get_file_knowledge_repo() -> FileKnowledgeRepository:
+    """Get file knowledge repository instance for dependency injection."""
+    return get_file_knowledge_repository()
 
 
 def get_project_root() -> Path:
@@ -94,4 +95,19 @@ def get_plan_status_service() -> PlanStatusService:
     return PlanStatusService(
         plan_repo=get_plan_repository(),
         build_state_repo=get_build_state_repository(),
+    )
+
+
+def get_codebase_explorer_service() -> CodebaseExplorerService:
+    """Get CodebaseExplorerService instance for dependency injection.
+
+    This service provides codebase exploration and understanding capabilities
+    by combining KnowledgeRepository (bulk scan data) and FileKnowledgeRepository
+    (file-level analysis) to help users understand architecture, patterns,
+    dependencies, and implementation details.
+    """
+    return CodebaseExplorerService(
+        knowledge_repo=get_knowledge_repository(),
+        file_knowledge_repo=get_file_knowledge_repository(),
+        project_root=PROJECT_ROOT
     )

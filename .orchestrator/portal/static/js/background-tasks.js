@@ -14,6 +14,7 @@ const BackgroundTasksIndicator = (function() {
         pollTimer: null,
         eventSource: null,
         container: null,
+        sseConnected: false,  // Track SSE connection status
         POLL_INTERVAL: 3000 // 3 seconds
     };
 
@@ -60,11 +61,19 @@ const BackgroundTasksIndicator = (function() {
 
     /**
      * Initialize the background tasks indicator
-     * Creates the floating UI and starts polling for tasks
+     * Creates the floating UI and establishes real-time updates.
+     * SSE is the primary update mechanism; polling is only used as fallback.
      */
     function init() {
         createFloatingUI();
+
+        // Fetch tasks immediately for initial data
+        fetchTasks();
+
+        // Start polling initially (will be disabled when SSE connects)
         startPolling();
+
+        // Connect SSE (primary) - will disable polling on successful connection
         connectSSE();
 
         // Cleanup on page unload
@@ -400,27 +409,32 @@ const BackgroundTasksIndicator = (function() {
     }
 
     /**
-     * Start polling for task updates
+     * Start polling for task updates (fallback when SSE disconnected)
      */
     function startPolling() {
-        if (state.pollTimer) {
-            clearInterval(state.pollTimer);
+        // Don't start polling if SSE is connected
+        if (state.sseConnected) {
+            return;
         }
 
-        // Initial fetch
-        fetchTasks();
+        // Don't duplicate if already polling
+        if (state.pollTimer) {
+            return;
+        }
 
-        // Poll periodically
+        // Poll periodically as fallback
         state.pollTimer = setInterval(fetchTasks, state.POLL_INTERVAL);
+        console.debug('Background tasks: Polling started (SSE fallback)');
     }
 
     /**
-     * Stop polling
+     * Stop polling (called when SSE connects successfully)
      */
     function stopPolling() {
         if (state.pollTimer) {
             clearInterval(state.pollTimer);
             state.pollTimer = null;
+            console.debug('Background tasks: Polling stopped (SSE active)');
         }
     }
 
@@ -471,16 +485,26 @@ const BackgroundTasksIndicator = (function() {
     }
 
     /**
-     * Connect to SSE for real-time updates
+     * Connect to SSE for real-time updates (primary method)
+     * When SSE is connected, polling is disabled.
+     * Polling only activates as fallback when SSE disconnects.
      */
     function connectSSE() {
         // Close existing connection
         if (state.eventSource) {
             state.eventSource.close();
+            state.sseConnected = false;
         }
 
         try {
             state.eventSource = new EventSource('/api/background-tasks/events');
+
+            state.eventSource.onopen = function() {
+                // SSE connected - disable polling
+                state.sseConnected = true;
+                stopPolling();
+                console.debug('Background tasks: SSE connected (primary)');
+            };
 
             state.eventSource.onmessage = function(e) {
                 try {
@@ -492,6 +516,11 @@ const BackgroundTasksIndicator = (function() {
             };
 
             state.eventSource.onerror = function() {
+                // SSE disconnected - enable polling as fallback
+                state.sseConnected = false;
+                startPolling();
+                console.debug('Background tasks: SSE disconnected, falling back to polling');
+
                 // Reconnect after delay
                 setTimeout(function() {
                     if (state.eventSource) {
@@ -502,6 +531,8 @@ const BackgroundTasksIndicator = (function() {
             };
         } catch (error) {
             console.debug('SSE connection failed:', error);
+            state.sseConnected = false;
+            startPolling();
         }
     }
 
@@ -543,6 +574,7 @@ const BackgroundTasksIndicator = (function() {
             state.eventSource.close();
             state.eventSource = null;
         }
+        state.sseConnected = false;
     }
 
     /**

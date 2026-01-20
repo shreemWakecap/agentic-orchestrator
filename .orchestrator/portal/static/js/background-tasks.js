@@ -25,6 +25,39 @@ const BackgroundTasksIndicator = (function() {
         FAILED: 'failed'
     };
 
+    // Background task types - tasks that should appear in the indicator
+    // Includes scout tasks explicitly for background processing visibility
+    const BACKGROUND_TASK_TYPES = [
+        'scout',
+        'scout_task',
+        'background',
+        'research',
+        'knowledge',
+        'indexing',
+        'analysis',
+        'processing'
+    ];
+
+    /**
+     * Check if a task type qualifies as a background task
+     * @param {string} type - The task type to check
+     * @returns {boolean} True if this is a background task type
+     */
+    function isBackgroundTask(task) {
+        if (!task) return false;
+        // Always include if explicitly marked as background
+        if (task.background === true) return true;
+        // Check if type matches known background task types
+        if (task.type) {
+            const taskType = task.type.toLowerCase();
+            return BACKGROUND_TASK_TYPES.some(function(bgType) {
+                return taskType === bgType || taskType.includes(bgType);
+            });
+        }
+        // Default to true if no type specified (legacy behavior)
+        return true;
+    }
+
     /**
      * Initialize the background tasks indicator
      * Creates the floating UI and starts polling for tasks
@@ -411,12 +444,15 @@ const BackgroundTasksIndicator = (function() {
 
     /**
      * Sync local task state with server data
+     * Filters to only include background tasks (including scout tasks)
      */
     function syncTasks(serverTasks) {
-        const serverTaskIds = new Set(serverTasks.map(function(t) { return t.id; }));
+        // Filter to only background tasks (scout, scout_task, etc.)
+        const backgroundTasks = serverTasks.filter(isBackgroundTask);
+        const serverTaskIds = new Set(backgroundTasks.map(function(t) { return t.id; }));
 
-        // Update or add tasks from server
-        serverTasks.forEach(function(task) {
+        // Update or add background tasks from server
+        backgroundTasks.forEach(function(task) {
             if (state.tasks.has(task.id)) {
                 updateTask(task.id, task);
             } else {
@@ -510,19 +546,39 @@ const BackgroundTasksIndicator = (function() {
     }
 
     /**
-     * Get current task count
+     * Get current task count (background tasks only)
      */
     function getTaskCount() {
-        return state.tasks.size;
+        return countBackgroundTasks();
     }
 
     /**
-     * Get all active tasks
+     * Count active background tasks (including scout tasks)
+     * @returns {number} Count of active background tasks
+     */
+    function countBackgroundTasks() {
+        return Array.from(state.tasks.values()).filter(function(t) {
+            return isBackgroundTask(t) &&
+                   (t.status === TaskStatus.PENDING || t.status === TaskStatus.RUNNING);
+        }).length;
+    }
+
+    /**
+     * Get all active tasks (background tasks only, including scout tasks)
      */
     function getActiveTasks() {
         return Array.from(state.tasks.values()).filter(function(t) {
-            return t.status === TaskStatus.PENDING || t.status === TaskStatus.RUNNING;
+            return isBackgroundTask(t) &&
+                   (t.status === TaskStatus.PENDING || t.status === TaskStatus.RUNNING);
         });
+    }
+
+    /**
+     * Get tasks as array (for external use)
+     * Filters to background tasks only
+     */
+    function getTasksArray() {
+        return Array.from(state.tasks.values()).filter(isBackgroundTask);
     }
 
     // Public API
@@ -534,8 +590,11 @@ const BackgroundTasksIndicator = (function() {
         toggle: toggle,
         getTaskCount: getTaskCount,
         getActiveTasks: getActiveTasks,
+        getTasksArray: getTasksArray,
+        isBackgroundTask: isBackgroundTask,
         cleanup: cleanup,
-        TaskStatus: TaskStatus
+        TaskStatus: TaskStatus,
+        BACKGROUND_TASK_TYPES: BACKGROUND_TASK_TYPES
     };
 })();
 

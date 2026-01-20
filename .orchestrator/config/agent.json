@@ -1,4 +1,24 @@
 {
+  "scan": {
+    "solution_paths": [],
+    "exclude_paths": [
+      ".orchestrator",
+      ".git",
+      ".venv",
+      "venv",
+      "node_modules",
+      "__pycache__",
+      "dist",
+      "build",
+      "bin",
+      "obj",
+      ".vs",
+      ".idea",
+      "packages"
+    ],
+    "include_extensions": [],
+    "focus_on_solution": true
+  },
   "timeouts": {
     "print_mode": 300,
     "agentic_mode": 600,

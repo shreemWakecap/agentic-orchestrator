@@ -411,22 +411,81 @@ Explore deeply - read actual files, don't just guess from names.
 def run(args=None) -> int:
     """Run scouting action from CLI."""
     import argparse
+    import os
 
     parser = argparse.ArgumentParser(description="Scout the codebase")
     parser.add_argument(
+        "--file", "-f",
+        type=str,
+        metavar="PATH",
+        help="Scout a single file instead of the entire codebase"
+    )
+    parser.add_argument(
         "--quick", "-q",
         action="store_true",
-        help="Quick scan (structure and tech only)"
+        help="Quick scan (structure and tech only) - ignored when --file is used"
     )
     parser.add_argument(
         "--generate-experts", "-g",
         action="store_true",
-        help="Auto-generate missing experts after scan"
+        help="Auto-generate missing experts after scan - ignored when --file is used"
     )
 
     parsed = parser.parse_args(args or [])
     project_root = Path(__file__).parent.parent.parent
 
+    # File-specific scouting mode
+    if parsed.file:
+        from rich.console import Console
+        console = Console()
+
+        # Resolve file path to absolute
+        file_path = Path(parsed.file)
+        if not file_path.is_absolute():
+            file_path = (project_root / file_path).resolve()
+        else:
+            file_path = file_path.resolve()
+
+        # Validate file exists
+        if not file_path.exists():
+            console.print(f"[red]Error:[/red] File does not exist: {file_path}")
+            return 1
+
+        # Validate it's a file (not directory)
+        if not file_path.is_file():
+            console.print(f"[red]Error:[/red] Path is not a file: {file_path}")
+            return 1
+
+        # Validate file is readable
+        try:
+            with open(file_path, "rb") as f:
+                f.read(1)
+        except PermissionError:
+            console.print(f"[red]Error:[/red] Permission denied: {file_path}")
+            return 1
+        except Exception as e:
+            console.print(f"[red]Error:[/red] Cannot read file: {file_path} - {e}")
+            return 1
+
+        # Import and run FileScoutingWorkflow
+        from workflows.file_scouting import FileScoutingWorkflow
+
+        workflow = FileScoutingWorkflow(project_root=project_root)
+        result = workflow.run(str(file_path))
+
+        # Print file-specific summary
+        if result.success and result.data:
+            console.print("\n[bold]File Knowledge Summary:[/bold]")
+            console.print(f"  Language: [cyan]{result.data.get('language', 'unknown')}[/cyan]")
+            console.print(f"  Lines: [cyan]{result.data.get('line_count', 0)}[/cyan]")
+            console.print(f"  Classes: [cyan]{result.data.get('classes_count', 0)}[/cyan]")
+            console.print(f"  Functions: [cyan]{result.data.get('functions_count', 0)}[/cyan]")
+            console.print(f"  Imports: [cyan]{result.data.get('imports_count', 0)}[/cyan]")
+            console.print(f"  Dependencies: [cyan]{result.data.get('dependencies_count', 0)}[/cyan]")
+
+        return 0 if result.success else 1
+
+    # Bulk scouting mode (default)
     scan_type = "quick" if parsed.quick else "full"
 
     workflow = ScoutingWorkflow(

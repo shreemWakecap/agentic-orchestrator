@@ -804,3 +804,68 @@
 [data-theme="dark"] .textarea-char-count {
     background: var(--bg-secondary);
 }
+
+/* ============================================
+   COLLAPSIBLE SYNC SECTION
+   ============================================ */
+.sync-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+}
+
+.sync-section-header:hover {
+    background-color: rgba(var(--color-secondary-200), 0.3);
+}
+
+.dark .sync-section-header:hover,
+[data-theme="dark"] .sync-section-header:hover {
+    background-color: rgba(var(--color-secondary-700), 0.3);
+}
+
+.sync-section-content {
+    max-height: 2000px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out, opacity 0.2s ease-out;
+    opacity: 1;
+}
+
+.sync-section-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+/* Chevron rotation for collapsed state */
+#sync-section-chevron {
+    transition: transform 0.3s ease;
+}
+
+#sync-section.collapsed #sync-section-chevron {
+    transform: rotate(-90deg);
+}
+
+/* Secondary section visual distinction */
+#sync-section {
+    background: var(--glass-bg);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+}
+
+#sync-section.collapsed {
+    box-shadow: var(--shadow-sm);
+}
+
+#sync-section.collapsed .sync-section-header {
+    border-radius: var(--radius-xl);
+}
+
+/* Line clamp utility for questions */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}

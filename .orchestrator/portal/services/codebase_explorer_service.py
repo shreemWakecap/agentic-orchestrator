@@ -1,13 +1,12 @@
 """Codebase Explorer Service for querying and understanding the codebase.
 
-Refactored from QuestionService to serve as a codebase exploration tool.
 Combines KnowledgeRepository and FileKnowledgeRepository to provide
 comprehensive codebase search and exploration capabilities. Designed to
 help users understand architecture, patterns, dependencies, and implementation
 details before planning features or making changes.
 """
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -28,10 +27,9 @@ class SearchResult:
 
 
 @dataclass
-class ExplorationResult:
-    """Response from a codebase exploration query."""
+class CodebaseSearchResponse:
+    """Response from a codebase search query."""
     query: str = ""
-    scope: str = "all"
     total_results: int = 0
     results: List[SearchResult] = field(default_factory=list)
     suggestions: List[str] = field(default_factory=list)
@@ -39,8 +37,8 @@ class ExplorationResult:
 
 
 @dataclass
-class ArchitectureOverview:
-    """Architecture overview for understanding the codebase."""
+class ArchitectureContext:
+    """Architecture context for understanding the codebase."""
     project_name: str = ""
     project_type: str = ""
     primary_language: str = ""
@@ -53,8 +51,8 @@ class ArchitectureOverview:
 
 
 @dataclass
-class FileAnalysis:
-    """Detailed analysis of a specific file."""
+class FileDetails:
+    """Detailed information about a specific file."""
     file_path: str = ""
     file_name: str = ""
     exists: bool = False
@@ -73,19 +71,18 @@ class FileAnalysis:
 
 
 @dataclass
-class PatternSearchResult:
-    """Result of searching for patterns in the codebase."""
-    keyword: str = ""
-    total_matches: int = 0
-    file_matches: List[Dict] = field(default_factory=list)
-    class_matches: List[Dict] = field(default_factory=list)
-    function_matches: List[Dict] = field(default_factory=list)
-    import_matches: List[Dict] = field(default_factory=list)
+class RelatedFilesResult:
+    """Result of finding related files."""
+    query: str = ""
+    primary_matches: List[Dict] = field(default_factory=list)
+    dependency_matches: List[Dict] = field(default_factory=list)
+    domain_matches: List[Dict] = field(default_factory=list)
+    module_matches: List[Dict] = field(default_factory=list)
 
 
 @dataclass
-class DomainInfo:
-    """Information about a specific domain in the codebase."""
+class DomainPatterns:
+    """Patterns and conventions for a specific domain."""
     domain_name: str = ""
     keywords: List[str] = field(default_factory=list)
     files: List[str] = field(default_factory=list)
@@ -111,17 +108,16 @@ class FormattedCodeSnippet:
 class CodebaseExplorerService:
     """Service for exploring and understanding the codebase.
 
-    Replaces the old QuestionService with codebase exploration capabilities.
     Combines knowledge from bulk scans (KnowledgeRepository) and
     file-level analysis (FileKnowledgeRepository) to provide
     comprehensive codebase search and exploration.
 
     Methods:
-        explore: Search across all knowledge for a query with optional scope
-        get_architecture_overview: Get high-level architecture overview
-        get_file_analysis: Get detailed info about a specific file
-        search_patterns: Search for patterns/keywords in the codebase
-        get_domain_info: Get information about a specific domain
+        search_codebase: Search across all knowledge for a query
+        get_architecture_context: Get high-level architecture overview
+        get_file_details: Get detailed info about a specific file
+        find_related_files: Find files related to a query or path
+        get_patterns_for_domain: Get patterns for a domain/area
         format_code_snippets: Format code snippets for display
     """
 
@@ -131,25 +127,17 @@ class CodebaseExplorerService:
         file_knowledge_repo: FileKnowledgeRepository,
         project_root: Path = None
     ):
-        """Initialize CodebaseExplorerService with dual repository injection.
-
-        Args:
-            knowledge_repo: Repository for codebase-level knowledge
-            file_knowledge_repo: Repository for file-level knowledge
-            project_root: Project root path (defaults to cwd)
-        """
         self.knowledge_repo = knowledge_repo
         self.file_knowledge_repo = file_knowledge_repo
         self.project_root = project_root or Path.cwd()
 
-    async def explore(
+    async def search_codebase(
         self,
         query: str,
-        scope: str = "all",
         max_results: int = 20,
         include_code: bool = True
-    ) -> ExplorationResult:
-        """Explore the codebase for relevant information.
+    ) -> CodebaseSearchResponse:
+        """Search the codebase for relevant information.
 
         Searches across domains, modules, files, classes, functions,
         and patterns to find information relevant to the query.
@@ -157,30 +145,26 @@ class CodebaseExplorerService:
 
         Args:
             query: Search query (can be natural language or keywords)
-            scope: Search scope ('all', 'files', 'classes', 'functions', 'domains', 'modules')
             max_results: Maximum number of results to return
             include_code: Whether to include code snippets in results
 
         Returns:
-            ExplorationResult with ranked results and suggestions
+            CodebaseSearchResponse with ranked results and suggestions
         """
-        response = ExplorationResult(query=query, scope=scope)
+        response = CodebaseSearchResponse(query=query)
         all_results: List[Tuple[float, SearchResult]] = []
 
         # Extract keywords from query
         keywords = self._extract_keywords(query)
         query_lower = query.lower()
 
-        # Search based on scope
-        if scope in ("all", "domains", "modules"):
-            # Search in codebase knowledge (domains, modules, patterns)
-            knowledge_results = self._search_knowledge(keywords, query_lower, scope)
-            all_results.extend(knowledge_results)
+        # Search in codebase knowledge (domains, modules, patterns)
+        knowledge_results = self._search_knowledge(keywords, query_lower)
+        all_results.extend(knowledge_results)
 
-        if scope in ("all", "files", "classes", "functions"):
-            # Search in file-level knowledge
-            file_results = self._search_file_knowledge(keywords, query_lower, include_code, scope)
-            all_results.extend(file_results)
+        # Search in file-level knowledge
+        file_results = self._search_file_knowledge(keywords, query_lower, include_code)
+        all_results.extend(file_results)
 
         # Sort by relevance score (descending)
         all_results.sort(key=lambda x: x[0], reverse=True)
@@ -200,35 +184,35 @@ class CodebaseExplorerService:
 
         return response
 
-    async def get_architecture_overview(self) -> ArchitectureOverview:
-        """Get high-level architecture overview.
+    async def get_architecture_context(self) -> ArchitectureContext:
+        """Get high-level architecture context.
 
         Returns comprehensive architecture information including
         project info, modules, domains, patterns, and technologies.
 
         Returns:
-            ArchitectureOverview with architecture information
+            ArchitectureContext with architecture overview
         """
-        overview = ArchitectureOverview()
+        context = ArchitectureContext()
 
         # Load codebase knowledge
         knowledge = self.knowledge_repo.load_knowledge()
         if not knowledge:
-            return overview
+            return context
 
         # Extract project info
         project = knowledge.get("project", {})
-        overview.project_name = project.get("name", "")
-        overview.project_type = project.get("type", "unknown")
-        overview.primary_language = project.get("primary_language", "")
+        context.project_name = project.get("name", "")
+        context.project_type = project.get("type", "unknown")
+        context.primary_language = project.get("primary_language", "")
 
         # Extract architecture
         architecture = knowledge.get("architecture", {})
-        overview.architecture_pattern = architecture.get("pattern", "unknown")
-        overview.entry_points = architecture.get("entry_points", [])
+        context.architecture_pattern = architecture.get("pattern", "unknown")
+        context.entry_points = architecture.get("entry_points", [])
 
         # Extract modules with dependencies
-        overview.modules = [
+        context.modules = [
             {
                 "name": m.get("name", ""),
                 "path": m.get("path", ""),
@@ -239,7 +223,7 @@ class CodebaseExplorerService:
         ]
 
         # Extract domains
-        overview.domains = [
+        context.domains = [
             {
                 "name": d.get("name", ""),
                 "keywords": d.get("keywords", []),
@@ -250,56 +234,56 @@ class CodebaseExplorerService:
 
         # Extract patterns/conventions
         patterns = knowledge.get("patterns", {})
-        overview.conventions = patterns.get("conventions", [])
+        context.conventions = patterns.get("conventions", [])
 
         # Extract technologies
         tech = knowledge.get("technologies", {})
-        overview.technologies = {
-            "languages": [lang.get("name", "") for lang in tech.get("languages", [])],
-            "frameworks": [fw.get("name", "") for fw in tech.get("frameworks", [])],
+        context.technologies = {
+            "languages": [l.get("name", "") for l in tech.get("languages", [])],
+            "frameworks": [f.get("name", "") for f in tech.get("frameworks", [])],
             "tools": [t.get("name", "") for t in tech.get("tools", [])]
         }
 
-        return overview
+        return context
 
-    async def get_file_analysis(self, path: str) -> FileAnalysis:
-        """Get detailed analysis of a specific file.
+    async def get_file_details(self, file_path: str) -> FileDetails:
+        """Get detailed information about a specific file.
 
         Combines file-level knowledge with domain/module context
         from codebase knowledge.
 
         Args:
-            path: Path to the file (relative or absolute)
+            file_path: Path to the file (relative or absolute)
 
         Returns:
-            FileAnalysis with comprehensive file information
+            FileDetails with comprehensive file information
         """
-        analysis = FileAnalysis(file_path=path)
+        details = FileDetails(file_path=file_path)
 
         # Normalize path
-        normalized_path = self._normalize_path(path)
-        analysis.file_path = normalized_path
-        analysis.file_name = Path(normalized_path).name
+        normalized_path = self._normalize_path(file_path)
+        details.file_path = normalized_path
+        details.file_name = Path(normalized_path).name
 
         # Check physical existence
         try:
             full_path = self._resolve_full_path(normalized_path)
-            analysis.exists = full_path.exists()
+            details.exists = full_path.exists()
         except Exception:
-            analysis.exists = False
+            details.exists = False
 
         # Load file-level knowledge
         file_knowledge = self.file_knowledge_repo.load_file_knowledge(normalized_path)
         if file_knowledge:
-            analysis.has_knowledge = True
-            analysis.language = file_knowledge.get("language", "")
-            analysis.size_bytes = file_knowledge.get("size_bytes", 0)
-            analysis.line_count = file_knowledge.get("line_count", 0)
-            analysis.imports = file_knowledge.get("imports", [])
-            analysis.exports = file_knowledge.get("exports", [])
-            analysis.classes = file_knowledge.get("classes", [])
-            analysis.functions = file_knowledge.get("functions", [])
-            analysis.dependencies = file_knowledge.get("dependencies", [])
+            details.has_knowledge = True
+            details.language = file_knowledge.get("language", "")
+            details.size_bytes = file_knowledge.get("size_bytes", 0)
+            details.line_count = file_knowledge.get("line_count", 0)
+            details.imports = file_knowledge.get("imports", [])
+            details.exports = file_knowledge.get("exports", [])
+            details.classes = file_knowledge.get("classes", [])
+            details.functions = file_knowledge.get("functions", [])
+            details.dependencies = file_knowledge.get("dependencies", [])
 
         # Get domain and module context from codebase knowledge
         knowledge = self.knowledge_repo.load_knowledge()
@@ -307,112 +291,151 @@ class CodebaseExplorerService:
             # Find which domain this file belongs to
             for domain in knowledge.get("domains", []):
                 if normalized_path in domain.get("files", []):
-                    analysis.domain_context = domain.get("name", "")
+                    details.domain_context = domain.get("name", "")
                     break
 
             # Find which module this file belongs to
             for module in knowledge.get("architecture", {}).get("modules", []):
                 module_path = module.get("path", "")
                 if normalized_path.startswith(module_path):
-                    analysis.module_context = module.get("name", "")
+                    details.module_context = module.get("name", "")
                     break
 
         # Find related files
-        analysis.related_files = await self._find_related_files_for_path(normalized_path)
+        details.related_files = await self._find_related_files_for_path(normalized_path)
 
-        return analysis
+        return details
 
-    async def search_patterns(self, keyword: str, max_results: int = 50) -> PatternSearchResult:
-        """Search for patterns/keywords across the codebase.
+    async def find_related_files(self, query: str, limit: int = 10) -> RelatedFilesResult:
+        """Find files related to a query or concept.
 
-        Searches file names, class names, function names, and imports
-        for the specified keyword.
+        Searches for files that are related by:
+        - Direct name/path match
+        - Shared dependencies
+        - Same domain
+        - Same module
 
         Args:
-            keyword: The keyword/pattern to search for
-            max_results: Maximum results per category
+            query: Search query or file path
+            limit: Maximum number of results per category
 
         Returns:
-            PatternSearchResult with categorized matches
+            RelatedFilesResult with categorized related files
         """
-        result = PatternSearchResult(keyword=keyword)
-        keyword_lower = keyword.lower()
+        result = RelatedFilesResult(query=query)
+        keywords = self._extract_keywords(query)
+        query_lower = query.lower()
 
         # Get all file knowledge
         all_files = self.file_knowledge_repo.get_all_file_knowledge()
 
+        # Primary matches (name/path contains query terms)
         for file_data in all_files:
             file_path = file_data.get("file_path", "")
             file_lower = file_path.lower()
 
-            # File name matches
-            if keyword_lower in file_lower:
-                result.file_matches.append({
+            score = 0
+            for keyword in keywords:
+                if keyword in file_lower:
+                    score += 1
+
+            if score > 0:
+                result.primary_matches.append({
                     "file_path": file_path,
+                    "score": score,
                     "language": file_data.get("language", ""),
                     "line_count": file_data.get("line_count", 0)
                 })
 
-            # Class matches
-            for cls in file_data.get("classes", []):
-                if keyword_lower in cls.get("name", "").lower():
-                    result.class_matches.append({
-                        "name": cls.get("name", ""),
-                        "file_path": file_path,
-                        "line": cls.get("line", 0)
-                    })
+        # Sort and limit primary matches
+        result.primary_matches.sort(key=lambda x: x["score"], reverse=True)
+        result.primary_matches = result.primary_matches[:limit]
 
-            # Function matches
-            for func in file_data.get("functions", []):
-                if keyword_lower in func.get("name", "").lower():
-                    result.function_matches.append({
-                        "name": func.get("name", ""),
-                        "file_path": file_path,
-                        "line": func.get("line", 0)
-                    })
+        # Load codebase knowledge for domain/module matching
+        knowledge = self.knowledge_repo.load_knowledge()
+        if knowledge:
+            # Domain matches
+            for domain in knowledge.get("domains", []):
+                domain_name = domain.get("name", "").lower()
+                domain_keywords = [k.lower() for k in domain.get("keywords", [])]
 
-            # Import matches
-            for imp in file_data.get("imports", []):
-                if keyword_lower in imp.lower():
-                    result.import_matches.append({
-                        "import": imp,
-                        "file_path": file_path
-                    })
+                # Check if query matches domain
+                match_score = 0
+                for keyword in keywords:
+                    if keyword in domain_name or keyword in domain_keywords:
+                        match_score += 1
 
-        # Limit results
-        result.file_matches = result.file_matches[:max_results]
-        result.class_matches = result.class_matches[:max_results]
-        result.function_matches = result.function_matches[:max_results]
-        result.import_matches = result.import_matches[:max_results]
+                if match_score > 0:
+                    for file_path in domain.get("files", [])[:limit]:
+                        result.domain_matches.append({
+                            "file_path": file_path,
+                            "domain": domain.get("name", ""),
+                            "score": match_score
+                        })
 
-        result.total_matches = (
-            len(result.file_matches) +
-            len(result.class_matches) +
-            len(result.function_matches) +
-            len(result.import_matches)
-        )
+            # Module matches
+            for module in knowledge.get("architecture", {}).get("modules", []):
+                module_name = module.get("name", "").lower()
+                module_purpose = module.get("purpose", "").lower()
+
+                match_score = 0
+                for keyword in keywords:
+                    if keyword in module_name or keyword in module_purpose:
+                        match_score += 1
+
+                if match_score > 0:
+                    module_path = module.get("path", "")
+                    # Find files in this module
+                    for file_data in all_files:
+                        if file_data.get("file_path", "").startswith(module_path):
+                            result.module_matches.append({
+                                "file_path": file_data.get("file_path", ""),
+                                "module": module.get("name", ""),
+                                "score": match_score
+                            })
+
+            result.module_matches = result.module_matches[:limit]
+
+        # Dependency matches (files that import/export similar things)
+        if keywords:
+            for file_data in all_files:
+                imports = file_data.get("imports", [])
+                exports = file_data.get("exports", [])
+                all_deps = [i.lower() for i in imports + exports]
+
+                for keyword in keywords:
+                    for dep in all_deps:
+                        if keyword in dep:
+                            result.dependency_matches.append({
+                                "file_path": file_data.get("file_path", ""),
+                                "matched_on": dep,
+                                "type": "import" if dep in [i.lower() for i in imports] else "export"
+                            })
+                            break
+
+            result.dependency_matches = result.dependency_matches[:limit]
 
         return result
 
-    async def get_domain_info(self, domain_name: str) -> DomainInfo:
-        """Get information about a specific domain.
+    async def get_patterns_for_domain(self, domain: str) -> DomainPatterns:
+        """Get patterns and conventions for a specific domain.
 
-        Returns files, patterns, naming conventions, and common
-        imports associated with the domain.
+        Returns naming conventions, structure patterns, common
+        imports, and other patterns used in the domain.
 
         Args:
-            domain_name: Name or keyword of the domain
+            domain: Domain name or keyword
 
         Returns:
-            DomainInfo with domain-specific information
+            DomainPatterns with domain-specific patterns
         """
-        info = DomainInfo(domain_name=domain_name)
-        domain_lower = domain_name.lower()
+        patterns = DomainPatterns(domain_name=domain)
+        domain_lower = domain.lower()
 
         # Load codebase knowledge
         knowledge = self.knowledge_repo.load_knowledge()
         if not knowledge:
-            return info
+            return patterns
 
         # Find matching domain
         matched_domain = None
@@ -426,21 +449,21 @@ class CodebaseExplorerService:
                 break
 
         if matched_domain:
-            info.domain_name = matched_domain.get("name", "")
-            info.keywords = matched_domain.get("keywords", [])
-            info.files = matched_domain.get("files", [])
-            info.models = matched_domain.get("models", [])
-            info.routes = matched_domain.get("routes", [])
+            patterns.domain_name = matched_domain.get("name", "")
+            patterns.keywords = matched_domain.get("keywords", [])
+            patterns.files = matched_domain.get("files", [])
+            patterns.models = matched_domain.get("models", [])
+            patterns.routes = matched_domain.get("routes", [])
 
         # Get naming conventions and structure patterns
         codebase_patterns = knowledge.get("patterns", {})
-        info.naming_conventions = codebase_patterns.get("naming", {})
-        info.structure_patterns = codebase_patterns.get("structure", {})
+        patterns.naming_conventions = codebase_patterns.get("naming", {})
+        patterns.structure_patterns = codebase_patterns.get("structure", {})
 
         # Analyze common imports from domain files
-        if info.files:
+        if patterns.files:
             import_counts: Dict[str, int] = {}
-            for file_path in info.files[:20]:  # Limit for performance
+            for file_path in patterns.files[:20]:  # Limit for performance
                 file_knowledge = self.file_knowledge_repo.load_file_knowledge(file_path)
                 if file_knowledge:
                     for imp in file_knowledge.get("imports", []):
@@ -448,9 +471,9 @@ class CodebaseExplorerService:
 
             # Sort by frequency
             sorted_imports = sorted(import_counts.items(), key=lambda x: x[1], reverse=True)
-            info.common_imports = [imp for imp, count in sorted_imports[:15]]
+            patterns.common_imports = [imp for imp, count in sorted_imports[:15]]
 
-        return info
+        return patterns
 
     def format_code_snippets(
         self,
@@ -527,63 +550,6 @@ class CodebaseExplorerService:
 
         return snippets
 
-    # --- Template/API Helpers ---
-
-    async def get_exploration_data_for_template(self, query: str = "") -> Dict:
-        """Get exploration data formatted for template rendering.
-
-        Args:
-            query: Optional search query
-
-        Returns:
-            Dict with exploration results and architecture context
-        """
-        result = {
-            "query": query,
-            "results": [],
-            "architecture": {},
-            "stats": {}
-        }
-
-        # Get architecture overview
-        overview = await self.get_architecture_overview()
-        result["architecture"] = {
-            "project_name": overview.project_name,
-            "project_type": overview.project_type,
-            "primary_language": overview.primary_language,
-            "architecture_pattern": overview.architecture_pattern,
-            "modules_count": len(overview.modules),
-            "domains_count": len(overview.domains),
-            "technologies": overview.technologies
-        }
-
-        # If query provided, search
-        if query:
-            exploration = await self.explore(query)
-            result["results"] = [
-                {
-                    "file_path": r.file_path,
-                    "match_type": r.match_type,
-                    "title": r.title,
-                    "description": r.description,
-                    "line_number": r.line_number,
-                    "relevance_score": r.relevance_score
-                }
-                for r in exploration.results
-            ]
-            result["total_results"] = exploration.total_results
-            result["suggestions"] = exploration.suggestions
-            result["context_summary"] = exploration.context_summary
-
-        # Get stats
-        all_files = self.file_knowledge_repo.get_all_file_knowledge()
-        result["stats"] = {
-            "total_files": len(all_files),
-            "has_knowledge": bool(self.knowledge_repo.load_knowledge())
-        }
-
-        return result
-
     # --- Private Helper Methods ---
 
     def _extract_keywords(self, query: str) -> List[str]:
@@ -613,8 +579,7 @@ class CodebaseExplorerService:
     def _search_knowledge(
         self,
         keywords: List[str],
-        query_lower: str,
-        scope: str = "all"
+        query_lower: str
     ) -> List[Tuple[float, SearchResult]]:
         """Search in codebase knowledge (domains, modules, patterns)."""
         results = []
@@ -624,79 +589,76 @@ class CodebaseExplorerService:
             return results
 
         # Search domains
-        if scope in ("all", "domains"):
-            for domain in knowledge.get("domains", []):
-                score = 0
-                domain_name = domain.get("name", "").lower()
-                domain_keywords = [k.lower() for k in domain.get("keywords", [])]
+        for domain in knowledge.get("domains", []):
+            score = 0
+            domain_name = domain.get("name", "").lower()
+            domain_keywords = [k.lower() for k in domain.get("keywords", [])]
 
-                for kw in keywords:
-                    if kw in domain_name:
-                        score += 3
-                    if kw in domain_keywords:
-                        score += 2
+            for kw in keywords:
+                if kw in domain_name:
+                    score += 3
+                if kw in domain_keywords:
+                    score += 2
 
-                if score > 0:
-                    result = SearchResult(
-                        match_type="domain",
-                        title=f"Domain: {domain.get('name', '')}",
-                        description=f"Keywords: {', '.join(domain.get('keywords', [])[:5])}",
-                        context={
-                            "files": domain.get("files", [])[:5],
-                            "models": domain.get("models", []),
-                            "routes": domain.get("routes", [])
-                        }
-                    )
-                    results.append((score, result))
+            if score > 0:
+                result = SearchResult(
+                    match_type="domain",
+                    title=f"Domain: {domain.get('name', '')}",
+                    description=f"Keywords: {', '.join(domain.get('keywords', [])[:5])}",
+                    context={
+                        "files": domain.get("files", [])[:5],
+                        "models": domain.get("models", []),
+                        "routes": domain.get("routes", [])
+                    }
+                )
+                results.append((score, result))
 
         # Search modules
-        if scope in ("all", "modules"):
-            for module in knowledge.get("architecture", {}).get("modules", []):
-                score = 0
-                module_name = module.get("name", "").lower()
-                module_purpose = module.get("purpose", "").lower()
-                module_path = module.get("path", "").lower()
+        for module in knowledge.get("architecture", {}).get("modules", []):
+            score = 0
+            module_name = module.get("name", "").lower()
+            module_purpose = module.get("purpose", "").lower()
+            module_path = module.get("path", "").lower()
 
-                for kw in keywords:
-                    if kw in module_name:
-                        score += 3
-                    if kw in module_purpose:
-                        score += 2
-                    if kw in module_path:
-                        score += 1
+            for kw in keywords:
+                if kw in module_name:
+                    score += 3
+                if kw in module_purpose:
+                    score += 2
+                if kw in module_path:
+                    score += 1
 
-                if score > 0:
-                    result = SearchResult(
-                        file_path=module.get("path", ""),
-                        match_type="module",
-                        title=f"Module: {module.get('name', '')}",
-                        description=module.get("purpose", ""),
-                        context={
-                            "depends_on": module.get("depends_on", [])
-                        }
-                    )
-                    results.append((score, result))
+            if score > 0:
+                result = SearchResult(
+                    file_path=module.get("path", ""),
+                    match_type="module",
+                    title=f"Module: {module.get('name', '')}",
+                    description=module.get("purpose", ""),
+                    context={
+                        "depends_on": module.get("depends_on", [])
+                    }
+                )
+                results.append((score, result))
 
         # Search patterns/conventions
-        if scope == "all":
-            patterns = knowledge.get("patterns", {})
-            conventions = patterns.get("conventions", [])
-            for convention in conventions:
-                score = 0
-                conv_lower = convention.lower()
+        patterns = knowledge.get("patterns", {})
+        conventions = patterns.get("conventions", [])
+        for convention in conventions:
+            score = 0
+            conv_lower = convention.lower()
 
-                for kw in keywords:
-                    if kw in conv_lower:
-                        score += 1
+            for kw in keywords:
+                if kw in conv_lower:
+                    score += 1
 
-                if score > 0:
-                    result = SearchResult(
-                        match_type="pattern",
-                        title="Convention",
-                        description=convention,
-                        context={}
-                    )
-                    results.append((score, result))
+            if score > 0:
+                result = SearchResult(
+                    match_type="pattern",
+                    title="Convention",
+                    description=convention,
+                    context={}
+                )
+                results.append((score, result))
 
         return results
 
@@ -704,8 +666,7 @@ class CodebaseExplorerService:
         self,
         keywords: List[str],
         query_lower: str,
-        include_code: bool,
-        scope: str = "all"
+        include_code: bool
     ) -> List[Tuple[float, SearchResult]]:
         """Search in file-level knowledge."""
         results = []
@@ -720,7 +681,7 @@ class CodebaseExplorerService:
             path_score = sum(1 for kw in keywords if kw in file_lower)
 
             # Add file result if path matches
-            if path_score > 0 and scope in ("all", "files"):
+            if path_score > 0:
                 result = SearchResult(
                     file_path=file_path,
                     match_type="file",
@@ -735,54 +696,51 @@ class CodebaseExplorerService:
                 results.append((path_score, result))
 
             # Search classes
-            if scope in ("all", "classes"):
-                for cls in file_data.get("classes", []):
-                    cls_name = cls.get("name", "").lower()
-                    score = sum(2 for kw in keywords if kw in cls_name)
+            for cls in file_data.get("classes", []):
+                cls_name = cls.get("name", "").lower()
+                score = sum(2 for kw in keywords if kw in cls_name)
 
-                    if score > 0:
-                        result = SearchResult(
-                            file_path=file_path,
-                            match_type="class",
-                            title=f"Class: {cls.get('name', '')}",
-                            line_number=cls.get("line", 0),
-                            description=f"in {Path(file_path).name}",
-                            context={"class_info": cls}
-                        )
-                        results.append((score, result))
+                if score > 0:
+                    result = SearchResult(
+                        file_path=file_path,
+                        match_type="class",
+                        title=f"Class: {cls.get('name', '')}",
+                        line_number=cls.get("line", 0),
+                        description=f"in {Path(file_path).name}",
+                        context={"class_info": cls}
+                    )
+                    results.append((score, result))
 
             # Search functions
-            if scope in ("all", "functions"):
-                for func in file_data.get("functions", []):
-                    func_name = func.get("name", "").lower()
-                    score = sum(2 for kw in keywords if kw in func_name)
+            for func in file_data.get("functions", []):
+                func_name = func.get("name", "").lower()
+                score = sum(2 for kw in keywords if kw in func_name)
 
-                    if score > 0:
-                        result = SearchResult(
-                            file_path=file_path,
-                            match_type="function",
-                            title=f"Function: {func.get('name', '')}",
-                            line_number=func.get("line", 0),
-                            description=f"in {Path(file_path).name}",
-                            context={"function_info": func}
-                        )
-                        results.append((score, result))
+                if score > 0:
+                    result = SearchResult(
+                        file_path=file_path,
+                        match_type="function",
+                        title=f"Function: {func.get('name', '')}",
+                        line_number=func.get("line", 0),
+                        description=f"in {Path(file_path).name}",
+                        context={"function_info": func}
+                    )
+                    results.append((score, result))
 
-            # Search imports (only in "all" scope)
-            if scope == "all":
-                for imp in file_data.get("imports", []):
-                    imp_lower = imp.lower()
-                    score = sum(1 for kw in keywords if kw in imp_lower)
+            # Search imports
+            for imp in file_data.get("imports", []):
+                imp_lower = imp.lower()
+                score = sum(1 for kw in keywords if kw in imp_lower)
 
-                    if score > 0:
-                        result = SearchResult(
-                            file_path=file_path,
-                            match_type="import",
-                            title=f"Import: {imp}",
-                            description=f"used in {Path(file_path).name}",
-                            context={"import": imp}
-                        )
-                        results.append((score * 0.5, result))  # Lower weight for imports
+                if score > 0:
+                    result = SearchResult(
+                        file_path=file_path,
+                        match_type="import",
+                        title=f"Import: {imp}",
+                        description=f"used in {Path(file_path).name}",
+                        context={"import": imp}
+                    )
+                    results.append((score * 0.5, result))  # Lower weight for imports
 
         return results
 
@@ -931,3 +889,116 @@ class CodebaseExplorerService:
             ".sh": "shell",
         }
         return ext_map.get(file_path.suffix.lower(), "unknown")
+
+    # --- Aliases for compatibility with question_service interface ---
+
+    async def get_architecture_overview(self) -> ArchitectureContext:
+        """Alias for get_architecture_context for API compatibility."""
+        return await self.get_architecture_context()
+
+    async def get_file_analysis(self, file_path: str) -> FileDetails:
+        """Alias for get_file_details for API compatibility."""
+        return await self.get_file_details(file_path)
+
+    async def get_exploration_data_for_template(self, query: str = "") -> Dict:
+        """Get exploration data formatted for template rendering.
+
+        Args:
+            query: Optional search query
+
+        Returns:
+            Dict with exploration results and architecture context
+        """
+        result = {
+            "query": query,
+            "results": [],
+            "architecture": {},
+            "stats": {},
+            "domains": [],
+            "modules": []
+        }
+
+        # Get architecture overview
+        overview = await self.get_architecture_context()
+        result["architecture"] = {
+            "project_name": overview.project_name,
+            "project_type": overview.project_type,
+            "primary_language": overview.primary_language,
+            "architecture_pattern": overview.architecture_pattern,
+            "modules_count": len(overview.modules),
+            "domains_count": len(overview.domains),
+            "technologies": overview.technologies
+        }
+
+        # Include domains and modules for exploration
+        result["domains"] = overview.domains[:5]  # Top 5 domains
+        result["modules"] = overview.modules[:5]  # Top 5 modules
+
+        # If query provided, search
+        if query:
+            exploration = await self.search_codebase(query)
+            result["results"] = [
+                {
+                    "file_path": r.file_path,
+                    "match_type": r.match_type,
+                    "title": r.title,
+                    "description": r.description,
+                    "line_number": r.line_number,
+                    "relevance_score": r.relevance_score
+                }
+                for r in exploration.results
+            ]
+            result["total_results"] = exploration.total_results
+            result["suggestions"] = exploration.suggestions
+            result["context_summary"] = exploration.context_summary
+
+        # Get stats
+        all_files = self.file_knowledge_repo.get_all_file_knowledge()
+        result["stats"] = {
+            "total_files": len(all_files),
+            "has_knowledge": bool(self.knowledge_repo.load_knowledge())
+        }
+
+        return result
+
+    async def get_recent_explorations(self, limit: int = 5) -> List[Dict]:
+        """Get recent exploration highlights for dashboard display.
+
+        Returns domains and modules as exploration entry points,
+        formatted for the dashboard widget.
+
+        Args:
+            limit: Maximum number of items to return
+
+        Returns:
+            List of exploration items with type, name, and description
+        """
+        explorations = []
+
+        # Get architecture context
+        context = await self.get_architecture_context()
+
+        # Add domains as exploration items
+        for domain in context.domains[:limit]:
+            explorations.append({
+                "type": "domain",
+                "name": domain.get("name", "Unknown Domain"),
+                "description": f"Domain with {domain.get('file_count', 0)} files",
+                "keywords": domain.get("keywords", [])[:3],
+                "icon": "folder",
+                "link": f"/questions?domain={domain.get('name', '')}"
+            })
+
+        # Add modules as exploration items
+        remaining = limit - len(explorations)
+        for module in context.modules[:remaining]:
+            explorations.append({
+                "type": "module",
+                "name": module.get("name", "Unknown Module"),
+                "description": module.get("purpose", "")[:60] or "Code module",
+                "path": module.get("path", ""),
+                "icon": "code",
+                "link": f"/explore/{module.get('path', '')}"
+            })
+
+        return explorations[:limit]

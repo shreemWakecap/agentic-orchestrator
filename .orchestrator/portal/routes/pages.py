@@ -5,11 +5,17 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from db import PlanRepository, RunRepository, KnowledgeRepository, BuildStateRepository, QuestionRepository
-from portal.dependencies import get_plan_repo, get_run_repo, get_knowledge_repo, get_build_state_repo, get_question_repo
+from db import PlanRepository, RunRepository, KnowledgeRepository, BuildStateRepository
+from portal.dependencies import (
+    get_plan_repo,
+    get_run_repo,
+    get_knowledge_repo,
+    get_build_state_repo,
+    get_codebase_explorer_service,
+)
 from portal.services.plan_service import PlanService
 from portal.services.knowledge_service import KnowledgeService
-from portal.services.question_service import QuestionService
+from portal.services.codebase_explorer_service import CodebaseExplorerService
 
 # Setup templates
 PORTAL_DIR = Path(__file__).parent.parent
@@ -56,11 +62,11 @@ def _get_knowledge_service(
     return KnowledgeService(knowledge_repo)
 
 
-def _get_question_service(
-    question_repo: QuestionRepository = Depends(get_question_repo),
-) -> QuestionService:
-    """Get question service with injected dependencies."""
-    return QuestionService(question_repo)
+def _get_codebase_explorer_service(
+    explorer_service: CodebaseExplorerService = Depends(get_codebase_explorer_service),
+) -> CodebaseExplorerService:
+    """Get codebase explorer service with injected dependencies."""
+    return explorer_service
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -69,7 +75,7 @@ async def dashboard(
     plan_repo: PlanRepository = Depends(get_plan_repo),
     run_repo: RunRepository = Depends(get_run_repo),
     plan_service: PlanService = Depends(_get_plan_service),
-    question_service: QuestionService = Depends(_get_question_service),
+    explorer_service: CodebaseExplorerService = Depends(_get_codebase_explorer_service),
 ):
     """Render main dashboard."""
     # Count plans by state from database
@@ -108,19 +114,19 @@ async def dashboard(
     )
     completed_runs = _transform_runs_for_template(all_finished[:5])
 
-    # Get recent questions for the Q&A widget
-    recent_questions_raw = await question_service.get_recent_questions(limit=5)
-    recent_questions = [
-        {
-            "id": q.id,
-            "question_text": q.question_text,
-            "source_type": q.source_type,
-            "status": q.status,
-            "answer_count": q.answer_count,
-            "created_at": q.created_at,
-        }
-        for q in recent_questions_raw
-    ]
+    # Get architecture overview for codebase exploration widget
+    architecture = await explorer_service.get_architecture_overview()
+    architecture_summary = {
+        "project_name": architecture.project_name,
+        "project_type": architecture.project_type,
+        "primary_language": architecture.primary_language,
+        "architecture_pattern": architecture.architecture_pattern,
+        "modules_count": len(architecture.modules),
+        "domains_count": len(architecture.domains),
+    }
+
+    # Get recent explorations for dashboard widget (domains and modules)
+    recent_explorations = await explorer_service.get_recent_explorations(limit=4)
 
     return templates.TemplateResponse(
         request,
@@ -130,7 +136,8 @@ async def dashboard(
             "recent_plans": recent_plans,
             "active_runs": runs,
             "completed_runs": completed_runs,
-            "recent_questions": recent_questions,
+            "architecture_summary": architecture_summary,
+            "recent_explorations": recent_explorations,
         },
     )
 
@@ -218,18 +225,101 @@ async def knowledge_page(
 @router.get("/questions", response_class=HTMLResponse)
 async def questions_page(
     request: Request,
-    question_service: QuestionService = Depends(_get_question_service),
+    explorer_service: CodebaseExplorerService = Depends(_get_codebase_explorer_service),
 ):
-    """Render questions management page."""
-    # Get questions data for template
-    data = await question_service.get_questions_for_template()
+    """Render codebase exploration page.
+
+    Provides an interface for exploring and understanding the codebase
+    including architecture overview, domains, modules, and patterns.
+    """
+    # Get architecture overview
+    architecture = await explorer_service.get_architecture_overview()
+
+    # Build architecture summary
+    architecture_summary = {
+        "project_name": architecture.project_name,
+        "project_type": architecture.project_type,
+        "primary_language": architecture.primary_language,
+        "architecture_pattern": architecture.architecture_pattern,
+        "entry_points": architecture.entry_points,
+        "conventions": architecture.conventions,
+        "technologies": architecture.technologies,
+    }
+
+    # Build domain list with details
+    domain_list = [
+        {
+            "name": d.get("name", ""),
+            "keywords": d.get("keywords", []),
+            "file_count": d.get("file_count", 0),
+        }
+        for d in architecture.domains
+    ]
+
+    # Build module list (patterns)
+    pattern_list = [
+        {
+            "name": m.get("name", ""),
+            "path": m.get("path", ""),
+            "purpose": m.get("purpose", ""),
+            "depends_on": m.get("depends_on", []),
+        }
+        for m in architecture.modules
+    ]
+
+    # Get exploration stats
+    exploration_data = await explorer_service.get_exploration_data_for_template()
+    stats = exploration_data.get("stats", {})
 
     return templates.TemplateResponse(
         request,
         "questions.html",
         {
-            "questions": data.get("questions", []),
-            "stats": data.get("stats", {}),
-            "total": data.get("total", 0),
+            "architecture_summary": architecture_summary,
+            "domain_list": domain_list,
+            "pattern_list": pattern_list,
+            "stats": stats,
+        },
+    )
+
+
+@router.get("/explore/{path:path}", response_class=HTMLResponse)
+async def explore_file_page(
+    request: Request,
+    path: str,
+    explorer_service: CodebaseExplorerService = Depends(_get_codebase_explorer_service),
+):
+    """Render file exploration detail page.
+
+    Shows detailed analysis of a specific file including classes,
+    functions, imports, dependencies, and domain/module context.
+    """
+    # Get file analysis
+    analysis = await explorer_service.get_file_analysis(path)
+
+    if not analysis.exists and not analysis.has_knowledge:
+        raise HTTPException(status_code=404, detail=f"File '{path}' not found or not analyzed")
+
+    return templates.TemplateResponse(
+        request,
+        "question_detail.html",
+        {
+            "file_analysis": {
+                "file_path": analysis.file_path,
+                "file_name": analysis.file_name,
+                "exists": analysis.exists,
+                "has_knowledge": analysis.has_knowledge,
+                "language": analysis.language,
+                "size_bytes": analysis.size_bytes,
+                "line_count": analysis.line_count,
+                "imports": analysis.imports,
+                "exports": analysis.exports,
+                "classes": analysis.classes,
+                "functions": analysis.functions,
+                "dependencies": analysis.dependencies,
+                "domain_context": analysis.domain_context,
+                "module_context": analysis.module_context,
+                "related_files": analysis.related_files,
+            },
         },
     )

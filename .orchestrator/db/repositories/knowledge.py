@@ -290,3 +290,168 @@ class KnowledgeRepository:
         if row:
             row['experts_generated'] = self.db.from_json(row.get('experts_generated_json'), [])
         return row
+
+    # --- Search Methods for Codebase Explorer ---
+
+    def search_domains_by_keyword(self, keywords: list[str]) -> list[dict]:
+        """Search domains that match any of the given keywords.
+
+        Args:
+            keywords: List of keywords to search for in domain keywords.
+
+        Returns:
+            List of matching domains with their details.
+        """
+        if not keywords:
+            return []
+
+        # Get knowledge ID first
+        knowledge_row = self.db.fetchone("SELECT id FROM codebase_knowledge LIMIT 1")
+        if not knowledge_row:
+            return []
+
+        knowledge_id = knowledge_row['id']
+
+        # Fetch all domains and filter by keywords
+        domain_rows = self.db.fetchall(
+            "SELECT * FROM domains WHERE knowledge_id = ?", (knowledge_id,)
+        )
+
+        results = []
+        keywords_lower = [kw.lower() for kw in keywords]
+
+        for d in domain_rows:
+            domain_keywords = self.db.from_json(d['keywords_json'], [])
+            domain_keywords_lower = [dk.lower() for dk in domain_keywords]
+
+            # Check if any search keyword matches domain keywords
+            matching_keywords = [
+                kw for kw in keywords_lower
+                if any(kw in dk or dk in kw for dk in domain_keywords_lower)
+            ]
+
+            if matching_keywords:
+                results.append({
+                    'name': d['name'],
+                    'keywords': domain_keywords,
+                    'files': self.db.from_json(d['files_json'], []),
+                    'models': self.db.from_json(d['models_json'], []),
+                    'routes': self.db.from_json(d['routes_json'], []),
+                    'matched_keywords': matching_keywords,
+                })
+
+        return results
+
+    def search_modules_by_path(self, path_pattern: str) -> list[dict]:
+        """Search modules whose path matches the given pattern.
+
+        Args:
+            path_pattern: Pattern to match against module paths (case-insensitive substring match).
+
+        Returns:
+            List of matching modules with their details.
+        """
+        if not path_pattern:
+            return []
+
+        # Get knowledge ID first
+        knowledge_row = self.db.fetchone("SELECT id FROM codebase_knowledge LIMIT 1")
+        if not knowledge_row:
+            return []
+
+        knowledge_id = knowledge_row['id']
+
+        # Fetch all modules and filter by path pattern
+        module_rows = self.db.fetchall(
+            "SELECT * FROM architecture_modules WHERE knowledge_id = ?", (knowledge_id,)
+        )
+
+        results = []
+        pattern_lower = path_pattern.lower()
+
+        for m in module_rows:
+            module_path = m['path'] or ''
+            module_name = m['name'] or ''
+
+            # Check if pattern matches path or name
+            if pattern_lower in module_path.lower() or pattern_lower in module_name.lower():
+                results.append({
+                    'name': m['name'],
+                    'path': m['path'],
+                    'purpose': m['purpose'],
+                    'depends_on': self.db.from_json(m['depends_on_json'], []),
+                })
+
+        return results
+
+    def get_technologies(self) -> dict:
+        """Get all technologies (languages, frameworks, tools) from knowledge store.
+
+        Returns:
+            Dictionary with 'languages', 'frameworks', and 'tools' lists.
+        """
+        # Get knowledge ID first
+        knowledge_row = self.db.fetchone("SELECT id FROM codebase_knowledge LIMIT 1")
+        if not knowledge_row:
+            return {'languages': [], 'frameworks': [], 'tools': []}
+
+        knowledge_id = knowledge_row['id']
+
+        # Fetch all technologies
+        tech_rows = self.db.fetchall(
+            "SELECT * FROM technologies WHERE knowledge_id = ?", (knowledge_id,)
+        )
+
+        languages = []
+        frameworks = []
+        tools = []
+
+        for t in tech_rows:
+            tech_data = {
+                'name': t['name'],
+                'confidence': t['confidence'],
+            }
+
+            if t['tech_type'] == 'language':
+                tech_data['version'] = t['version']
+                languages.append(tech_data)
+            elif t['tech_type'] == 'framework':
+                tech_data['entry_point'] = t['entry_point']
+                tech_data['config_file'] = t['config_file']
+                frameworks.append(tech_data)
+            elif t['tech_type'] == 'tool':
+                tech_data['config_file'] = t['config_file']
+                tools.append(tech_data)
+
+        return {
+            'languages': languages,
+            'frameworks': frameworks,
+            'tools': tools,
+        }
+
+    def get_conventions(self) -> dict:
+        """Get coding conventions and patterns from knowledge store.
+
+        Returns:
+            Dictionary with 'naming', 'structure', and 'conventions' data.
+        """
+        # Get knowledge ID first
+        knowledge_row = self.db.fetchone("SELECT id FROM codebase_knowledge LIMIT 1")
+        if not knowledge_row:
+            return {'naming': {}, 'structure': {}, 'conventions': []}
+
+        knowledge_id = knowledge_row['id']
+
+        # Fetch patterns
+        pattern_row = self.db.fetchone(
+            "SELECT * FROM patterns WHERE knowledge_id = ?", (knowledge_id,)
+        )
+
+        if not pattern_row:
+            return {'naming': {}, 'structure': {}, 'conventions': []}
+
+        return {
+            'naming': self.db.from_json(pattern_row['naming_json'], {}),
+            'structure': self.db.from_json(pattern_row['structure_json'], {}),
+            'conventions': self.db.from_json(pattern_row['conventions_json'], []),
+        }

@@ -213,3 +213,73 @@ class IQuestionRepository(ABC):
     def delete_answer(self, answer_id: str) -> bool:
         """Delete an answer."""
         ...
+
+
+class IFileKnowledgeRepository(ABC):
+    """Interface for file-level knowledge repository operations."""
+
+    @abstractmethod
+    def save_file_knowledge(
+        self,
+        file_path: str,
+        file_type: str,
+        language: str,
+        size_bytes: int,
+        line_count: int,
+        imports: List[str] = None,
+        exports: List[str] = None,
+        classes: List[Dict] = None,
+        functions: List[Dict] = None,
+        dependencies: List[str] = None,
+        metadata: Dict = None,
+        summary: str = None
+    ) -> int:
+        """Save or update file-level knowledge."""
+        ...
+
+    @abstractmethod
+    def load_file_knowledge(self, file_path: str) -> Optional[Dict]:
+        """Load knowledge for a specific file."""
+        ...
+
+    @abstractmethod
+    def get_all_file_knowledge(self) -> List[Dict]:
+        """Get knowledge for all scanned files."""
+        ...
+
+    @abstractmethod
+    def delete_file_knowledge(self, file_path: str) -> bool:
+        """Delete knowledge for a specific file."""
+        ...
+
+    @abstractmethod
+    def exists(self, file_path: str) -> bool:
+        """Check if knowledge exists for a specific file."""
+        ...
+
+    @abstractmethod
+    def save_file_scan(
+        self,
+        scan_id: str,
+        file_path: str,
+        scan_type: str = "single",
+        trigger: str = "manual",
+        started_at: str = None,
+        completed_at: str = None,
+        duration_seconds: float = 0,
+        status: str = "completed",
+        error_message: str = None,
+        knowledge_id: int = None
+    ) -> int:
+        """Save a file scan history record."""
+        ...
+
+    @abstractmethod
+    def get_file_scan_history(self, file_path: str, limit: int = 10) -> List[Dict]:
+        """Get scan history for a specific file."""
+        ...
+
+    @abstractmethod
+    def clear_all_file_knowledge(self) -> int:
+        """Clear all file knowledge and scan history."""
+        ...

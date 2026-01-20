@@ -18,6 +18,13 @@ class MovePlanRequest(BaseModel):
     target_state: str = Field(..., pattern="^(pending|failed)$", description="Target state: pending or failed")
 
 
+class UpdatePlanRequest(BaseModel):
+    """Request to update a plan's content (only allowed when status is pending)."""
+    goal: Optional[str] = Field(None, min_length=1, description="Updated goal/title for the plan")
+    request: Optional[str] = Field(None, min_length=1, description="Updated request description")
+    raw_content: Optional[str] = Field(None, min_length=1, description="Updated raw plan content/markdown")
+
+
 class BudgetUpdateRequest(BaseModel):
     """Request to update budget settings."""
     daily_limit: Optional[float] = Field(None, ge=0, description="Daily spending limit in USD")

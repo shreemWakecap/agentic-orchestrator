@@ -250,7 +250,7 @@ const UnifiedPlanDialog = (function() {
             function createPlan(description) {
                 updateState(STATE.CREATING);
 
-                fetch('/api/plans', {
+                fetch('/api/workflows/plan', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ description: description })
@@ -265,9 +265,9 @@ const UnifiedPlanDialog = (function() {
                         // Auto-close after success and redirect
                         setTimeout(function() {
                             close({ created: true, runId: runId });
-                            // Navigate to the plan page
+                            // Navigate to the run page to show planning progress
                             if (typeof window !== 'undefined') {
-                                window.location.href = '/plans/' + runId;
+                                window.location.href = '/runs/' + runId;
                             }
                         }, 1500);
                     } else {

@@ -32,6 +32,11 @@
     50% { transform: translateY(-2px); }
 }
 
+@keyframes statusFade {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.3; }
+}
+
 /* ============================================
    STATUS BADGE - BASE CLASS
    ============================================ */
@@ -293,6 +298,31 @@
 }
 
 /* ============================================
+   STATUS VARIANTS - PLANNING (Gray/Disabled)
+   ============================================ */
+.status-badge-planning,
+.status-badge--planning {
+    background: linear-gradient(135deg, #f1f5f9 0%, #f8fafc 100%);
+    color: #94a3b8;
+    border-color: #e2e8f0;
+    opacity: 0.75;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.status-badge-planning:hover,
+.status-badge--planning:hover {
+    background: linear-gradient(135deg, #f1f5f9 0%, #f8fafc 100%);
+    border-color: #e2e8f0;
+}
+
+.status-dot-planning,
+.status-dot--planning {
+    background: #cbd5e1;
+    animation: statusFade 2.5s ease-in-out infinite;
+}
+
+/* ============================================
    DARK MODE SUPPORT
    ============================================ */
 
@@ -498,6 +528,32 @@
     background: #fb923c;
 }
 
+/* Planning - Dark */
+.dark .status-badge-planning,
+.dark .status-badge--planning,
+[data-theme="dark"] .status-badge-planning,
+[data-theme="dark"] .status-badge--planning {
+    background: linear-gradient(135deg, rgba(71, 85, 105, 0.2) 0%, rgba(71, 85, 105, 0.1) 100%);
+    color: #64748b;
+    border-color: rgba(71, 85, 105, 0.3);
+    opacity: 0.7;
+}
+
+.dark .status-badge-planning:hover,
+.dark .status-badge--planning:hover,
+[data-theme="dark"] .status-badge-planning:hover,
+[data-theme="dark"] .status-badge--planning:hover {
+    background: linear-gradient(135deg, rgba(71, 85, 105, 0.2) 0%, rgba(71, 85, 105, 0.1) 100%);
+    border-color: rgba(71, 85, 105, 0.3);
+}
+
+.dark .status-dot-planning,
+.dark .status-dot--planning,
+[data-theme="dark"] .status-dot-planning,
+[data-theme="dark"] .status-dot--planning {
+    background: #475569;
+}
+
 /* ============================================
    UTILITY CLASSES FOR STATUS INDICATORS
    ============================================ */
@@ -578,6 +634,13 @@
     color: #ea580c;
 }
 
+.status-badge.outline.status-badge-planning,
+.status-badge.outline.status-badge--planning {
+    border-color: #cbd5e1;
+    color: #94a3b8;
+    opacity: 0.75;
+}
+
 /* Dark mode outline variants */
 .dark .status-badge.outline.status-badge-completed,
 .dark .status-badge.outline.status-badge--completed,
@@ -639,6 +702,15 @@
     color: #fb923c;
 }
 
+.dark .status-badge.outline.status-badge-planning,
+.dark .status-badge.outline.status-badge--planning,
+[data-theme="dark"] .status-badge.outline.status-badge-planning,
+[data-theme="dark"] .status-badge.outline.status-badge--planning {
+    border-color: #475569;
+    color: #64748b;
+    opacity: 0.7;
+}
+
 /* ============================================
    STATUS BADGE GROUP (for inline badges)
    ============================================ */
@@ -679,7 +751,9 @@
     .status-dot-pending,
     .status-dot--pending,
     .status-dot-stuck,
-    .status-dot--stuck {
+    .status-dot--stuck,
+    .status-dot-planning,
+    .status-dot--planning {
         animation: none;
     }
 }

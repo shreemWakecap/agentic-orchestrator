@@ -74,6 +74,15 @@ class PlanRepository:
                     UPDATE plans SET status = ?, updated_at = ? WHERE plan_id = ?
                 """, (status, now, plan_id))
 
+    def update_content(self, plan_id: str, goal: str, request: str, raw_content: str):
+        """Update plan content (goal, request, raw_content)."""
+        now = datetime.now().isoformat()
+        with self.db.transaction() as conn:
+            conn.execute("""
+                UPDATE plans SET goal = ?, request = ?, raw_content = ?, updated_at = ?
+                WHERE plan_id = ?
+            """, (goal, request, raw_content, now, plan_id))
+
     def delete(self, plan_id: str):
         """Delete a plan (cascades to steps, phases, build state)."""
         with self.db.transaction() as conn:

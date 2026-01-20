@@ -78,6 +78,11 @@ class RunResponse(BaseModel):
     progress: int = 0
     error: Optional[str] = None
     data: Optional[Dict[str, Any]] = None
+    # Phase tracking fields for real-time visibility
+    current_phase_name: Optional[str] = Field(None, description="Name of the current execution phase")
+    phase_progress: int = Field(0, description="Progress within current phase (0-100)")
+    phases_total: int = Field(0, description="Total number of phases in the workflow")
+    activity_log: List[Dict[str, Any]] = Field(default_factory=list, description="Recent activity log entries with timestamps")
 
     class Config:
         from_attributes = True
@@ -281,3 +286,11 @@ class CancelBuildResponse(BaseModel):
     message: str = "Build cancelled successfully"
     steps_completed: int = 0
     steps_remaining: int = 0
+
+
+class UpdatePlanResponse(BaseModel):
+    """Response for plan update operation."""
+    status: str = "updated"
+    plan_id: str
+    updated_fields: List[str] = Field(default_factory=list, description="List of fields that were updated")
+    message: str = "Plan updated successfully"

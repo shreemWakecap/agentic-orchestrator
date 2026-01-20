@@ -594,6 +594,7 @@
 <script src="/static/js/plan-confirm-dialog.js"></script>
 <script src="/static/js/plan-recovery.js"></script>
 <script src="/static/js/unified-plan-dialog.js"></script>
+<script src="/static/js/plan-delete-dialog.js"></script>
 <script>
 /**
  * Create Plan form handler for the plans page
@@ -686,16 +687,31 @@ window.deletePlan = async function(planId, event) {
     const deleted = await PlanManager.deletePlan(planId, button);
 
     if (deleted) {
-        // Remove the plan item from the DOM with animation
+        // Remove the plan item from the DOM with fade-out animation
         const planItem = document.querySelector('[data-plan-id="' + planId + '"]');
         if (planItem) {
-            planItem.style.opacity = '0';
-            planItem.style.transform = 'translateY(-20px) scale(0.95)';
-            planItem.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+            // Disable pointer events during animation to prevent interaction
+            planItem.style.pointerEvents = 'none';
+
+            // Apply fade-out animation with scale and slide effect
+            // Use !important-equivalent inline styles to override any CSS class transitions
+            planItem.style.cssText = planItem.style.cssText +
+                ';opacity: 0 !important' +
+                ';transform: translateY(-20px) scale(0.95) !important' +
+                ';transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important' +
+                ';pointer-events: none !important';
+
+            // Remove from DOM after animation completes
             setTimeout(function() {
-                planItem.remove();
-                updatePlanCount();
+                // Additional safety check that element still exists
+                if (planItem && planItem.parentNode) {
+                    planItem.remove();
+                    updatePlanCount();
+                }
             }, 400);
+        } else {
+            // Plan item not found in DOM (may have already been removed), just update count
+            updatePlanCount();
         }
     }
 };

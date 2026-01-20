@@ -805,6 +805,257 @@ const PlanDetail = (function() {
         return div.innerHTML;
     }
 
+    // =========================================================================
+    // Plan Editing Functions
+    // =========================================================================
+
+    /**
+     * Edit plan details (goal and content)
+     * Opens the PlanEditDialog with goal and content fields
+     */
+    async function editPlanDetails() {
+        if (!window.PLAN_DATA) {
+            Toast.error('Plan data not available');
+            return;
+        }
+
+        if (window.PLAN_DATA.state !== 'pending') {
+            Toast.warning('Only pending plans can be edited');
+            return;
+        }
+
+        if (typeof PlanEditDialog === 'undefined') {
+            Toast.error('Edit dialog module not loaded');
+            return;
+        }
+
+        try {
+            const planData = {
+                id: window.PLAN_DATA.id || window.PLAN_DATA.folder,
+                goal: window.PLAN_DATA.goal || '',
+                request: window.PLAN_DATA.request || '',
+                content: window.PLAN_DATA.content || ''
+            };
+
+            const result = await PlanEditDialog.showEditDialog(planData);
+
+            if (result.saved && result.data) {
+                await savePlanChanges(result.data);
+            }
+        } catch (error) {
+            console.error('Error editing plan details:', error);
+            Toast.error('Failed to edit plan: ' + error.message);
+        }
+    }
+
+    /**
+     * Edit plan request only
+     * Opens the PlanEditDialog focused on request field
+     */
+    async function editPlanRequest() {
+        if (!window.PLAN_DATA) {
+            Toast.error('Plan data not available');
+            return;
+        }
+
+        if (window.PLAN_DATA.state !== 'pending') {
+            Toast.warning('Only pending plans can be edited');
+            return;
+        }
+
+        if (typeof PlanEditDialog === 'undefined') {
+            Toast.error('Edit dialog module not loaded');
+            return;
+        }
+
+        try {
+            const planData = {
+                id: window.PLAN_DATA.id || window.PLAN_DATA.folder,
+                goal: window.PLAN_DATA.goal || '',
+                request: window.PLAN_DATA.request || '',
+                content: window.PLAN_DATA.content || ''
+            };
+
+            const result = await PlanEditDialog.showEditDialog(planData);
+
+            if (result.saved && result.data) {
+                await savePlanChanges(result.data);
+            }
+        } catch (error) {
+            console.error('Error editing plan request:', error);
+            Toast.error('Failed to edit request: ' + error.message);
+        }
+    }
+
+    /**
+     * Improve plan request using AI, then open edit dialog with improved text
+     * Calls the improve-request API endpoint and opens dialog with result
+     */
+    async function improvePlanRequest() {
+        if (!window.PLAN_DATA) {
+            Toast.error('Plan data not available');
+            return;
+        }
+
+        if (window.PLAN_DATA.state !== 'pending') {
+            Toast.warning('Only pending plans can be edited');
+            return;
+        }
+
+        const currentRequest = window.PLAN_DATA.request || '';
+        if (!currentRequest.trim()) {
+            Toast.warning('No request text to improve');
+            return;
+        }
+
+        if (typeof PlanEditDialog === 'undefined') {
+            Toast.error('Edit dialog module not loaded');
+            return;
+        }
+
+        Toast.info('Improving request with AI...');
+
+        try {
+            const response = await fetch('/api/workflows/improve-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ draft: currentRequest })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to improve request');
+            }
+
+            const improvedRequest = (data.success && data.improved) ? data.improved : currentRequest;
+
+            // Open edit dialog with improved request
+            const planData = {
+                id: window.PLAN_DATA.id || window.PLAN_DATA.folder,
+                goal: window.PLAN_DATA.goal || '',
+                request: improvedRequest,
+                content: window.PLAN_DATA.content || ''
+            };
+
+            Toast.success('Request improved');
+
+            const result = await PlanEditDialog.showEditDialog(planData);
+
+            if (result.saved && result.data) {
+                await savePlanChanges(result.data);
+            }
+        } catch (error) {
+            console.error('Error improving plan request:', error);
+            Toast.error('Failed to improve request: ' + error.message);
+        }
+    }
+
+    /**
+     * Delete plan after confirmation
+     * Shows the PlanDeleteDialog with appropriate warning level based on plan state,
+     * then calls DELETE API and redirects to /plans on success.
+     *
+     * @param {string} planId - The plan identifier (folder name)
+     */
+    async function deletePlan(planId) {
+        if (!planId && window.PLAN_DATA) {
+            planId = window.PLAN_DATA.id || window.PLAN_DATA.folder;
+        }
+
+        if (!planId) {
+            Toast.error('Plan identifier not available');
+            return;
+        }
+
+        // Check if PlanDeleteDialog module is loaded
+        if (typeof PlanDeleteDialog === 'undefined') {
+            Toast.error('Delete dialog module not loaded');
+            return;
+        }
+
+        var planState = window.PLAN_DATA ? window.PLAN_DATA.state : 'unknown';
+
+        try {
+            // Show confirmation dialog with appropriate warning level
+            var confirmed = await PlanDeleteDialog.showDeleteConfirmation(planId, planState);
+
+            if (!confirmed) {
+                // User cancelled
+                return;
+            }
+
+            Toast.info('Deleting plan...');
+
+            // Call DELETE API
+            var response = await fetch('/api/plans/' + encodeURIComponent(planId), {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            var data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to delete plan');
+            }
+
+            Toast.success('Plan deleted successfully');
+
+            // Redirect to plans list
+            setTimeout(function() {
+                window.location.href = '/plans';
+            }, 500);
+        } catch (error) {
+            console.error('Error deleting plan:', error);
+            Toast.error('Failed to delete plan: ' + error.message);
+        }
+    }
+
+    /**
+     * Save plan changes via PATCH API
+     * @param {Object} data - Plan data to save
+     * @param {string} data.id - Plan identifier
+     * @param {string} data.goal - Plan goal
+     * @param {string} data.request - Plan request
+     * @param {string} data.content - Plan content
+     */
+    async function savePlanChanges(data) {
+        if (!data || !data.id) {
+            Toast.error('Invalid plan data');
+            return;
+        }
+
+        Toast.info('Saving changes...');
+
+        try {
+            const response = await fetch('/api/plans/' + encodeURIComponent(data.id), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    goal: data.goal,
+                    request: data.request,
+                    content: data.content
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.detail || 'Failed to save plan changes');
+            }
+
+            Toast.success('Plan updated successfully');
+
+            // Refresh the page to show updated content
+            setTimeout(function() {
+                window.location.reload();
+            }, 500);
+        } catch (error) {
+            console.error('Error saving plan changes:', error);
+            Toast.error('Failed to save changes: ' + error.message);
+        }
+    }
+
     // Initialize on DOM ready
     document.addEventListener('DOMContentLoaded', init);
 
@@ -832,7 +1083,14 @@ const PlanDetail = (function() {
                 var stepEl = document.getElementById('step-' + step.id);
                 if (stepEl) updateStepElementContent(stepEl, step, index);
             });
-        }
+        },
+        // Plan editing functions
+        editPlanDetails: editPlanDetails,
+        editPlanRequest: editPlanRequest,
+        improvePlanRequest: improvePlanRequest,
+        savePlanChanges: savePlanChanges,
+        // Plan deletion
+        deletePlan: deletePlan
     };
 })();
 

@@ -226,6 +226,21 @@
         transform: translateY(-1px);
     }
 
+    .btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.39);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px 0 rgba(239, 68, 68, 0.5);
+    }
+
+    .btn-danger:active {
+        transform: translateY(0);
+    }
+
     /* Success animation */
     @keyframes success-bounce {
         0%, 100% { transform: scale(1); }
@@ -289,6 +304,73 @@
         border: 1px solid rgba(255, 255, 255, 0.2);
     }
 
+    /* Status banner styling */
+    .status-banner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.875rem 1.25rem;
+        border-radius: 0.75rem;
+        margin-bottom: 1.5rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .status-banner-editable {
+        background: linear-gradient(135deg, #dcfce7 0%, #d1fae5 100%);
+        border: 1px solid #86efac;
+    }
+
+    .status-banner-readonly {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        border: 1px solid #cbd5e1;
+    }
+
+    .status-banner-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 0.5rem;
+        flex-shrink: 0;
+    }
+
+    .status-banner-editable .status-banner-icon {
+        background: rgba(34, 197, 94, 0.2);
+        color: #16a34a;
+    }
+
+    .status-banner-readonly .status-banner-icon {
+        background: rgba(100, 116, 139, 0.2);
+        color: #64748b;
+    }
+
+    .status-banner-text {
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .status-banner-editable .status-banner-text {
+        color: #166534;
+    }
+
+    .status-banner-readonly .status-banner-text {
+        color: #475569;
+    }
+
+    .status-banner-subtext {
+        font-size: 0.75rem;
+        margin-top: 0.125rem;
+    }
+
+    .status-banner-editable .status-banner-subtext {
+        color: #15803d;
+    }
+
+    .status-banner-readonly .status-banner-subtext {
+        color: #64748b;
+    }
+
     /* Terminal log styling */
     .terminal-log {
         background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
@@ -307,6 +389,237 @@
     .terminal-log::-webkit-scrollbar-thumb {
         background: #475569;
         border-radius: 3px;
+    }
+
+    /* Edit Mode Indicator Banner */
+    .edit-mode-banner {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .edit-mode-banner::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 50%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        animation: edit-mode-shimmer 3s ease-in-out infinite;
+    }
+
+    @keyframes edit-mode-shimmer {
+        0% { left: -100%; }
+        50%, 100% { left: 200%; }
+    }
+
+    .edit-mode-banner.status-banner-editable {
+        background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 50%, #d1fae5 100%);
+        border: 1px solid #4ade80;
+        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15);
+    }
+
+    .edit-mode-banner.status-banner-readonly {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        border: 1px solid #94a3b8;
+        box-shadow: 0 1px 3px rgba(100, 116, 139, 0.1);
+    }
+
+    /* Editable Section Styling */
+    .editable-section {
+        position: relative;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border-radius: 0.75rem;
+    }
+
+    .editable-section:hover {
+        background: rgba(59, 130, 246, 0.02);
+    }
+
+    .editable-section.is-editable:hover {
+        background: rgba(59, 130, 246, 0.04);
+        box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.1);
+    }
+
+    .editable-section .editable-content {
+        transition: all 0.2s ease;
+    }
+
+    .editable-section.is-editable:hover .editable-content {
+        border-color: #93c5fd;
+    }
+
+    /* Edit Button Base & Hover States */
+    .edit-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        color: #9ca3af;
+        background: transparent;
+        border: 1px solid transparent;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
+    }
+
+    .edit-btn:hover {
+        color: #3b82f6;
+        background: rgba(59, 130, 246, 0.1);
+        border-color: rgba(59, 130, 246, 0.2);
+        transform: translateY(-1px);
+    }
+
+    .edit-btn:active {
+        transform: translateY(0);
+        background: rgba(59, 130, 246, 0.15);
+    }
+
+    .edit-btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    .edit-btn.edit-btn-ai {
+        color: #a78bfa;
+    }
+
+    .edit-btn.edit-btn-ai:hover {
+        color: #8b5cf6;
+        background: rgba(139, 92, 246, 0.1);
+        border-color: rgba(139, 92, 246, 0.2);
+    }
+
+    .edit-btn.edit-btn-ai:active {
+        background: rgba(139, 92, 246, 0.15);
+    }
+
+    .edit-btn.edit-btn-ai:focus {
+        box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+    }
+
+    /* Edit Button Group Styling */
+    .edit-btn-group {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        opacity: 0.6;
+        transition: opacity 0.2s ease;
+    }
+
+    .editable-section:hover .edit-btn-group {
+        opacity: 1;
+    }
+
+    /* Edit Mode Visual Indicators */
+    .edit-indicator {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.25rem 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border-radius: 9999px;
+        transition: all 0.2s ease;
+    }
+
+    .edit-indicator-active {
+        background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+        color: #166534;
+        border: 1px solid #86efac;
+    }
+
+    .edit-indicator-active svg {
+        color: #22c55e;
+    }
+
+    .edit-indicator-locked {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        color: #64748b;
+        border: 1px solid #cbd5e1;
+    }
+
+    .edit-indicator-locked svg {
+        color: #94a3b8;
+    }
+
+    /* Inline Edit Field Styling */
+    .inline-edit-field {
+        width: 100%;
+        padding: 0.75rem;
+        font-size: 0.875rem;
+        color: #1f2937;
+        background: #ffffff;
+        border: 2px solid #3b82f6;
+        border-radius: 0.5rem;
+        outline: none;
+        transition: all 0.2s ease;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+
+    .inline-edit-field:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+    }
+
+    .inline-edit-field::placeholder {
+        color: #9ca3af;
+    }
+
+    /* Edit Action Buttons Row */
+    .edit-actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    .edit-actions .btn-save {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        color: white;
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+    }
+
+    .edit-actions .btn-save:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35);
+    }
+
+    .edit-actions .btn-cancel {
+        background: #f1f5f9;
+        color: #64748b;
+        padding: 0.5rem 1rem;
+        font-size: 0.75rem;
+        font-weight: 500;
+        border-radius: 0.5rem;
+        border: 1px solid #e2e8f0;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .edit-actions .btn-cancel:hover {
+        background: #e2e8f0;
+        color: #475569;
+    }
+
+    /* Pulse animation for editable hint */
+    @keyframes edit-pulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.3);
+        }
+        50% {
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0);
+        }
+    }
+
+    .edit-pulse {
+        animation: edit-pulse 2s ease-in-out infinite;
     }
 </style>
 {% endblock %}
@@ -357,8 +670,174 @@
         </div>
     </div>
 
+    <!-- Status Banner - Edit Availability Indicator -->
+    <div id="plan-status-banner" class="status-banner animate-fade-in-up {% if plan.state == 'pending' %}status-banner-editable{% else %}status-banner-readonly{% endif %}" style="animation-delay: 0.05s;">
+        <div class="flex items-center space-x-3">
+            <div class="status-banner-icon">
+                {% if plan.state == 'pending' %}
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                {% else %}
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                {% endif %}
+            </div>
+            <div>
+                <p class="status-banner-text">
+                    {% if plan.state == 'pending' %}
+                    Editing enabled
+                    {% else %}
+                    View only - plan is {{ plan.state }}
+                    {% endif %}
+                </p>
+                <p class="status-banner-subtext">
+                    {% if plan.state == 'pending' %}
+                    You can modify plan details, update the request, or use AI assistance
+                    {% else %}
+                    Plan editing is disabled for plans in {{ plan.state }} status
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+        <div class="flex items-center">
+            <span class="status-badge pill sm {% if plan.state == 'pending' %}status-badge-completed{% else %}status-badge-paused{% endif %}">
+                {% if plan.state == 'pending' %}
+                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                Editable
+                {% else %}
+                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"></path>
+                </svg>
+                Locked
+                {% endif %}
+            </span>
+        </div>
+    </div>
+
+    <!-- Plan Information Section (Always visible, Edit buttons only when pending) -->
+    <div id="plan-info-section" class="mb-8 bg-white shadow-lg sm:rounded-2xl overflow-hidden border border-gray-100 animate-fade-in-up" style="animation-delay: 0.1s;">
+        <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-blue-100 rounded-lg">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">Plan Information</h3>
+                </div>
+                {% if plan.state == 'pending' %}
+                <div class="flex items-center space-x-2">
+                    <button onclick="PlanEditDialog.openEditPlan('{{ plan.id }}')"
+                            class="btn-primary inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                        </svg>
+                        Edit Plan
+                    </button>
+                    <button onclick="PlanEditDialog.openAiAssist('{{ plan.id }}')"
+                            class="btn-purple inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500">
+                        <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                        AI Assist
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Goal Section -->
+        <div class="px-6 py-4 border-b border-gray-100">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <h4 class="text-sm font-semibold text-gray-700">Goal</h4>
+                    </div>
+                    <p id="plan-goal-display" class="text-sm text-gray-800 bg-gray-50 rounded-lg p-3 border border-gray-100">{{ plan.goal or plan.name or 'No goal specified' }}</p>
+                </div>
+                {% if plan.state == 'pending' %}
+                <button onclick="PlanEditDialog.openEditGoal('{{ plan.id }}')"
+                        class="ml-4 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Goal">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Request Section -->
+        <div class="px-6 py-4 border-b border-gray-100">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+                        </svg>
+                        <h4 class="text-sm font-semibold text-gray-700">Request</h4>
+                    </div>
+                    <p id="plan-request-display" class="text-sm text-gray-800 bg-gray-50 rounded-lg p-3 border border-gray-100 whitespace-pre-wrap">{{ plan.request or 'No request specified' }}</p>
+                </div>
+                {% if plan.state == 'pending' %}
+                <div class="ml-4 flex items-center space-x-1">
+                    <button onclick="PlanEditDialog.openEditRequest('{{ plan.id }}')"
+                            class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit Request">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                        </svg>
+                    </button>
+                    <button onclick="PlanEditDialog.openAiAssist('{{ plan.id }}', 'request')"
+                            class="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                            title="Improve Request with AI">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+                        </svg>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Content Preview Section -->
+        <div class="px-6 py-4">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <h4 class="text-sm font-semibold text-gray-700">Plan Content Preview</h4>
+                    </div>
+                    <div id="plan-content-preview" class="text-sm text-gray-800 bg-gray-50 rounded-lg p-3 border border-gray-100 max-h-32 overflow-y-auto">
+                        <pre class="whitespace-pre-wrap font-mono text-xs">{{ plan.content[:500] }}{% if plan.content|length > 500 %}...{% endif %}</pre>
+                    </div>
+                </div>
+                {% if plan.state == 'pending' %}
+                <button onclick="PlanEditDialog.openEditContent('{{ plan.id }}')"
+                        class="ml-4 p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Content">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
     <!-- Build Actions & Progress Section -->
-    <div id="build-section" class="mb-8 bg-white shadow-lg sm:rounded-2xl overflow-hidden border border-gray-100 animate-fade-in-up" style="animation-delay: 0.1s;">
+    <div id="build-section" class="mb-8 bg-white shadow-lg sm:rounded-2xl overflow-hidden border border-gray-100 animate-fade-in-up" style="animation-delay: 0.15s;">
         <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
@@ -411,6 +890,15 @@
                         </svg>
                         Back to Plans
                     </a>
+                    <span class="mx-2 text-gray-300">|</span>
+                    <button id="delete-plan-btn" onclick="PlanDetail.deletePlan('{{ plan.id }}')"
+                            class="btn-danger inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            title="Delete this plan">
+                        <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete
+                    </button>
                 </div>
             </div>
         </div>
@@ -633,6 +1121,9 @@
         file: "{{ plan.file }}",
         state: "{{ plan.state }}",
         name: "{{ plan.name }}",
+        goal: {{ plan.goal | tojson | safe if plan.goal else '""' }},
+        request: {{ plan.request | tojson | safe if plan.request else '""' }},
+        content: {{ plan.content | tojson | safe if plan.content else '""' }},
         failedStep: "{{ plan.failed_step or '' }}",
         currentStep: "{{ plan.current_step or '' }}",
         errorMessage: "{{ plan.error_message or '' | e }}",
@@ -648,6 +1139,8 @@
 <script src="/static/js/build-progress.js"></script>
 <script src="/static/js/plan-recovery.js"></script>
 <script src="/static/js/plan-detail.js"></script>
+<script src="/static/js/plan-edit-dialog.js"></script>
+<script src="/static/js/plan-delete-dialog.js"></script>
 <script>
     // Initialize plan recovery module for stuck/failed plans
     document.addEventListener('DOMContentLoaded', function() {

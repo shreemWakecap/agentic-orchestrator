@@ -5,10 +5,11 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from db import PlanRepository, RunRepository, KnowledgeRepository, BuildStateRepository
-from portal.dependencies import get_plan_repo, get_run_repo, get_knowledge_repo, get_build_state_repo
+from db import PlanRepository, RunRepository, KnowledgeRepository, BuildStateRepository, QuestionRepository
+from portal.dependencies import get_plan_repo, get_run_repo, get_knowledge_repo, get_build_state_repo, get_question_repo
 from portal.services.plan_service import PlanService
 from portal.services.knowledge_service import KnowledgeService
+from portal.services.question_service import QuestionService
 
 # Setup templates
 PORTAL_DIR = Path(__file__).parent.parent
@@ -55,12 +56,20 @@ def _get_knowledge_service(
     return KnowledgeService(knowledge_repo)
 
 
+def _get_question_service(
+    question_repo: QuestionRepository = Depends(get_question_repo),
+) -> QuestionService:
+    """Get question service with injected dependencies."""
+    return QuestionService(question_repo)
+
+
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
     plan_repo: PlanRepository = Depends(get_plan_repo),
     run_repo: RunRepository = Depends(get_run_repo),
     plan_service: PlanService = Depends(_get_plan_service),
+    question_service: QuestionService = Depends(_get_question_service),
 ):
     """Render main dashboard."""
     # Count plans by state from database
@@ -76,7 +85,17 @@ async def dashboard(
     recent_plans = all_plans[:5]
 
     # Get active runs from database and transform for template
-    runs = _transform_runs_for_template(run_repo.list_active())
+    # Include planning, running, and pending statuses for real-time visibility
+    active_statuses = ['planning', 'running', 'pending']
+    active_runs_raw = []
+    for status in active_statuses:
+        active_runs_raw.extend(run_repo.list_active(status=status))
+    # Sort by started_at (most recent first)
+    active_runs_raw.sort(
+        key=lambda r: r.get("started_at") or "",
+        reverse=True
+    )
+    runs = _transform_runs_for_template(active_runs_raw)
 
     # Get completed runs (completed + failed status) for "Recent Completed" section
     completed_runs_raw = run_repo.list_active(status="completed")
@@ -89,6 +108,20 @@ async def dashboard(
     )
     completed_runs = _transform_runs_for_template(all_finished[:5])
 
+    # Get recent questions for the Q&A widget
+    recent_questions_raw = await question_service.get_recent_questions(limit=5)
+    recent_questions = [
+        {
+            "id": q.id,
+            "question_text": q.question_text,
+            "source_type": q.source_type,
+            "status": q.status,
+            "answer_count": q.answer_count,
+            "created_at": q.created_at,
+        }
+        for q in recent_questions_raw
+    ]
+
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -97,6 +130,7 @@ async def dashboard(
             "recent_plans": recent_plans,
             "active_runs": runs,
             "completed_runs": completed_runs,
+            "recent_questions": recent_questions,
         },
     )
 
@@ -177,5 +211,25 @@ async def knowledge_page(
             "knowledge": knowledge,
             "scan_meta": scan_meta,
             "expert_count": expert_count,
+        },
+    )
+
+
+@router.get("/questions", response_class=HTMLResponse)
+async def questions_page(
+    request: Request,
+    question_service: QuestionService = Depends(_get_question_service),
+):
+    """Render questions management page."""
+    # Get questions data for template
+    data = await question_service.get_questions_for_template()
+
+    return templates.TemplateResponse(
+        request,
+        "questions.html",
+        {
+            "questions": data.get("questions", []),
+            "stats": data.get("stats", {}),
+            "total": data.get("total", 0),
         },
     )

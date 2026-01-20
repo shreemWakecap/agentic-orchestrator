@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 from db import PlanRepository, BuildStateRepository, RunRepository
 from portal.dependencies import get_plan_repo, get_build_state_repo, get_run_repo, get_recovery_service
-from portal.schemas.requests import MovePlanRequest, ResumeBuildRequest, RecoverPlanRequest
+from portal.schemas.requests import MovePlanRequest, ResumeBuildRequest, RecoverPlanRequest, UpdatePlanRequest
 from portal.schemas.responses import (
     PlanResponse,
     PlanDetailResponse,
@@ -23,11 +23,29 @@ from portal.schemas.responses import (
     StuckPlansResponse,
     StuckPlanInfo,
     CancelBuildResponse,
+    UpdatePlanResponse,
 )
 from portal.services.recovery_service import RecoveryService
 from portal.services.plan_service import PlanService
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
+
+
+@router.get("/counts")
+async def get_plan_counts(
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+) -> Dict[str, int]:
+    """Get plan counts by status for dashboard stats.
+
+    Returns counts for: pending, in_progress, completed, failed
+    Used for real-time dashboard stats updates without full page refresh.
+    """
+    return {
+        "pending": len(plan_repo.list_by_status("pending")),
+        "in_progress": len(plan_repo.list_by_status("building")),
+        "completed": len(plan_repo.list_by_status("completed")),
+        "failed": len(plan_repo.list_by_status("failed")),
+    }
 
 
 def _get_plan_service(
@@ -57,6 +75,64 @@ async def get_plan(
     if not plan:
         raise HTTPException(status_code=404, detail="Plan not found")
     return PlanDetailResponse(**plan)
+
+
+@router.patch("/{plan_id}", response_model=UpdatePlanResponse)
+async def update_plan(
+    plan_id: str,
+    request: UpdatePlanRequest,
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+) -> UpdatePlanResponse:
+    """Update a plan's content (goal, request, raw_content).
+
+    Only allowed when the plan is in 'pending' status.
+    At least one field must be provided for update.
+    """
+    plan = plan_repo.get_by_id(plan_id)
+
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    current_status = plan.get("status", "pending")
+
+    if current_status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot update plan in '{current_status}' status. Only plans in 'pending' status can be edited.",
+        )
+
+    # Check if at least one field is provided
+    if not any([request.goal, request.request, request.raw_content]):
+        raise HTTPException(
+            status_code=400,
+            detail="At least one field (goal, request, or raw_content) must be provided for update.",
+        )
+
+    # Build the update values, using existing values for fields not provided
+    goal = request.goal if request.goal is not None else plan.get("goal", "")
+    plan_request = request.request if request.request is not None else plan.get("request", "")
+    raw_content = request.raw_content if request.raw_content is not None else plan.get("raw_content", "")
+
+    # Track which fields were updated
+    updated_fields = []
+    if request.goal is not None:
+        updated_fields.append("goal")
+    if request.request is not None:
+        updated_fields.append("request")
+    if request.raw_content is not None:
+        updated_fields.append("raw_content")
+
+    try:
+        plan_repo.update_content(plan_id, goal, plan_request, raw_content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update plan: {str(e)}")
+
+    return UpdatePlanResponse(
+        status="updated",
+        plan_id=plan_id,
+        updated_fields=updated_fields,
+        message=f"Plan updated successfully. Updated fields: {', '.join(updated_fields)}",
+    )
 
 
 @router.get("/{plan_id}/files/{filename}", response_model=PlanFileResponse)
@@ -193,15 +269,39 @@ async def resume_plan_build(
 @router.delete("/{plan_id}", response_model=DeleteResponse)
 async def delete_plan(
     plan_id: str,
+    force: bool = False,
     plan_repo: PlanRepository = Depends(get_plan_repo),
 ) -> DeleteResponse:
-    """Delete a plan from database."""
+    """Delete a plan from database.
+
+    Args:
+        plan_id: The ID of the plan to delete
+        force: If True, allows deletion of active plans (building, in_progress, running).
+               Default is False.
+
+    Returns:
+        DeleteResponse with deletion status
+
+    Raises:
+        404: Plan not found
+        409: Plan is active and force=False
+        500: Failed to delete plan
+    """
     plan = plan_repo.get_by_id(plan_id)
 
     if not plan:
         raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
 
     plan_state = plan.get("status", "pending")
+
+    # Check if plan is in an active state
+    active_states = ["building", "in_progress", "running"]
+    if plan_state in active_states and not force:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Plan '{plan_id}' is currently active (status: {plan_state}). "
+            f"Use force=true to delete an active plan.",
+        )
 
     try:
         plan_repo.delete(plan_id)

@@ -155,3 +155,61 @@ class ICostRepository(ABC):
     def get_monthly_total(self) -> float:
         """Get total cost for this month."""
         ...
+
+
+class IQuestionRepository(ABC):
+    """Interface for question repository operations."""
+
+    @abstractmethod
+    def create_question(self, question_text: str, source_type: str = "knowledge_base") -> str:
+        """Create a new question."""
+        ...
+
+    @abstractmethod
+    def get_question(self, question_id: str) -> Optional[Dict]:
+        """Get a question by ID."""
+        ...
+
+    @abstractmethod
+    def get_question_with_answers(self, question_id: str) -> Optional[Dict]:
+        """Get a question with all its answers."""
+        ...
+
+    @abstractmethod
+    def list_questions(self, status: Optional[str] = None, source_type: Optional[str] = None,
+                       search: Optional[str] = None, limit: int = 50, offset: int = 0) -> List[Dict]:
+        """List questions with optional filtering."""
+        ...
+
+    @abstractmethod
+    def update_question(self, question_id: str, question_text: Optional[str] = None,
+                        status: Optional[str] = None) -> bool:
+        """Update a question."""
+        ...
+
+    @abstractmethod
+    def delete_question(self, question_id: str) -> bool:
+        """Delete a question and all its answers."""
+        ...
+
+    @abstractmethod
+    def create_answer(self, question_id: str, answer_text: str,
+                      source_details: Optional[Dict] = None) -> str:
+        """Create an answer for a question."""
+        ...
+
+    @abstractmethod
+    def get_answer(self, answer_id: str) -> Optional[Dict]:
+        """Get an answer by ID."""
+        ...
+
+    @abstractmethod
+    def update_answer(self, answer_id: str, answer_text: Optional[str] = None,
+                      is_obsolete: Optional[bool] = None) -> bool:
+        """Update an answer."""
+        ...
+
+    @abstractmethod
+    def delete_answer(self, answer_id: str) -> bool:
+        """Delete an answer."""
+        ...

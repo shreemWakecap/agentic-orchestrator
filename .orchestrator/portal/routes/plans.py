@@ -269,15 +269,39 @@ async def resume_plan_build(
 @router.delete("/{plan_id}", response_model=DeleteResponse)
 async def delete_plan(
     plan_id: str,
+    force: bool = False,
     plan_repo: PlanRepository = Depends(get_plan_repo),
 ) -> DeleteResponse:
-    """Delete a plan from database."""
+    """Delete a plan from database.
+
+    Args:
+        plan_id: The ID of the plan to delete
+        force: If True, allows deletion of active plans (building, in_progress, running).
+               Default is False.
+
+    Returns:
+        DeleteResponse with deletion status
+
+    Raises:
+        404: Plan not found
+        409: Plan is active and force=False
+        500: Failed to delete plan
+    """
     plan = plan_repo.get_by_id(plan_id)
 
     if not plan:
         raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
 
     plan_state = plan.get("status", "pending")
+
+    # Check if plan is in an active state
+    active_states = ["building", "in_progress", "running"]
+    if plan_state in active_states and not force:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Plan '{plan_id}' is currently active (status: {plan_state}). "
+            f"Use force=true to delete an active plan.",
+        )
 
     try:
         plan_repo.delete(plan_id)

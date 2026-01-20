@@ -33,6 +33,7 @@ from portal.routes import (
     pages_router,
     health_router,
     knowledge_router,
+    questions_router,
     background_tasks_router,
     websocket_router,
 )
@@ -147,6 +148,7 @@ app.include_router(workflows_router)
 app.include_router(cost_router)
 app.include_router(pages_router)
 app.include_router(knowledge_router)
+app.include_router(questions_router)
 app.include_router(background_tasks_router)
 app.include_router(websocket_router)
 

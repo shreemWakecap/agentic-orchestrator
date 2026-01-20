@@ -142,10 +142,33 @@
                             </label>
                             <span class="text-xs text-tertiary dark:text-tertiary italic">Don't worry about details - AI can help!</span>
                         </div>
-                        <textarea id="plan-description" name="description"
-                                  class="input-modern w-full resize-y"
-                                  rows="4"
-                                  placeholder="Write a rough idea of what you want...&#10;&#10;e.g., add user login&#10;or: make the dashboard faster&#10;or: add dark mode to the app"></textarea>
+                        <div class="enhanced-textarea-wrapper relative">
+                            <textarea id="plan-description" name="description"
+                                      class="input-modern enhanced-textarea w-full"
+                                      rows="4"
+                                      minlength="10"
+                                      maxlength="2000"
+                                      aria-label="Plan description - describe what you want to build"
+                                      aria-describedby="plan-description-hint plan-description-counter"
+                                      data-enhance-textarea="true"
+                                      data-min-rows="4"
+                                      data-max-rows="12"
+                                      placeholder="Describe what you want to build...
+
+Examples:
+• Add user authentication with email/password login
+• Create a dashboard showing sales analytics
+• Implement dark mode toggle for the entire app
+• Fix the bug where users can't upload images"></textarea>
+                            <div class="enhanced-textarea-footer flex items-center justify-between mt-2 text-xs">
+                                <span id="plan-description-hint" class="text-tertiary dark:text-tertiary">
+                                    Be specific about features, behaviors, or problems to solve
+                                </span>
+                                <span id="plan-description-counter" class="textarea-char-counter text-tertiary dark:text-tertiary font-mono" aria-live="polite">
+                                    <span class="char-current">0</span>/<span class="char-max">2000</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <button type="submit" class="btn btn-primary btn-modern group">
@@ -796,6 +819,7 @@
 <script src="/static/js/plan-manager.js"></script>
 <script src="/static/js/plan-recovery.js"></script>
 <script src="/static/js/task-activity-panel.js"></script>
+<script src="/static/js/textarea-enhancer.js"></script>
 <script>
 // Initialize keyboard shortcuts for plan management on dashboard
 document.addEventListener('DOMContentLoaded', function() {
@@ -806,6 +830,57 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (hasPlanElements && typeof PlanManager !== 'undefined' && PlanManager.initKeyboardShortcuts) {
         PlanManager.initKeyboardShortcuts();
+    }
+
+    // Initialize TextareaEnhancer for plan description textarea
+    if (typeof TextareaEnhancer !== 'undefined') {
+        var planTextarea = document.getElementById('plan-description');
+        if (planTextarea) {
+            // Get existing counter element to integrate with
+            var existingCounter = document.getElementById('plan-description-counter');
+
+            TextareaEnhancer.init(planTextarea, {
+                // Size configuration based on data attributes
+                minHeight: 120,
+                maxHeight: 400,
+
+                // Character count thresholds matching minlength/maxlength attributes
+                showCharCount: false, // We have a custom counter already
+                minChars: 10,         // Matches minlength="10"
+                maxChars: 2000,       // Matches maxlength="2000"
+                warnThreshold: 0.75,  // Show warning at 1500 chars (75%)
+                errorThreshold: 0.95, // Show error at 1900 chars (95%)
+
+                // Visual classes
+                focusClass: 'textarea-enhanced-focus',
+                warnClass: 'textarea-enhanced-warn',
+                errorClass: 'textarea-enhanced-error'
+            });
+
+            // Update custom character counter on input
+            planTextarea.addEventListener('input', function() {
+                var currentSpan = existingCounter ? existingCounter.querySelector('.char-current') : null;
+                if (currentSpan) {
+                    var count = planTextarea.value.length;
+                    currentSpan.textContent = count;
+
+                    // Update counter styling based on thresholds
+                    existingCounter.classList.remove('text-green-600', 'text-yellow-600', 'text-red-600',
+                        'dark:text-green-400', 'dark:text-yellow-400', 'dark:text-red-400');
+
+                    if (count > 1900) {
+                        existingCounter.classList.add('text-red-600', 'dark:text-red-400');
+                    } else if (count > 1500) {
+                        existingCounter.classList.add('text-yellow-600', 'dark:text-yellow-400');
+                    } else if (count >= 10) {
+                        existingCounter.classList.add('text-green-600', 'dark:text-green-400');
+                    }
+                }
+            });
+
+            // Trigger initial count update
+            planTextarea.dispatchEvent(new Event('input'));
+        }
     }
 });
 </script>

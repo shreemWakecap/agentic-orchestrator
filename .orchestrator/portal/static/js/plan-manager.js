@@ -302,14 +302,37 @@ const PlanManager = (function() {
             return false;
         }
 
-        // Show confirmation dialog
-        var confirmed = await showConfirmDialog({
-            title: 'Delete Plan',
-            message: 'Are you sure you want to delete plan "' + planId + '"? This action cannot be undone.',
-            confirmText: 'Delete',
-            cancelText: 'Cancel',
-            confirmClass: 'bg-red-600 hover:bg-red-700'
-        });
+        // Fetch plan state first to determine confirmation dialog type
+        var planState = null;
+        try {
+            var planData = await apiRequest(API_BASE + '/' + encodeURIComponent(planId), {
+                method: 'GET'
+            });
+            planState = planData.state || planData.status || null;
+        } catch (error) {
+            // If we can't fetch the plan state, proceed with standard confirmation
+            console.warn('Could not fetch plan state, proceeding with standard confirmation:', error.message);
+        }
+
+        // Check if plan is in an active state
+        var isActivePlan = planState && PlanDeleteDialog &&
+            PlanDeleteDialog.ACTIVE_STATES &&
+            PlanDeleteDialog.ACTIVE_STATES.includes(planState.toLowerCase().trim());
+
+        // Show enhanced confirmation dialog using PlanDeleteDialog if available
+        var confirmed = false;
+        if (typeof PlanDeleteDialog !== 'undefined' && PlanDeleteDialog.showDeleteConfirmation) {
+            confirmed = await PlanDeleteDialog.showDeleteConfirmation(planId, planState);
+        } else {
+            // Fallback to basic confirm dialog if PlanDeleteDialog is not available
+            confirmed = await showConfirmDialog({
+                title: 'Delete Plan',
+                message: 'Are you sure you want to delete plan "' + planId + '"? This action cannot be undone.',
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                confirmClass: 'bg-red-600 hover:bg-red-700'
+            });
+        }
 
         if (!confirmed) {
             return false;
@@ -318,7 +341,13 @@ const PlanManager = (function() {
         setLoadingState(buttonElement, true);
 
         try {
-            await apiRequest(API_BASE + '/' + encodeURIComponent(planId), {
+            // Build delete URL with force param for active plans
+            var deleteUrl = API_BASE + '/' + encodeURIComponent(planId);
+            if (isActivePlan) {
+                deleteUrl += '?force=true';
+            }
+
+            await apiRequest(deleteUrl, {
                 method: 'DELETE'
             });
 

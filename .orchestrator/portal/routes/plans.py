@@ -31,6 +31,23 @@ from portal.services.plan_service import PlanService
 router = APIRouter(prefix="/api/plans", tags=["plans"])
 
 
+@router.get("/counts")
+async def get_plan_counts(
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+) -> Dict[str, int]:
+    """Get plan counts by status for dashboard stats.
+
+    Returns counts for: pending, in_progress, completed, failed
+    Used for real-time dashboard stats updates without full page refresh.
+    """
+    return {
+        "pending": len(plan_repo.list_by_status("pending")),
+        "in_progress": len(plan_repo.list_by_status("building")),
+        "completed": len(plan_repo.list_by_status("completed")),
+        "failed": len(plan_repo.list_by_status("failed")),
+    }
+
+
 def _get_plan_service(
     plan_repo: PlanRepository = Depends(get_plan_repo),
     build_state_repo: BuildStateRepository = Depends(get_build_state_repo),

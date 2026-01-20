@@ -1,7 +1,15 @@
 /**
  * Dashboard page functionality
  * Handles plan creation form submission using unified AI-enhanced dialog
+ * Integrates with TaskActivityPanel for real-time task visibility
  */
+
+// Task Activity Panel integration state
+let taskActivityState = {
+    initialized: false,
+    logEventSources: {}, // Track SSE connections for task logs
+    planningWorkflows: new Map() // Track planning workflows by ID
+};
 
 function initDashboard() {
     const form = document.getElementById('plan-form');
@@ -451,13 +459,52 @@ function stopLivePolling() {
 
 async function fetchActiveRuns() {
     try {
-        const response = await fetch('/api/runs?status=running,pending&limit=10');
-        if (!response.ok) {
+        // Fetch both active runs AND planning workflows
+        const [runsResponse, planningResponse] = await Promise.all([
+            fetch('/api/runs?status=running,pending&limit=10'),
+            fetch('/api/plans?status=planning&limit=10').catch(() => null)
+        ]);
+
+        if (!runsResponse.ok) {
             throw new Error('Failed to fetch runs');
         }
-        const data = await response.json();
-        updateLiveBuildsUI(data.runs || []);
-        return data;
+
+        const runsData = await runsResponse.json();
+        var runs = runsData.runs || [];
+
+        // Add planning workflows to the display
+        if (planningResponse && planningResponse.ok) {
+            const planningData = await planningResponse.json();
+            const planningWorkflows = (planningData.plans || []).map(function(plan) {
+                return {
+                    id: 'planning-' + plan.id,
+                    plan_id: plan.id,
+                    workflow: 'planning',
+                    status: 'planning',
+                    progress: 0,
+                    current_step: 'AI is analyzing your request...',
+                    started_at: plan.created_at || new Date().toISOString(),
+                    is_planning: true,
+                    plan_name: plan.name || plan.description || 'New Plan'
+                };
+            });
+
+            // Update tracking map
+            taskActivityState.planningWorkflows.clear();
+            planningWorkflows.forEach(function(pw) {
+                taskActivityState.planningWorkflows.set(pw.plan_id, pw);
+            });
+
+            // Prepend planning workflows to runs
+            runs = planningWorkflows.concat(runs);
+        }
+
+        updateLiveBuildsUI(runs);
+
+        // Also sync with TaskActivityPanel if available
+        syncWithTaskActivityPanel(runs);
+
+        return { runs: runs };
     } catch (error) {
         console.error('Error fetching active runs:', error);
         return null;
@@ -526,43 +573,127 @@ function updateLiveBuildsUI(runs) {
 
 function createBuildCard(run) {
     const card = document.createElement('div');
-    card.className = 'border border-gray-200 rounded-lg p-4 live-build-card';
+    const isPlanning = run.status === 'planning' || run.is_planning;
+    const isBuilding = run.status === 'running' || run.status === 'building';
+
+    // Apply appropriate classes based on status
+    var cardClasses = 'border rounded-lg p-4 live-build-card transition-all duration-300';
+    if (isPlanning) {
+        cardClasses += ' border-gray-300 bg-gray-50 dark:bg-gray-800/50 opacity-75 pointer-events-none';
+    } else if (isBuilding) {
+        cardClasses += ' border-violet-200 dark:border-violet-800 bg-violet-50/30 dark:bg-violet-900/10';
+    } else {
+        cardClasses += ' border-gray-200 dark:border-gray-700';
+    }
+
+    card.className = cardClasses;
     card.dataset.runId = run.id;
     card.dataset.runStatus = run.status;
     card.dataset.startedAt = run.started_at || new Date().toISOString();
+    if (run.plan_id) {
+        card.dataset.planId = run.plan_id;
+    }
 
     const statusClasses = getStatusClasses(run.status);
     const progress = run.progress || 0;
-    const currentStep = run.current_step || 'Initializing...';
-    const workflow = run.workflow ? run.workflow.charAt(0).toUpperCase() + run.workflow.slice(1) : 'Build';
+    const currentStep = run.current_step || (isPlanning ? 'AI is analyzing your request...' : 'Initializing...');
+    var workflow = run.workflow ? run.workflow.charAt(0).toUpperCase() + run.workflow.slice(1) : 'Build';
+
+    // Use plan name for planning workflows
+    if (isPlanning && run.plan_name) {
+        workflow = run.plan_name.length > 30 ? run.plan_name.substring(0, 30) + '...' : run.plan_name;
+    }
+
+    // Build progress bar color based on status
+    var progressBarClass = 'bg-blue-600';
+    if (isPlanning) {
+        progressBarClass = 'bg-gray-400 animate-pulse';
+    } else if (isBuilding) {
+        progressBarClass = 'bg-violet-500';
+    }
+
+    // Determine link behavior (disabled for planning)
+    var titleHtml;
+    if (isPlanning) {
+        titleHtml = '<span class="text-sm font-medium text-gray-500 dark:text-gray-400 cursor-not-allowed">' +
+            escapeHtml(workflow) +
+            '</span>';
+    } else {
+        titleHtml = '<a href="/runs/' + escapeHtml(run.id) + '" class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">' +
+            escapeHtml(workflow) +
+            '</a>';
+    }
+
+    // Build status indicator icon for planning/building
+    var statusIconHtml = '';
+    if (isPlanning) {
+        statusIconHtml = '<div class="flex items-center mr-2">' +
+            '<svg class="animate-spin h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24">' +
+            '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+            '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
+            '</svg>' +
+            '</div>';
+    } else if (isBuilding) {
+        statusIconHtml = '<div class="flex items-center mr-2">' +
+            '<svg class="animate-pulse h-4 w-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>' +
+            '</svg>' +
+            '</div>';
+    }
+
+    // Build expand button for log streaming (not for planning)
+    var expandButtonHtml = '';
+    if (!isPlanning) {
+        expandButtonHtml = '<button type="button" class="expand-logs-btn ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="View live logs">' +
+            '<svg class="h-4 w-4 text-gray-400 expand-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>' +
+            '</svg>' +
+            '</button>';
+    }
 
     card.innerHTML =
         '<div class="flex items-center justify-between mb-3">' +
             '<div class="flex items-center">' +
-                '<a href="/runs/' + escapeHtml(run.id) + '" class="text-sm font-medium text-blue-600 hover:text-blue-800">' +
-                    escapeHtml(workflow) +
-                '</a>' +
-                '<span class="ml-2 text-xs text-gray-500">' + escapeHtml(run.id.substring(0, 8)) + '</span>' +
+                statusIconHtml +
+                titleHtml +
+                '<span class="ml-2 text-xs text-gray-500 dark:text-gray-400">' + escapeHtml(run.id.substring(0, 8)) + '</span>' +
             '</div>' +
             '<div class="flex items-center space-x-3">' +
-                '<span class="text-xs text-gray-500 elapsed-time" data-started="' + escapeHtml(run.started_at || '') + '">--:--</span>' +
+                '<span class="text-xs text-gray-500 dark:text-gray-400 elapsed-time" data-started="' + escapeHtml(run.started_at || '') + '">--:--</span>' +
                 '<span class="status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + statusClasses + '">' +
+                    '<span class="status-dot status-dot-' + escapeHtml(run.status) + ' mr-1.5"></span>' +
                     escapeHtml(run.status) +
                 '</span>' +
+                expandButtonHtml +
             '</div>' +
         '</div>' +
         '<div class="mb-2">' +
-            '<div class="flex items-center justify-between text-xs text-gray-600 mb-1">' +
+            '<div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">' +
                 '<span class="current-step">' + escapeHtml(currentStep) + '</span>' +
                 '<span class="progress-percent">' + progress + '%</span>' +
             '</div>' +
-            '<div class="w-full bg-gray-200 rounded-full h-2.5">' +
-                '<div class="progress-bar bg-blue-600 h-2.5 rounded-full transition-all duration-300" style="width: ' + progress + '%"></div>' +
+            '<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">' +
+                '<div class="progress-bar ' + progressBarClass + ' h-2.5 rounded-full transition-all duration-300" style="width: ' + progress + '%"></div>' +
             '</div>' +
         '</div>' +
-        '<div class="step-details mt-2 text-xs text-gray-500">' +
+        '<div class="step-details mt-2 text-xs text-gray-500 dark:text-gray-400">' +
             (run.total_steps ? '<span>Step ' + (run.current_step_num || 0) + ' of ' + run.total_steps + '</span>' : '') +
+        '</div>' +
+        // Hidden log container that expands
+        '<div class="log-container hidden mt-3 max-h-48 overflow-y-auto bg-gray-900 rounded-lg p-3 font-mono text-xs text-gray-300">' +
+            '<div class="log-content"></div>' +
         '</div>';
+
+    // Attach expand button handler for non-planning cards
+    if (!isPlanning) {
+        var expandBtn = card.querySelector('.expand-logs-btn');
+        if (expandBtn) {
+            expandBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                toggleLogContainer(card, run.id);
+            });
+        }
+    }
 
     return card;
 }
@@ -686,7 +817,8 @@ function getStatusClasses(status) {
         building: 'status-badge-building',
         paused: 'status-badge-paused',
         stuck: 'status-badge-stuck',
-        in_progress: 'status-badge-in-progress'
+        in_progress: 'status-badge-in-progress',
+        planning: 'status-badge-planning'
     };
     return classMap[status] || 'status-badge-paused';
 }
@@ -830,6 +962,278 @@ async function pollTaskUntilComplete(taskId, taskType, maxAttempts, interval) {
     throw new Error('Task polling timed out after ' + maxAttempts + ' attempts');
 }
 
+/**
+ * Toggle log container visibility and connect/disconnect SSE
+ * @param {HTMLElement} card - The build card element
+ * @param {string} runId - The run ID
+ */
+function toggleLogContainer(card, runId) {
+    var logContainer = card.querySelector('.log-container');
+    var expandIcon = card.querySelector('.expand-icon');
+
+    if (!logContainer) return;
+
+    var isExpanded = !logContainer.classList.contains('hidden');
+
+    if (isExpanded) {
+        // Collapse
+        logContainer.classList.add('hidden');
+        if (expandIcon) expandIcon.style.transform = 'rotate(0deg)';
+
+        // Disconnect SSE
+        disconnectLogSSE(runId);
+    } else {
+        // Expand
+        logContainer.classList.remove('hidden');
+        if (expandIcon) expandIcon.style.transform = 'rotate(180deg)';
+
+        // Connect SSE for log streaming
+        connectLogSSE(runId, card);
+    }
+}
+
+/**
+ * Connect SSE for live log streaming
+ * @param {string} runId - The run ID
+ * @param {HTMLElement} card - The build card element
+ */
+function connectLogSSE(runId, card) {
+    // Close existing connection if any
+    disconnectLogSSE(runId);
+
+    var logContent = card.querySelector('.log-content');
+    if (!logContent) return;
+
+    // Add loading indicator
+    logContent.innerHTML = '<div class="text-gray-500 animate-pulse">Connecting to log stream...</div>';
+
+    try {
+        var es = new EventSource('/api/runs/' + runId + '/events');
+
+        es.onopen = function() {
+            logContent.innerHTML = '<div class="text-green-400">Connected to live logs</div>';
+        };
+
+        es.onmessage = function(e) {
+            try {
+                var event = JSON.parse(e.data);
+                appendLogEntry(logContent, event);
+            } catch (err) {
+                console.debug('Log SSE parse error:', err);
+            }
+        };
+
+        es.addEventListener('log', function(e) {
+            try {
+                var data = JSON.parse(e.data);
+                appendLogEntry(logContent, data);
+            } catch (err) {
+                console.debug('Log event parse error:', err);
+            }
+        });
+
+        es.addEventListener('progress', function(e) {
+            try {
+                var data = JSON.parse(e.data);
+                if (data.message || data.step) {
+                    appendLogEntry(logContent, {
+                        type: 'progress',
+                        message: data.message || data.step,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            } catch (err) {
+                console.debug('Progress event parse error:', err);
+            }
+        });
+
+        es.onerror = function() {
+            appendLogEntry(logContent, {
+                type: 'error',
+                message: 'Log stream disconnected',
+                timestamp: new Date().toISOString()
+            });
+            es.close();
+            delete taskActivityState.logEventSources[runId];
+        };
+
+        taskActivityState.logEventSources[runId] = es;
+    } catch (error) {
+        console.error('Failed to connect log SSE:', error);
+        logContent.innerHTML = '<div class="text-red-400">Failed to connect to log stream</div>';
+    }
+}
+
+/**
+ * Disconnect SSE for log streaming
+ * @param {string} runId - The run ID
+ */
+function disconnectLogSSE(runId) {
+    if (taskActivityState.logEventSources[runId]) {
+        taskActivityState.logEventSources[runId].close();
+        delete taskActivityState.logEventSources[runId];
+    }
+}
+
+/**
+ * Append a log entry to the log container
+ * @param {HTMLElement} logContent - The log content element
+ * @param {Object} event - The log event
+ */
+function appendLogEntry(logContent, event) {
+    if (!logContent || !event) return;
+
+    var message = event.message || event.log || event.step || event.data || '';
+    if (!message && typeof event === 'string') {
+        message = event;
+    }
+    if (!message) return;
+
+    var timestamp = event.timestamp ? new Date(event.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString();
+    var level = event.level || event.type || 'info';
+
+    // Color based on level
+    var colorClass = 'text-gray-300';
+    if (level === 'error' || level === 'failed') {
+        colorClass = 'text-red-400';
+    } else if (level === 'warning' || level === 'warn') {
+        colorClass = 'text-yellow-400';
+    } else if (level === 'success' || level === 'completed' || level === 'done') {
+        colorClass = 'text-green-400';
+    } else if (level === 'progress' || level === 'step') {
+        colorClass = 'text-blue-400';
+    }
+
+    var logLine = document.createElement('div');
+    logLine.className = 'log-line ' + colorClass + ' whitespace-pre-wrap break-all';
+    logLine.textContent = '[' + timestamp + '] ' + message;
+
+    // Remove loading message if it's the first real log
+    var loadingMsg = logContent.querySelector('.animate-pulse');
+    if (loadingMsg) {
+        loadingMsg.remove();
+    }
+
+    logContent.appendChild(logLine);
+
+    // Auto-scroll to bottom
+    var logContainer = logContent.closest('.log-container');
+    if (logContainer) {
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    // Trim old entries (keep last 200 lines)
+    var lines = logContent.querySelectorAll('.log-line');
+    if (lines.length > 200) {
+        for (var i = 0; i < lines.length - 200; i++) {
+            lines[i].remove();
+        }
+    }
+}
+
+/**
+ * Sync runs with TaskActivityPanel if available
+ * @param {Array} runs - Array of run objects
+ */
+function syncWithTaskActivityPanel(runs) {
+    if (typeof TaskActivityPanel === 'undefined') return;
+
+    // Initialize panel if not done
+    if (!taskActivityState.initialized) {
+        var panelContainer = document.getElementById('task-activity-panel');
+        if (panelContainer) {
+            TaskActivityPanel.init('task-activity-panel');
+            taskActivityState.initialized = true;
+        }
+    }
+
+    // Sync each run to TaskActivityPanel
+    runs.forEach(function(run) {
+        var taskData = {
+            id: run.id,
+            name: run.plan_name || run.workflow || 'Task',
+            status: mapStatusToTaskStatus(run.status),
+            phase: mapStatusToPhase(run.status),
+            progress: run.progress || 0,
+            currentStep: run.current_step || '',
+            startedAt: run.started_at,
+            planId: run.plan_id,
+            totalSteps: run.total_steps || 0,
+            currentStepNum: run.current_step_num || 0
+        };
+
+        if (TaskActivityPanel.getTasks) {
+            var existingTasks = TaskActivityPanel.getTasks();
+            var exists = existingTasks.some(function(t) { return t.id === run.id; });
+
+            if (exists) {
+                TaskActivityPanel.updateTask(run.id, taskData);
+            } else {
+                TaskActivityPanel.addTask(taskData);
+            }
+        }
+    });
+}
+
+/**
+ * Map run status to TaskActivityPanel status
+ * @param {string} status - Run status
+ * @returns {string} TaskActivityPanel status
+ */
+function mapStatusToTaskStatus(status) {
+    var statusMap = {
+        planning: 'planning',
+        pending: 'pending',
+        running: 'running',
+        building: 'running',
+        completed: 'completed',
+        failed: 'failed',
+        error: 'failed'
+    };
+    return statusMap[status] || 'pending';
+}
+
+/**
+ * Map run status to task phase
+ * @param {string} status - Run status
+ * @returns {string} Task phase
+ */
+function mapStatusToPhase(status) {
+    var phaseMap = {
+        planning: 'planning',
+        pending: 'initializing',
+        running: 'executing',
+        building: 'executing',
+        completed: 'completed',
+        failed: 'failed'
+    };
+    return phaseMap[status] || 'initializing';
+}
+
+/**
+ * Initialize TaskActivityPanel integration
+ */
+function initTaskActivityPanel() {
+    if (typeof TaskActivityPanel === 'undefined') return;
+
+    var panelContainer = document.getElementById('task-activity-panel');
+    if (!panelContainer) {
+        // Create container if it doesn't exist
+        var liveBuildsSection = document.getElementById('live-builds-section');
+        if (liveBuildsSection) {
+            panelContainer = document.createElement('div');
+            panelContainer.id = 'task-activity-panel';
+            panelContainer.className = 'mt-6';
+            liveBuildsSection.parentNode.insertBefore(panelContainer, liveBuildsSection.nextSibling);
+        }
+    }
+
+    if (panelContainer) {
+        TaskActivityPanel.init('task-activity-panel');
+        taskActivityState.initialized = true;
+    }
+}
+
 // Cleanup function for page unload
 function cleanupLiveBuilds() {
     stopLivePolling();
@@ -840,6 +1244,17 @@ function cleanupLiveBuilds() {
         liveBuildsState.eventSources[runId].close();
     });
     liveBuildsState.eventSources = {};
+
+    // Cleanup log SSE connections
+    Object.keys(taskActivityState.logEventSources).forEach(function(runId) {
+        taskActivityState.logEventSources[runId].close();
+    });
+    taskActivityState.logEventSources = {};
+
+    // Cleanup TaskActivityPanel
+    if (typeof TaskActivityPanel !== 'undefined' && TaskActivityPanel.cleanup) {
+        TaskActivityPanel.cleanup();
+    }
 }
 
 /**
@@ -1141,6 +1556,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initSyncFileListToggle();
     initLiveBuilds();
     initStuckPlans();
+    initTaskActivityPanel();
     fetchSyncStatus();
 });
 

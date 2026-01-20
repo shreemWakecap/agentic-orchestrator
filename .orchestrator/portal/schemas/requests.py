@@ -100,3 +100,114 @@ class RecoverPlanRequest(BaseModel):
         None,
         description="Step ID to resume from (only used when action is 'resume'). If not provided, resumes from last incomplete step."
     )
+
+
+class CreateQuestionRequest(BaseModel):
+    """Request to create a new question."""
+    question: str = Field(..., min_length=1, max_length=2000, description="The question text to ask")
+    source_preference: Optional[str] = Field(
+        "auto",
+        pattern="^(knowledge_base|code_exploration|auto)$",
+        description="Preferred source for answer: 'knowledge_base' for scouting results, 'code_exploration' for codebase analysis, 'auto' for automatic selection"
+    )
+    tags: Optional[List[str]] = Field(
+        None,
+        description="Optional tags for categorizing the question"
+    )
+
+
+class UpdateQuestionRequest(BaseModel):
+    """Request to update an existing question."""
+    question: Optional[str] = Field(None, min_length=1, max_length=2000, description="Updated question text")
+    status: Optional[str] = Field(
+        None,
+        pattern="^(pending|answered|archived)$",
+        description="Question status: 'pending', 'answered', or 'archived'"
+    )
+    tags: Optional[List[str]] = Field(
+        None,
+        description="Updated tags for the question"
+    )
+
+
+class CreateAnswerRequest(BaseModel):
+    """Request to create an answer for a question."""
+    content: str = Field(..., min_length=1, max_length=10000, description="The answer content")
+    source: str = Field(
+        ...,
+        pattern="^(knowledge_base|code_exploration|manual)$",
+        description="Answer source: 'knowledge_base', 'code_exploration', or 'manual'"
+    )
+    source_references: Optional[List[str]] = Field(
+        None,
+        description="References to source files or knowledge entries used for the answer"
+    )
+    confidence: Optional[float] = Field(
+        None,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score for the answer (0.0 to 1.0)"
+    )
+
+
+class UpdateAnswerRequest(BaseModel):
+    """Request to update an existing answer."""
+    content: Optional[str] = Field(None, min_length=1, max_length=10000, description="Updated answer content")
+    is_obsolete: Optional[bool] = Field(None, description="Mark the answer as obsolete/outdated")
+    obsolete_reason: Optional[str] = Field(None, max_length=500, description="Reason why the answer is marked obsolete")
+
+
+class AnswerResponse(BaseModel):
+    """Response model for a single answer."""
+    id: str = Field(..., description="Unique answer identifier")
+    question_id: str = Field(..., description="ID of the parent question")
+    content: str = Field(..., description="The answer content")
+    source: str = Field(..., description="Answer source: 'knowledge_base', 'code_exploration', or 'manual'")
+    source_references: List[str] = Field(default_factory=list, description="References to source files or knowledge entries")
+    confidence: Optional[float] = Field(None, description="Confidence score for the answer (0.0 to 1.0)")
+    is_obsolete: bool = Field(False, description="Whether the answer is marked as obsolete")
+    obsolete_reason: Optional[str] = Field(None, description="Reason why the answer is obsolete")
+    created_at: str = Field(..., description="ISO timestamp when answer was created")
+    updated_at: Optional[str] = Field(None, description="ISO timestamp when answer was last updated")
+
+    class Config:
+        from_attributes = True
+
+
+class QuestionResponse(BaseModel):
+    """Response model for a single question (summary view)."""
+    id: str = Field(..., description="Unique question identifier")
+    question: str = Field(..., description="The question text")
+    status: str = Field(..., description="Question status: 'pending', 'answered', or 'archived'")
+    source_preference: str = Field("auto", description="Preferred source for answer")
+    tags: List[str] = Field(default_factory=list, description="Tags for categorizing the question")
+    answer_count: int = Field(0, description="Number of answers for this question")
+    created_at: str = Field(..., description="ISO timestamp when question was created")
+    updated_at: Optional[str] = Field(None, description="ISO timestamp when question was last updated")
+
+    class Config:
+        from_attributes = True
+
+
+class QuestionDetailResponse(BaseModel):
+    """Response model for a single question with full details including answers."""
+    id: str = Field(..., description="Unique question identifier")
+    question: str = Field(..., description="The question text")
+    status: str = Field(..., description="Question status: 'pending', 'answered', or 'archived'")
+    source_preference: str = Field("auto", description="Preferred source for answer")
+    tags: List[str] = Field(default_factory=list, description="Tags for categorizing the question")
+    answers: List[AnswerResponse] = Field(default_factory=list, description="List of answers for this question")
+    created_at: str = Field(..., description="ISO timestamp when question was created")
+    updated_at: Optional[str] = Field(None, description="ISO timestamp when question was last updated")
+
+    class Config:
+        from_attributes = True
+
+
+class QuestionListResponse(BaseModel):
+    """Response model for listing questions with pagination."""
+    questions: List[QuestionResponse] = Field(default_factory=list, description="List of questions")
+    total: int = Field(0, description="Total number of questions matching filters")
+    page: int = Field(1, description="Current page number")
+    page_size: int = Field(20, description="Number of items per page")
+    has_more: bool = Field(False, description="Whether there are more pages available")

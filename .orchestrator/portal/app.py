@@ -34,6 +34,7 @@ from portal.routes import (
     health_router,
     knowledge_router,
     background_tasks_router,
+    websocket_router,
 )
 from portal.routes.health import set_version
 from portal.exception_handlers import register_exception_handlers
@@ -45,6 +46,10 @@ from portal.services.task_manager import (
 from portal.services.auto_recovery import (
     start_auto_recovery,
     stop_auto_recovery,
+)
+from portal.streaming.websocket import (
+    init_websocket_manager,
+    shutdown_websocket_manager,
 )
 
 logger = logging.getLogger(__name__)
@@ -77,7 +82,17 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Auto-recovery task started successfully")
 
+    # Startup: Initialize WebSocket manager for real-time updates
+    logger.info("Starting WebSocket manager...")
+    await init_websocket_manager()
+    logger.info("WebSocket manager started successfully")
+
     yield
+
+    # Shutdown: Stop WebSocket manager
+    logger.info("Stopping WebSocket manager...")
+    await shutdown_websocket_manager()
+    logger.info("WebSocket manager stopped")
 
     # Shutdown: Stop auto-recovery task
     logger.info("Stopping auto-recovery task...")
@@ -133,6 +148,7 @@ app.include_router(cost_router)
 app.include_router(pages_router)
 app.include_router(knowledge_router)
 app.include_router(background_tasks_router)
+app.include_router(websocket_router)
 
 
 def run_portal(host: str = "127.0.0.1", port: int = 8000):

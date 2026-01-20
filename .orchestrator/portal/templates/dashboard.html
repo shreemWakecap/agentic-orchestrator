@@ -5,6 +5,7 @@
 {% block extra_styles %}
 <link rel="stylesheet" href="/static/css/plan-recovery.css">
 <link rel="stylesheet" href="/static/css/status-theme.css">
+<link rel="stylesheet" href="/static/css/task-activity-panel.css">
 {% endblock %}
 
 {% block content %}
@@ -31,7 +32,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <div class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{{ counts.pending }}</div>
+                <div id="count-pending" class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">{{ counts.pending }}</div>
                 <div class="text-sm font-medium text-tertiary dark:text-tertiary">Pending Plans</div>
             </div>
         </a>
@@ -45,7 +46,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                     </svg>
                 </div>
-                <div class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ counts.in_progress }}</div>
+                <div id="count-in-progress" class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{{ counts.in_progress }}</div>
                 <div class="text-sm font-medium text-tertiary dark:text-tertiary">In Progress</div>
             </div>
         </a>
@@ -59,7 +60,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <div class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{{ counts.completed }}</div>
+                <div id="count-completed" class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{{ counts.completed }}</div>
                 <div class="text-sm font-medium text-tertiary dark:text-tertiary">Completed</div>
             </div>
         </a>
@@ -73,7 +74,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
                 </div>
-                <div class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">{{ counts.failed }}</div>
+                <div id="count-failed" class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">{{ counts.failed }}</div>
                 <div class="text-sm font-medium text-tertiary dark:text-tertiary">Failed</div>
             </div>
         </a>
@@ -328,48 +329,113 @@
         </div>
     </div>
 
-    <!-- Live Builds Section - Modern Design -->
-    <div class="glass-card mb-12" id="live-builds-section">
+    <!-- Active Tasks Section - Real-time Task Visibility -->
+    <div class="glass-card mb-12" id="active-tasks-section">
         <div class="p-8">
             <div class="flex items-center justify-between mb-8">
                 <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center mr-4 shadow-lg">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-4 shadow-lg">
                         <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                         </svg>
                     </div>
                     <div>
-                        <h2 class="text-2xl font-bold text-primary dark:text-primary">Live Builds</h2>
-                        <span id="live-builds-indicator" class="flex items-center text-sm text-emerald-600 dark:text-emerald-400 mt-1" style="display: {% if active_runs %}flex{% else %}none{% endif %};">
+                        <h2 class="text-2xl font-bold text-primary dark:text-primary">Active Tasks</h2>
+                        <span id="active-tasks-indicator" class="flex items-center text-sm text-blue-600 dark:text-blue-400 mt-1" style="display: {% if active_runs or planning_tasks %}flex{% else %}none{% endif %};">
                             <span class="relative flex h-2.5 w-2.5 mr-2">
-                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
                             </span>
-                            Active
+                            <span id="active-tasks-count">{{ (active_runs|length if active_runs else 0) + (planning_tasks|length if planning_tasks else 0) }}</span> Active
                         </span>
                     </div>
                 </div>
-                <button id="refresh-builds-btn" type="button" class="btn btn-secondary btn-sm btn-modern group">
-                    <svg class="h-4 w-4 mr-1.5 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    Refresh
-                </button>
+                <div class="flex items-center space-x-2">
+                    <button id="toggle-log-panel-btn" type="button" class="btn btn-secondary btn-sm btn-modern group" title="Toggle Activity Log">
+                        <svg class="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                        </svg>
+                        Log
+                    </button>
+                    <button id="refresh-tasks-btn" type="button" class="btn btn-secondary btn-sm btn-modern group">
+                        <svg class="h-4 w-4 mr-1.5 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
             </div>
 
-            <div id="live-builds-container">
+            <!-- Planning Tasks (Gray/Disabled State) -->
+            {% if planning_tasks %}
+            <div id="planning-tasks-container" class="mb-6">
+                <div class="flex items-center mb-3">
+                    <span class="text-sm font-medium text-tertiary dark:text-tertiary">Planning</span>
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400">
+                        {{ planning_tasks|length }}
+                    </span>
+                </div>
+                <div class="space-y-3" id="planning-tasks-list">
+                    {% for task in planning_tasks %}
+                    <div class="glass rounded-xl p-4 planning-task-card opacity-60 cursor-not-allowed"
+                         data-task-id="{{ task.id }}"
+                         data-task-status="planning">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-400 to-gray-500 flex items-center justify-center mr-3 shadow-sm">
+                                    <svg class="h-5 w-5 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ task.name|default('Planning workflow...', true) }}</span>
+                                    <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ task.description|default('Analyzing requirements and generating plan...', true)|truncate(60) }}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <span class="status-badge pill bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                                    <span class="status-dot bg-gray-400 animate-pulse"></span>
+                                    Planning
+                                </span>
+                            </div>
+                        </div>
+                        <!-- Planning Progress Indicator -->
+                        <div class="mt-3">
+                            <div class="relative w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div class="absolute inset-0 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300 animate-pulse" style="animation-duration: 2s;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Building Tasks (Active/In-Progress) -->
+            <div id="active-tasks-container">
                 {% if active_runs %}
-                <div class="space-y-5" id="live-builds-list">
+                <div class="flex items-center mb-3">
+                    <span class="text-sm font-medium text-tertiary dark:text-tertiary">Building</span>
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
+                        {{ active_runs|length }}
+                    </span>
+                </div>
+                <div class="space-y-5" id="active-tasks-list">
                     {% for run in active_runs %}
-                    <div class="glass rounded-2xl p-6 live-build-card group hover:shadow-lg transition-all duration-300"
+                    <div class="glass rounded-2xl p-6 active-task-card group hover:shadow-lg transition-all duration-300"
                          data-run-id="{{ run.id }}"
                          data-run-status="{{ run.status }}"
                          data-started-at="{{ run.started_at }}">
                         <div class="flex items-center justify-between mb-5">
                             <div class="flex items-center">
                                 <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-4 shadow-md group-hover:scale-105 transition-transform">
-                                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="h-6 w-6 text-white {% if run.status == 'running' %}animate-spin{% endif %}" fill="none" {% if run.status == 'running' %}viewBox="0 0 24 24"{% else %}stroke="currentColor" viewBox="0 0 24 24"{% endif %}>
+                                        {% if run.status == 'running' %}
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        {% else %}
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                        {% endif %}
                                     </svg>
                                 </div>
                                 <div>
@@ -384,6 +450,36 @@
                                 <span class="status-badge pill {% if run.status == 'completed' %}status-badge-completed{% elif run.status == 'running' %}status-badge-running{% elif run.status == 'pending' %}status-badge-pending{% else %}status-badge-failed{% endif %}">
                                     <span class="status-dot {% if run.status == 'completed' %}status-dot-completed{% elif run.status == 'running' %}status-dot-running{% elif run.status == 'pending' %}status-dot-pending{% else %}status-dot-failed{% endif %}"></span>
                                     {{ run.status|title }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Phase Progress Indicators -->
+                        <div class="task-phase-indicator mb-4">
+                            <div class="task-phase-list w-full flex items-center">
+                                <span class="task-phase-badge {% if run.phase == 'planning' %}active{% elif run.phase in ['initializing', 'executing', 'validating', 'completing', 'completed'] %}completed{% else %}pending{% endif %}">
+                                    <span class="task-phase-badge-dot"></span>
+                                    Plan
+                                </span>
+                                <span class="task-phase-connector {% if run.phase in ['initializing', 'executing', 'validating', 'completing', 'completed'] %}completed{% elif run.phase == 'planning' %}active{% endif %}"></span>
+                                <span class="task-phase-badge {% if run.phase == 'initializing' %}active{% elif run.phase in ['executing', 'validating', 'completing', 'completed'] %}completed{% else %}pending{% endif %}">
+                                    <span class="task-phase-badge-dot"></span>
+                                    Init
+                                </span>
+                                <span class="task-phase-connector {% if run.phase in ['executing', 'validating', 'completing', 'completed'] %}completed{% elif run.phase == 'initializing' %}active{% endif %}"></span>
+                                <span class="task-phase-badge {% if run.phase == 'executing' %}active{% elif run.phase in ['validating', 'completing', 'completed'] %}completed{% else %}pending{% endif %}">
+                                    <span class="task-phase-badge-dot"></span>
+                                    Build
+                                </span>
+                                <span class="task-phase-connector {% if run.phase in ['validating', 'completing', 'completed'] %}completed{% elif run.phase == 'executing' %}active{% endif %}"></span>
+                                <span class="task-phase-badge {% if run.phase == 'validating' %}active{% elif run.phase in ['completing', 'completed'] %}completed{% else %}pending{% endif %}">
+                                    <span class="task-phase-badge-dot"></span>
+                                    Verify
+                                </span>
+                                <span class="task-phase-connector {% if run.phase in ['completing', 'completed'] %}completed{% elif run.phase == 'validating' %}active{% endif %}"></span>
+                                <span class="task-phase-badge {% if run.phase == 'completing' %}active{% elif run.phase == 'completed' %}completed{% else %}pending{% endif %}">
+                                    <span class="task-phase-badge-dot"></span>
+                                    Done
                                 </span>
                             </div>
                         </div>
@@ -423,16 +519,61 @@
                     {% endfor %}
                 </div>
                 {% else %}
-                <div id="no-builds-message" class="text-center py-16">
+                <div id="no-tasks-message" class="text-center py-16 {% if planning_tasks %}hidden{% endif %}">
                     <div class="w-20 h-20 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-5 shadow-inner">
                         <svg class="h-10 w-10 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-semibold text-primary dark:text-primary mb-2">No Active Builds</h3>
-                    <p class="text-sm text-secondary dark:text-secondary">Start a new plan to see build progress here</p>
+                    <h3 class="text-lg font-semibold text-primary dark:text-primary mb-2">No Active Tasks</h3>
+                    <p class="text-sm text-secondary dark:text-secondary">Create a new plan to see task progress here</p>
                 </div>
                 {% endif %}
+            </div>
+
+            <!-- Task Activity Log Panel (Collapsible) -->
+            <div id="task-activity-log-panel" class="task-activity-panel collapsed mt-6 hidden">
+                <div class="task-activity-panel-header" onclick="toggleActivityLogPanel()">
+                    <div class="task-activity-panel-title">
+                        <svg class="task-activity-panel-title-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                        </svg>
+                        Activity Log
+                    </div>
+                    <div class="task-activity-panel-actions">
+                        <button class="task-activity-panel-toggle" title="Expand/Collapse">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="task-activity-panel-body">
+                    <div id="task-log-output" class="task-log-output auto-scroll">
+                        <div class="task-log-line info">
+                            <span class="task-log-timestamp">--:--:--</span>
+                            <span class="task-log-level info">INFO</span>
+                            <span class="task-log-message">Waiting for task activity...</span>
+                        </div>
+                    </div>
+                    <div class="task-log-controls">
+                        <div class="task-log-controls-left">
+                            <button id="log-auto-scroll-btn" class="task-log-control-btn active" title="Auto-scroll">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                                </svg>
+                                Auto-scroll
+                            </button>
+                        </div>
+                        <div class="task-log-controls-right">
+                            <button id="log-clear-btn" class="task-log-control-btn" title="Clear log">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -481,7 +622,7 @@
                 <div class="text-center py-10">
                     <div class="w-14 h-14 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
                         <svg class="h-7 w-7 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                         </svg>
                     </div>
                     <p class="text-sm text-secondary dark:text-secondary">No plans yet. Create your first plan above!</p>
@@ -541,6 +682,73 @@
             </div>
         </div>
     </div>
+
+    <!-- Recent Questions Section -->
+    <div class="glass-card overflow-hidden mt-6">
+        <div class="p-8">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mr-4 shadow-lg">
+                        <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <h2 class="text-xl font-bold text-primary dark:text-primary">Recent Questions</h2>
+                </div>
+                <a href="/questions" class="btn btn-sm btn-secondary btn-modern group">
+                    View all
+                    <svg class="h-4 w-4 ml-1.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            </div>
+            {% if recent_questions %}
+            <ul class="space-y-3">
+                {% for question in recent_questions %}
+                <li class="glass rounded-xl p-4 hover:shadow-md transition-all duration-200 group">
+                    <div class="flex items-center justify-between">
+                        <div class="min-w-0 flex-1">
+                            <a href="/questions/{{ question.id }}" class="text-base font-semibold text-primary dark:text-primary group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate block">
+                                {{ question.question_text[:80] }}{% if question.question_text|length > 80 %}...{% endif %}
+                            </a>
+                            <div class="flex items-center mt-1 text-sm text-tertiary dark:text-tertiary">
+                                <span>{{ question.created_at[:10] }}</span>
+                                <span class="mx-2">·</span>
+                                <span class="flex items-center">
+                                    {% if question.source == 'knowledge_base' %}
+                                    <svg class="h-3.5 w-3.5 mr-1 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                                    </svg>
+                                    Knowledge Base
+                                    {% else %}
+                                    <svg class="h-3.5 w-3.5 mr-1 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                    </svg>
+                                    Code Exploration
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        <span class="status-badge pill ml-4 {% if question.status == 'answered' %}status-badge-completed{% elif question.status == 'pending' %}status-badge-pending{% elif question.status == 'processing' %}status-badge-running{% else %}status-badge-failed{% endif %}">
+                            <span class="status-dot {% if question.status == 'answered' %}status-dot-completed{% elif question.status == 'pending' %}status-dot-pending{% elif question.status == 'processing' %}status-dot-running{% else %}status-dot-failed{% endif %}"></span>
+                            {{ question.status|title }}
+                        </span>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="text-center py-10">
+                <div class="w-14 h-14 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+                    <svg class="h-7 w-7 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <p class="text-sm text-secondary dark:text-secondary">No questions yet. Ask a question to get answers from the knowledge base!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 </div>
 
 <style>
@@ -582,10 +790,12 @@
 <script src="/static/js/plan-confirm-dialog.js"></script>
 <script src="/static/js/request-improver-dialog.js"></script>
 <script src="/static/js/unified-plan-dialog.js"></script>
+<script src="/static/js/realtime-updates.js"></script>
 <script src="/static/js/dashboard.js"></script>
 <script src="/static/js/build-progress.js"></script>
 <script src="/static/js/plan-manager.js"></script>
 <script src="/static/js/plan-recovery.js"></script>
+<script src="/static/js/task-activity-panel.js"></script>
 <script>
 // Initialize keyboard shortcuts for plan management on dashboard
 document.addEventListener('DOMContentLoaded', function() {
@@ -601,28 +811,34 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <script>
 /**
- * Live Builds Dashboard Module
- * Handles real-time build progress updates via SSE and polling
+ * Active Tasks Dashboard Module
+ * Handles real-time task progress updates via SSE and polling
+ * Supports planning tasks (gray/disabled) and building tasks (active)
  */
 (function() {
     'use strict';
 
     const POLL_INTERVAL = 3000;
     const ELAPSED_UPDATE_INTERVAL = 1000;
+    const LOG_MAX_LINES = 200;
 
     let eventSources = {};
     let pollTimer = null;
     let elapsedTimer = null;
+    let logAutoScroll = true;
+    let activityLogVisible = false;
 
     function init() {
-        const buildCards = document.querySelectorAll('.live-build-card');
+        const taskCards = document.querySelectorAll('.active-task-card');
+        const planningCards = document.querySelectorAll('.planning-task-card');
 
-        if (buildCards.length === 0) {
+        if (taskCards.length === 0 && planningCards.length === 0) {
             hideIndicator();
-            return;
+        } else {
+            showIndicator();
         }
 
-        buildCards.forEach(function(card) {
+        taskCards.forEach(function(card) {
             const runId = card.dataset.runId;
             const status = card.dataset.runStatus;
 
@@ -633,7 +849,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         startElapsedTimer();
         setupRefreshButton();
+        setupLogPanelToggle();
+        setupLogControls();
         startPolling();
+
+        // Initialize TaskActivityPanel if available
+        if (typeof TaskActivityPanel !== 'undefined') {
+            // TaskActivityPanel will be initialized by the module
+            console.log('[ActiveTasks] TaskActivityPanel module loaded');
+        }
     }
 
     function startSSE(runId, card) {
@@ -647,7 +871,8 @@ document.addEventListener('DOMContentLoaded', function() {
         es.onmessage = function(e) {
             try {
                 const event = JSON.parse(e.data);
-                updateBuildCard(card, event);
+                updateTaskCard(card, event);
+                appendLogLine(event);
             } catch (err) {
                 console.error('SSE parse error:', err);
             }
@@ -662,7 +887,7 @@ document.addEventListener('DOMContentLoaded', function() {
         eventSources[runId] = es;
     }
 
-    function updateBuildCard(card, event) {
+    function updateTaskCard(card, event) {
         if (event.progress !== undefined) {
             const progressBar = card.querySelector('.progress-bar');
             const progressPercent = card.querySelector('.progress-percent');
@@ -682,16 +907,22 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        if (event.phase) {
+            updatePhaseIndicators(card, event.phase);
+        }
+
         if (event.status) {
             const badge = card.querySelector('.status-badge');
             if (badge) {
-                badge.textContent = event.status.charAt(0).toUpperCase() + event.status.slice(1);
+                const dotEl = badge.querySelector('.status-dot');
+                const textContent = event.status.charAt(0).toUpperCase() + event.status.slice(1);
+                badge.innerHTML = '<span class="status-dot"></span>' + textContent;
                 updateStatusBadgeClasses(badge, event.status);
             }
             card.dataset.runStatus = event.status;
         }
 
-        if (event.type === 'done') {
+        if (event.type === 'done' || event.type === 'completed') {
             const runId = card.dataset.runId;
             if (eventSources[runId]) {
                 eventSources[runId].close();
@@ -701,35 +932,119 @@ document.addEventListener('DOMContentLoaded', function() {
             setTimeout(function() {
                 card.style.opacity = '0.6';
                 setTimeout(function() {
-                    refreshBuilds();
+                    refreshTasks();
                 }, 2000);
             }, 1000);
         }
     }
 
+    function updatePhaseIndicators(card, currentPhase) {
+        const phases = ['planning', 'initializing', 'executing', 'validating', 'completing', 'completed'];
+        const phaseIndex = phases.indexOf(currentPhase);
+
+        const badges = card.querySelectorAll('.task-phase-badge');
+        const connectors = card.querySelectorAll('.task-phase-connector');
+
+        badges.forEach(function(badge, index) {
+            badge.classList.remove('pending', 'active', 'completed');
+            if (index < phaseIndex) {
+                badge.classList.add('completed');
+            } else if (index === phaseIndex) {
+                badge.classList.add('active');
+            } else {
+                badge.classList.add('pending');
+            }
+        });
+
+        connectors.forEach(function(connector, index) {
+            connector.classList.remove('completed', 'active');
+            if (index < phaseIndex) {
+                connector.classList.add('completed');
+            } else if (index === phaseIndex) {
+                connector.classList.add('active');
+            }
+        });
+    }
+
     function updateStatusBadgeClasses(badge, status) {
-        // Status badge class mapping using unified theme classes
         const statusClasses = {
             completed: 'status-badge-completed',
             running: 'status-badge-running',
             pending: 'status-badge-pending',
+            planning: 'status-badge-pending',
             failed: 'status-badge-failed',
             error: 'status-badge-failed'
         };
 
-        // Remove all existing status badge classes
         badge.classList.remove('status-badge-completed', 'status-badge-running', 'status-badge-pending', 'status-badge-failed', 'status-badge-in-progress');
 
-        // Add new status class
         const statusClass = statusClasses[status] || statusClasses.pending;
         badge.classList.add(statusClass);
 
-        // Update the status dot if present
         const dot = badge.querySelector('.status-dot');
         if (dot) {
             dot.classList.remove('status-dot-completed', 'status-dot-running', 'status-dot-pending', 'status-dot-failed', 'status-dot-in-progress');
             dot.classList.add(statusClass.replace('badge', 'dot'));
         }
+    }
+
+    function appendLogLine(event) {
+        const logOutput = document.getElementById('task-log-output');
+        if (!logOutput) return;
+
+        const timestamp = new Date().toLocaleTimeString('en-US', { hour12: false });
+        let level = 'info';
+        let message = '';
+
+        if (event.log || event.message) {
+            message = event.log || event.message;
+            level = event.level || 'info';
+        } else if (event.step) {
+            message = 'Step: ' + event.step;
+            level = 'info';
+        } else if (event.phase) {
+            message = 'Phase changed to: ' + event.phase;
+            level = 'success';
+        } else if (event.error) {
+            message = 'Error: ' + event.error;
+            level = 'error';
+        } else {
+            return; // No loggable content
+        }
+
+        const logLine = document.createElement('div');
+        logLine.className = 'task-log-line';
+
+        logLine.innerHTML = [
+            '<span class="task-log-timestamp">' + timestamp + '</span>',
+            '<span class="task-log-level ' + level + '">' + level.toUpperCase() + '</span>',
+            '<span class="task-log-message">' + escapeHtml(message) + '</span>'
+        ].join('');
+
+        // Remove placeholder if present
+        const placeholder = logOutput.querySelector('.task-log-line:only-child');
+        if (placeholder && placeholder.querySelector('.task-log-message').textContent === 'Waiting for task activity...') {
+            placeholder.remove();
+        }
+
+        logOutput.appendChild(logLine);
+
+        // Trim old logs
+        while (logOutput.children.length > LOG_MAX_LINES) {
+            logOutput.removeChild(logOutput.firstChild);
+        }
+
+        // Auto-scroll
+        if (logAutoScroll) {
+            logOutput.scrollTop = logOutput.scrollHeight;
+        }
+    }
+
+    function escapeHtml(text) {
+        if (typeof text !== 'string') return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     function startElapsedTimer() {
@@ -780,64 +1095,133 @@ document.addEventListener('DOMContentLoaded', function() {
 
         pollTimer = setInterval(function() {
             if (Object.keys(eventSources).length === 0) {
-                const activeCards = document.querySelectorAll('.live-build-card[data-run-status="running"], .live-build-card[data-run-status="pending"]');
+                const activeCards = document.querySelectorAll('.active-task-card[data-run-status="running"], .active-task-card[data-run-status="pending"]');
                 if (activeCards.length > 0) {
-                    refreshBuilds();
+                    refreshTasks();
                 }
             }
+            // Always check for planning task updates
+            refreshPlanningTasks();
         }, POLL_INTERVAL);
     }
 
-    function refreshBuilds() {
+    function refreshTasks() {
         fetch('/api/runs?status=running,pending&limit=10')
             .then(function(response) {
                 return response.json();
             })
             .then(function(data) {
                 if (data.runs) {
-                    updateBuildsList(data.runs);
+                    updateTasksList(data.runs);
                 }
             })
             .catch(function(err) {
-                console.error('Failed to refresh builds:', err);
+                console.error('Failed to refresh tasks:', err);
             });
     }
 
-    function updateBuildsList(runs) {
-        const container = document.getElementById('live-builds-container');
-        const noBuildsMsg = document.getElementById('no-builds-message');
+    function refreshPlanningTasks() {
+        fetch('/api/tasks/planning')
+            .then(function(response) {
+                if (!response.ok) return { tasks: [] };
+                return response.json();
+            })
+            .then(function(data) {
+                if (data.tasks) {
+                    updatePlanningTasksList(data.tasks);
+                }
+            })
+            .catch(function(err) {
+                console.debug('Planning tasks fetch failed:', err);
+            });
+    }
+
+    function updateTasksList(runs) {
+        const container = document.getElementById('active-tasks-container');
+        const noTasksMsg = document.getElementById('no-tasks-message');
+        const planningContainer = document.getElementById('planning-tasks-container');
 
         if (!runs || runs.length === 0) {
-            if (noBuildsMsg) {
-                noBuildsMsg.style.display = 'block';
+            if (noTasksMsg && !planningContainer) {
+                noTasksMsg.style.display = 'block';
+            } else if (noTasksMsg) {
+                noTasksMsg.classList.add('hidden');
             }
-            const list = document.getElementById('live-builds-list');
+            const list = document.getElementById('active-tasks-list');
             if (list) {
                 list.innerHTML = '';
             }
-            hideIndicator();
+            if (!planningContainer) {
+                hideIndicator();
+            }
+            updateTaskCount();
             return;
         }
 
+        if (noTasksMsg) {
+            noTasksMsg.classList.add('hidden');
+        }
         showIndicator();
 
         runs.forEach(function(run) {
-            let card = document.querySelector('.live-build-card[data-run-id="' + run.id + '"]');
+            let card = document.querySelector('.active-task-card[data-run-id="' + run.id + '"]');
 
             if (card) {
-                updateBuildCard(card, {
+                updateTaskCard(card, {
                     progress: run.progress || 0,
                     step: run.current_step,
-                    status: run.status
+                    status: run.status,
+                    phase: run.phase
                 });
             } else {
                 window.location.reload();
             }
         });
+
+        updateTaskCount();
+    }
+
+    function updatePlanningTasksList(tasks) {
+        const planningContainer = document.getElementById('planning-tasks-container');
+        if (!planningContainer) {
+            // Create container if we have planning tasks
+            if (tasks.length > 0) {
+                window.location.reload();
+            }
+            return;
+        }
+
+        if (tasks.length === 0) {
+            planningContainer.remove();
+            const noTasksMsg = document.getElementById('no-tasks-message');
+            const activeList = document.getElementById('active-tasks-list');
+            if (noTasksMsg && (!activeList || activeList.children.length === 0)) {
+                noTasksMsg.classList.remove('hidden');
+            }
+        }
+
+        updateTaskCount();
+    }
+
+    function updateTaskCount() {
+        const activeCards = document.querySelectorAll('.active-task-card');
+        const planningCards = document.querySelectorAll('.planning-task-card');
+        const countEl = document.getElementById('active-tasks-count');
+
+        const total = activeCards.length + planningCards.length;
+        if (countEl) {
+            countEl.textContent = total;
+        }
+
+        if (total === 0) {
+            hideIndicator();
+        } else {
+            showIndicator();
+        }
     }
 
     function setupRefreshButton() {
-        const btn = document.getElementById('refresh-builds-btn');
+        const btn = document.getElementById('refresh-tasks-btn');
         if (!btn) return;
 
         btn.addEventListener('click', function() {
@@ -846,7 +1230,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 icon.classList.add('animate-spin');
             }
 
-            refreshBuilds();
+            refreshTasks();
+            refreshPlanningTasks();
 
             setTimeout(function() {
                 if (icon) {
@@ -856,15 +1241,70 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function setupLogPanelToggle() {
+        const toggleBtn = document.getElementById('toggle-log-panel-btn');
+        if (!toggleBtn) return;
+
+        toggleBtn.addEventListener('click', function() {
+            toggleActivityLogPanel();
+        });
+    }
+
+    function setupLogControls() {
+        const autoScrollBtn = document.getElementById('log-auto-scroll-btn');
+        const clearBtn = document.getElementById('log-clear-btn');
+
+        if (autoScrollBtn) {
+            autoScrollBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                logAutoScroll = !logAutoScroll;
+                autoScrollBtn.classList.toggle('active', logAutoScroll);
+            });
+        }
+
+        if (clearBtn) {
+            clearBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const logOutput = document.getElementById('task-log-output');
+                if (logOutput) {
+                    logOutput.innerHTML = [
+                        '<div class="task-log-line info">',
+                        '  <span class="task-log-timestamp">--:--:--</span>',
+                        '  <span class="task-log-level info">INFO</span>',
+                        '  <span class="task-log-message">Log cleared. Waiting for task activity...</span>',
+                        '</div>'
+                    ].join('');
+                }
+            });
+        }
+    }
+
+    // Global function for toggle
+    window.toggleActivityLogPanel = function() {
+        const panel = document.getElementById('task-activity-log-panel');
+        if (!panel) return;
+
+        activityLogVisible = !activityLogVisible;
+        panel.classList.toggle('hidden', !activityLogVisible);
+        panel.classList.toggle('collapsed', !activityLogVisible);
+        panel.classList.toggle('expanded', activityLogVisible);
+
+        const toggleBtn = document.getElementById('toggle-log-panel-btn');
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('btn-primary', activityLogVisible);
+            toggleBtn.classList.toggle('btn-secondary', !activityLogVisible);
+        }
+    };
+
     function hideIndicator() {
-        const indicator = document.getElementById('live-builds-indicator');
+        const indicator = document.getElementById('active-tasks-indicator');
         if (indicator) {
             indicator.style.display = 'none';
         }
     }
 
     function showIndicator() {
-        const indicator = document.getElementById('live-builds-indicator');
+        const indicator = document.getElementById('active-tasks-indicator');
         if (indicator) {
             indicator.style.display = 'flex';
         }

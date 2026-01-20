@@ -76,7 +76,17 @@ async def dashboard(
     recent_plans = all_plans[:5]
 
     # Get active runs from database and transform for template
-    runs = _transform_runs_for_template(run_repo.list_active())
+    # Include planning, running, and pending statuses for real-time visibility
+    active_statuses = ['planning', 'running', 'pending']
+    active_runs_raw = []
+    for status in active_statuses:
+        active_runs_raw.extend(run_repo.list_active(status=status))
+    # Sort by started_at (most recent first)
+    active_runs_raw.sort(
+        key=lambda r: r.get("started_at") or "",
+        reverse=True
+    )
+    runs = _transform_runs_for_template(active_runs_raw)
 
     # Get completed runs (completed + failed status) for "Recent Completed" section
     completed_runs_raw = run_repo.list_active(status="completed")

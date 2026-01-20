@@ -308,3 +308,38 @@ Critical Issues Found
 
 
 https://github.com/davila7/claude-code-templates
+
+===================================
+Dashboard displays Plans, Questions, and Statistics prominently at the top with Sync section moved lower and collapsible by default
+
+Revamp the dashboard layout to prioritize high-value content sections. Reorder the dashboard to display Plans, Questions, and Statistics sections prominently at the top as primary content areas. Move the Sync section to a less prominent position (lower on the page or collapsed by default) since it's used less frequently. Apply UX best practices including clear visual hierarchy, appropriate whitespace, and logical content grouping to improve scannability and user workflow efficiency.
+
+
+
+===================================
+
+Users can scout individual files or paths on demand, with scouting allowed for any accessible project file
+
+Enhance the knowledge scouting functionality to support targeted file scouting. Allow users to specify individual files or paths to scout rather than only bulk-scanning entire directories. Remove the restriction that limits scouting to files within the .orchestrator directory, enabling scouting of any accessible file in the project. The scouting process should accept a file path parameter and process that single file on demand.
+
+
+GOAL: Users can scout individual files or paths on demand, with scouting allowed for any accessible project file
+
+CONTEXT:
+- Scouting workflow in `.orchestrator/workflows/scouting.py` currently only supports full/quick bulk scans
+- Scout agent in `.orchestrator/agents/scout.md` outputs KEY: VALUE format with PROJECT_TYPE:, STRUCTURE: markers
+- Knowledge is persisted via KnowledgeStore in `.orchestrator/core/knowledge_store.py` using SQLite database
+- CLI dispatcher in `.orchestrator/cli.py` routes `scout` command to `workflows/scouting.py:run()`
+- Current architecture has no file path restriction mechanism to enforce .orchestrator-only scouting
+- Planning workflow in `.orchestrator/workflows/planning.py` integrates with knowledge store for context
+
+STEPS:
+1. Add file scout agent definition
+2. Add file knowledge data model
+3. Extend KnowledgeRepository for file-level storage
+4. Create database migration for file_knowledge table
+5. Extend KnowledgeStore with file operations
+6. Add file scouting mode to ScoutingWorkflow
+7. Update agent output markers for file-scout
+8. Update CLI to accept file path argument
+9. Update CLI help text for scout command

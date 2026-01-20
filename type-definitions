@@ -1,0 +1,146 @@
+# Task Type Definitions Analysis
+
+## Overview
+
+This document analyzes where task types are defined in the frontend and backend, specifically to determine if Scout Tasks have a different type identifier that might not be included in background task aggregation.
+
+## Backend Task Type Definitions
+
+### 1. TaskManager Service (`.orchestrator/portal/services/task_manager.py`)
+
+The `TaskManager` class defines tasks with a `task_type` field:
+
+```python
+@dataclass
+class TaskInfo:
+    task_id: str
+    name: str
+    task_type: str = "task"  # Default type is "task"
+    status: TaskStatus = TaskStatus.PENDING
+    # ... other fields
+```
+
+The `to_dict()` method exports the task_type in two ways:
+```python
+{
+    "task_type": self.task_type,
+    "type": self.task_type,  # Frontend alias
+}
+```
+
+### 2. Scout Task Registration (`.orchestrator/portal/routes/knowledge.py`)
+
+Scout tasks are registered with `task_type="scout"`:
+
+```python
+# Line 113-127 in /scout endpoint
+task_manager.submit_task(
+    func=run_scouting_workflow_sync,
+    args=(run_id,),
+    kwargs={...},
+    name=f"Scouting: {request.scan_type or 'quick'}",
+    task_id=run_id,
+    task_type="scout",  # <-- SCOUT TYPE IDENTIFIER
+    metadata={"run_id": run_id, "scan_type": request.scan_type or "quick"},
+)
+```
+
+Similar registration for path and keyword scouting endpoints (lines 151, 193).
+
+### 3. Core Enums (`.orchestrator/core/enums.py`)
+
+Agent types are defined:
+```python
+class AgentType(str, Enum):
+    PLANNER = "planner"
+    BUILDER = "builder"
+    SCOUT = "scout"
+    SYNCER = "syncer"
+    VERIFIER = "verifier"
+```
+
+Workflow types:
+```python
+class WorkflowType(str, Enum):
+    PLANNING = "planning"
+    BUILDING = "building"
+    SYNCING = "syncing"
+    SCOUTING = "scouting"
+```
+
+## Frontend Task Type Handling
+
+### 1. Background Tasks Indicator (`.orchestrator/portal/static/js/background-tasks.js`)
+
+The frontend indicator uses a generic `type` field from task data:
+
+```javascript
+function addTask(task) {
+    const taskData = {
+        id: task.id,
+        type: task.type || 'task',  // Uses 'type' field or defaults to 'task'
+        status: task.status || TaskStatus.PENDING,
+        progress: task.progress || 0,
+        message: task.message || 'Starting...',
+        startedAt: task.startedAt || new Date().toISOString()
+    };
+    // ...
+}
+```
+
+The `formatTaskType()` function displays task types:
+```javascript
+function formatTaskType(type) {
+    if (!type) return 'Task';
+    return type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' ');
+}
+```
+
+### 2. Background Tasks API (`.orchestrator/portal/routes/background_tasks.py`)
+
+The `/api/background-tasks` endpoint returns ALL tasks from TaskManager:
+
+```python
+@router.get("")
+async def list_background_tasks(
+    status: Optional[str] = None,
+    task_type: Optional[str] = None,
+    task_manager: TaskManager = Depends(get_task_manager),
+):
+    tasks = task_manager.list_all_tasks()  # Gets ALL tasks regardless of type
+```
+
+## Key Finding
+
+**Scout Tasks ARE properly included in background task aggregation.**
+
+The evidence:
+
+1. **Backend**: Scout tasks are registered with `task_type="scout"` in the TaskManager
+2. **API**: The `/api/background-tasks` endpoint returns ALL tasks from `list_all_tasks()` without filtering by type
+3. **Frontend**: The `background-tasks.js` module fetches from `/api/background-tasks` and accepts any task type
+
+## No Type Filtering Issues
+
+The background task system is **type-agnostic**:
+
+- `TaskManager.list_all_tasks()` returns all registered tasks regardless of `task_type`
+- `TaskManager.list_active_tasks()` filters by status (pending/running), not by type
+- Frontend `syncTasks()` function processes all server tasks without type filtering
+
+## Task Type Values in Use
+
+| Task Type | Where Used | Example |
+|-----------|------------|---------|
+| `"scout"` | Knowledge/scouting routes | Codebase analysis |
+| `"plan"` | Planning workflows | Plan creation |
+| `"build"` | Building workflows | Build execution |
+| `"sync"` | Syncing workflows | Remote sync |
+| `"improve_request"` | Request improvement | AI-enhanced requests |
+| `"task"` (default) | Generic tasks | Fallback |
+
+## Conclusion
+
+Scout Tasks use the type identifier `"scout"` and are fully included in background task aggregation. There is no exclusion or special handling that would prevent Scout Tasks from appearing in the background tasks indicator.
+
+If Scout Tasks are not appearing, the issue would be elsewhere (e.g., tasks completing too quickly before polling, SSE connection issues, or the task not being submitted properly).

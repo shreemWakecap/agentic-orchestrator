@@ -78,6 +78,17 @@ async def dashboard(
     # Get active runs from database and transform for template
     runs = _transform_runs_for_template(run_repo.list_active())
 
+    # Get completed runs (completed + failed status) for "Recent Completed" section
+    completed_runs_raw = run_repo.list_active(status="completed")
+    failed_runs_raw = run_repo.list_active(status="failed")
+    # Combine and sort by completed_at or started_at (most recent first), limit to 5
+    all_finished = completed_runs_raw + failed_runs_raw
+    all_finished.sort(
+        key=lambda r: r.get("completed_at") or r.get("started_at") or "",
+        reverse=True
+    )
+    completed_runs = _transform_runs_for_template(all_finished[:5])
+
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -85,6 +96,7 @@ async def dashboard(
             "counts": counts,
             "recent_plans": recent_plans,
             "active_runs": runs,
+            "completed_runs": completed_runs,
         },
     )
 

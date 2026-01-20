@@ -281,3 +281,11 @@ class CancelBuildResponse(BaseModel):
     message: str = "Build cancelled successfully"
     steps_completed: int = 0
     steps_remaining: int = 0
+
+
+class UpdatePlanResponse(BaseModel):
+    """Response for plan update operation."""
+    status: str = "updated"
+    plan_id: str
+    updated_fields: List[str] = Field(default_factory=list, description="List of fields that were updated")
+    message: str = "Plan updated successfully"

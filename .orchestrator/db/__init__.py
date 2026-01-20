@@ -39,6 +39,7 @@ from .repositories import (
     KnowledgeRepository,
     CostRepository,
     RunRepository,
+    QuestionRepository,
 )
 from .migrations import MigrationRunner
 
@@ -87,6 +88,11 @@ def get_cost_repository() -> CostRepository:
 def get_run_repository() -> RunRepository:
     """Get run repository."""
     return RunRepository(get_database())
+
+
+def get_question_repository() -> QuestionRepository:
+    """Get question repository."""
+    return QuestionRepository(get_database())
 
 
 def run_migrations() -> list[str]:
@@ -141,6 +147,7 @@ __all__ = [
     "KnowledgeRepository",
     "CostRepository",
     "RunRepository",
+    "QuestionRepository",
     # Migrations
     "MigrationRunner",
     # Factory functions
@@ -150,6 +157,7 @@ __all__ = [
     "get_knowledge_repository",
     "get_cost_repository",
     "get_run_repository",
+    "get_question_repository",
     # Migration utilities
     "run_migrations",
     "get_schema_version",

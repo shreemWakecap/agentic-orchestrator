@@ -471,6 +471,20 @@ class KnowledgeStore:
                 "\n".join(f"- {c}" for c in knowledge.patterns.conventions[:5])
             )
 
+        # Integration patterns for layered architecture
+        if knowledge.architecture.pattern == "layered":
+            sections.append("""Integration Pattern (CRITICAL for new features):
+When adding a new feature module, create ALL layers in order:
+1. Repository: db/repositories/{module}.py + export in __init__.py files
+2. Service: portal/services/{module}_service.py
+3. Dependency: portal/dependencies.py - add get_{module}_repo()
+4. API Routes: portal/routes/{module}.py
+5. Route Registration: import in routes/__init__.py + include_router in app.py
+6. Page Route: portal/routes/pages.py - add /{module} page
+7. Template: portal/templates/{module}.html
+
+Reference: Trace the Knowledge module to see this pattern in action.""")
+
         context = "\n\n".join(sections)
 
         # Truncate if needed

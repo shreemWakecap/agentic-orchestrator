@@ -581,3 +581,226 @@
 [data-theme="dark"] .dark-mode-toggle::after {
     transform: translateX(1.5rem);
 }
+
+/* ============================================
+   ENHANCED TEXTAREA COMPONENT
+   ============================================ */
+.textarea-enhanced {
+    /* Base Sizing & Layout */
+    width: 100%;
+    min-height: 150px;
+    max-height: 400px;
+    padding: var(--space-4);
+    font-family: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+
+    /* Visual Styling */
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 2px solid var(--border-default);
+    border-radius: var(--radius-lg);
+
+    /* Smooth Transitions */
+    transition:
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast),
+        background-color var(--transition-fast);
+
+    /* Text Handling */
+    resize: vertical;
+    overflow-y: auto;
+}
+
+/* Placeholder Styling */
+.textarea-enhanced::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+    font-style: italic;
+}
+
+/* Focus State with Gradient Border Effect */
+.textarea-enhanced:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow:
+        0 0 0 3px rgba(59, 130, 246, 0.15),
+        var(--shadow-sm);
+    background: var(--bg-primary);
+}
+
+/* Hover State */
+.textarea-enhanced:hover:not(:focus) {
+    border-color: var(--color-primary-300);
+}
+
+/* Disabled State */
+.textarea-enhanced:disabled {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Read-only State */
+.textarea-enhanced:read-only {
+    background: var(--bg-secondary);
+    border-color: var(--border-light);
+}
+
+/* Error State */
+.textarea-enhanced.is-invalid,
+.textarea-enhanced.error {
+    border-color: var(--color-danger-500);
+}
+
+.textarea-enhanced.is-invalid:focus,
+.textarea-enhanced.error:focus {
+    border-color: var(--color-danger-500);
+    box-shadow:
+        0 0 0 3px rgba(239, 68, 68, 0.15),
+        var(--shadow-sm);
+}
+
+/* Success State */
+.textarea-enhanced.is-valid,
+.textarea-enhanced.success {
+    border-color: var(--color-success-500);
+}
+
+.textarea-enhanced.is-valid:focus,
+.textarea-enhanced.success:focus {
+    border-color: var(--color-success-500);
+    box-shadow:
+        0 0 0 3px rgba(16, 185, 129, 0.15),
+        var(--shadow-sm);
+}
+
+/* Custom Scrollbar for Enhanced Textarea */
+.textarea-enhanced::-webkit-scrollbar {
+    width: 8px;
+}
+
+.textarea-enhanced::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.textarea-enhanced::-webkit-scrollbar-thumb {
+    background: var(--border-dark);
+    border-radius: var(--radius-full);
+    border: 2px solid var(--bg-secondary);
+}
+
+.textarea-enhanced::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Firefox Scrollbar */
+.textarea-enhanced {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-dark) var(--bg-secondary);
+}
+
+/* ============================================
+   TEXTAREA WRAPPER & CHARACTER COUNT
+   ============================================ */
+.textarea-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.textarea-char-count {
+    position: absolute;
+    bottom: var(--space-3);
+    right: var(--space-4);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    pointer-events: none;
+    transition: color var(--transition-fast);
+}
+
+.textarea-char-count.warning {
+    color: var(--color-warning-600);
+}
+
+.textarea-char-count.danger {
+    color: var(--color-danger-500);
+}
+
+/* External Character Count (below textarea) */
+.textarea-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--space-2);
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+}
+
+.textarea-hint {
+    color: var(--text-muted);
+}
+
+.textarea-counter {
+    color: var(--text-muted);
+    transition: color var(--transition-fast);
+}
+
+.textarea-counter.warning {
+    color: var(--color-warning-600);
+}
+
+.textarea-counter.danger {
+    color: var(--color-danger-500);
+    font-weight: 500;
+}
+
+/* ============================================
+   AUTO-RESIZE TEXTAREA MODIFIER
+   ============================================ */
+.textarea-enhanced.auto-resize {
+    resize: none;
+    overflow: hidden;
+    min-height: 100px;
+    max-height: none;
+}
+
+/* ============================================
+   TEXTAREA SIZE VARIANTS
+   ============================================ */
+.textarea-enhanced.textarea-sm {
+    min-height: 80px;
+    padding: var(--space-3);
+    font-size: 0.875rem;
+}
+
+.textarea-enhanced.textarea-lg {
+    min-height: 200px;
+    padding: var(--space-5);
+    font-size: 1rem;
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS FOR TEXTAREA
+   ============================================ */
+.dark .textarea-enhanced,
+[data-theme="dark"] .textarea-enhanced {
+    background: var(--bg-secondary);
+}
+
+.dark .textarea-enhanced:focus,
+[data-theme="dark"] .textarea-enhanced:focus {
+    background: var(--bg-primary);
+    box-shadow:
+        0 0 0 3px rgba(59, 130, 246, 0.25),
+        var(--shadow-md);
+}
+
+.dark .textarea-char-count,
+[data-theme="dark"] .textarea-char-count {
+    background: var(--bg-secondary);
+}

@@ -16,11 +16,13 @@ from db import (
     get_run_repository,
     get_cost_repository,
     get_knowledge_repository,
+    get_question_repository,
     PlanRepository,
     BuildStateRepository,
     RunRepository,
     CostRepository,
     KnowledgeRepository,
+    QuestionRepository,
 )
 from portal.services.task_manager import TaskManager, get_task_manager as _get_task_manager
 from portal.services.recovery_service import RecoveryService, get_recovery_service as _get_recovery_service
@@ -55,6 +57,11 @@ def get_cost_repo() -> CostRepository:
 def get_knowledge_repo() -> KnowledgeRepository:
     """Get knowledge repository instance for dependency injection."""
     return get_knowledge_repository()
+
+
+def get_question_repo() -> QuestionRepository:
+    """Get question repository instance for dependency injection."""
+    return get_question_repository()
 
 
 def get_project_root() -> Path:

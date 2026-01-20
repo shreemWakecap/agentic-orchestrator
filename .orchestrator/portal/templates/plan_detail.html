@@ -226,6 +226,21 @@
         transform: translateY(-1px);
     }
 
+    .btn-danger {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.39);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-danger:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px 0 rgba(239, 68, 68, 0.5);
+    }
+
+    .btn-danger:active {
+        transform: translateY(0);
+    }
+
     /* Success animation */
     @keyframes success-bounce {
         0%, 100% { transform: scale(1); }
@@ -875,6 +890,15 @@
                         </svg>
                         Back to Plans
                     </a>
+                    <span class="mx-2 text-gray-300">|</span>
+                    <button id="delete-plan-btn" onclick="PlanDetail.deletePlan('{{ plan.id }}')"
+                            class="btn-danger inline-flex items-center px-4 py-2.5 text-sm font-medium rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            title="Delete this plan">
+                        <svg class="-ml-0.5 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        Delete
+                    </button>
                 </div>
             </div>
         </div>
@@ -1116,6 +1140,7 @@
 <script src="/static/js/plan-recovery.js"></script>
 <script src="/static/js/plan-detail.js"></script>
 <script src="/static/js/plan-edit-dialog.js"></script>
+<script src="/static/js/plan-delete-dialog.js"></script>
 <script>
     // Initialize plan recovery module for stuck/failed plans
     document.addEventListener('DOMContentLoaded', function() {

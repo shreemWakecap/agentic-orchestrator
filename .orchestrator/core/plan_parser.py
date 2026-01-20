@@ -522,3 +522,76 @@ def validate_plan_coverage(request: str, plan: ParsedPlan) -> tuple[bool, str]:
         )
 
     return True, ""
+
+
+def validate_integration_completeness(request: str, plan: ParsedPlan) -> tuple[bool, str]:
+    """
+    Validate that plan covers all integration layers for new features.
+
+    For requests that indicate a new feature/module, checks that the plan
+    includes steps for all required architectural layers.
+
+    Args:
+        request: Original user request
+        plan: Parsed plan
+
+    Returns:
+        Tuple of (is_valid, warning_message)
+    """
+    # Detect if this is a new feature request
+    new_feature_keywords = [
+        "implement", "add", "create", "new", "module", "feature",
+        "build", "develop", "introduce"
+    ]
+    request_lower = request.lower()
+    is_new_feature = any(kw in request_lower for kw in new_feature_keywords)
+
+    if not is_new_feature:
+        return True, ""
+
+    # Collect all step targets and descriptions for analysis
+    all_targets = []
+    all_descriptions = []
+    for step in plan.all_steps:
+        if step.target:
+            all_targets.append(step.target.lower())
+        all_descriptions.append(step.description.lower())
+
+    combined_text = " ".join(all_targets + all_descriptions)
+
+    # Required integration layer patterns
+    required_layers = [
+        (r'repositor|db/repositories', "Repository layer (db/repositories/)"),
+        (r'service|_service\.py', "Service layer (portal/services/)"),
+        (r'routes/\w+\.py|router|apiRouter', "API routes (portal/routes/)"),
+        (r'__init__|app\.py|include_router', "Route registration (app.py or __init__.py)"),
+    ]
+
+    # Optional but important layers (warn if missing)
+    optional_layers = [
+        (r'pages\.py|page.*route', "Page route (portal/routes/pages.py)"),
+        (r'dependencies|get_\w+_repo', "Dependency injection (portal/dependencies.py)"),
+    ]
+
+    missing_required = []
+    missing_optional = []
+
+    for pattern, name in required_layers:
+        if not re.search(pattern, combined_text, re.IGNORECASE):
+            missing_required.append(name)
+
+    for pattern, name in optional_layers:
+        if not re.search(pattern, combined_text, re.IGNORECASE):
+            missing_optional.append(name)
+
+    # Build warning message
+    warnings = []
+    if missing_required:
+        warnings.append(f"Missing required layers: {', '.join(missing_required)}")
+    if missing_optional:
+        warnings.append(f"May be missing: {', '.join(missing_optional)}")
+
+    if warnings:
+        return False, " | ".join(warnings)
+
+    return True, ""

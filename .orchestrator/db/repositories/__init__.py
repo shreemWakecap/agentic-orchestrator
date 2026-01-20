@@ -11,12 +11,14 @@ from .interfaces import (
     IRunRepository,
     IKnowledgeRepository,
     ICostRepository,
+    IQuestionRepository,
 )
 from .plans import PlanRepository
 from .build_state import BuildStateRepository
 from .knowledge import KnowledgeRepository
 from .cost import CostRepository
 from .runs import RunRepository
+from .questions import QuestionRepository
 
 __all__ = [
     # Base and interfaces
@@ -26,10 +28,12 @@ __all__ = [
     "IRunRepository",
     "IKnowledgeRepository",
     "ICostRepository",
+    "IQuestionRepository",
     # Implementations
     "PlanRepository",
     "BuildStateRepository",
     "KnowledgeRepository",
     "CostRepository",
     "RunRepository",
+    "QuestionRepository",
 ]

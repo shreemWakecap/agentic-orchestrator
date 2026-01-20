@@ -48,7 +48,7 @@ def run_setup(args=None) -> int:
             ok = False
 
     # Create directories (only config and agents/experts remain file-based)
-    for d in ['agents/experts', 'config']:
+    for d in ['agents/experts', 'config', 'docs']:
         (ORCHESTRATOR_DIR / d).mkdir(parents=True, exist_ok=True)
     print("  [+] Directories created")
 
@@ -59,6 +59,30 @@ def run_setup(args=None) -> int:
         print(f"  [+] Database initialized: {get_db_path()}")
     except Exception as e:
         print(f"  [!] Database error: {e}")
+        ok = False
+
+    # Check and refresh documentation
+    try:
+        from core.docs_loader import DocsLoader
+        docs_loader = DocsLoader(PROJECT_ROOT)
+        status = docs_loader.get_status()
+
+        stale_count = len(status['stale'])
+        missing_count = len(status['missing'])
+
+        if stale_count > 0 or missing_count > 0:
+            print(f"\n  Docs: {status['fresh']} fresh, {stale_count} stale, {missing_count} missing")
+            print("  Refreshing documentation...")
+            result = docs_loader.refresh()
+            if result['updated'] > 0:
+                print(f"  [+] Docs updated: {result['updated']} refreshed, {result['failed']} failed")
+            elif result['failed'] > 0:
+                print(f"  [!] Docs refresh failed: {result['failed']} errors")
+                ok = False
+        else:
+            print(f"  [+] Docs: {status['total']} cached, all fresh")
+    except Exception as e:
+        print(f"  [!] Docs error: {e}")
         ok = False
 
     print("\n" + ("Setup complete!" if ok else "Setup completed with issues"))

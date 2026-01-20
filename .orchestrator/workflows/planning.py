@@ -23,7 +23,7 @@ from datetime import datetime
 from pathlib import Path
 
 from core import Agent, Workflow, WorkflowResult, get_agent_config
-from core.plan_parser import PlanParser, validate_plan_coverage
+from core.plan_parser import PlanParser, validate_plan_coverage, validate_integration_completeness
 from core.knowledge_store import KnowledgeStore
 from core.expert_selector import ExpertSelector
 from db import get_plan_repository, get_build_state_repository
@@ -165,15 +165,27 @@ class PlanningWorkflow(Workflow):
    - Relevant existing files
    - Conventions to follow
 
-2. Then output a complete plan in the required format:
+2. **CRITICAL: Trace a Similar Feature End-to-End**
+   Before planning, find ONE existing feature similar to what you're building.
+   Trace its COMPLETE integration chain by answering:
+   - What repository does it use? Where is it exported?
+   - What service wraps that repository?
+   - How is the service injected into routes? (check dependencies.py)
+   - How are routes registered in app.py?
+   - How does the page route get data to the template?
+
+   Your plan MUST include equivalent steps for EACH layer you discover.
+
+3. Then output a complete plan in the required format:
    GOAL, CONTEXT, STEPS (with ACTION/DO/IN/OUT/DONE/NEEDS), VERIFY
 
 Remember:
-- Explore first, then plan
+- Explore first, trace a similar feature, then plan
 - Be specific with file paths
 - Include DONE criteria for each step
 - Follow existing patterns you discover
 - Use architecture and expert guidance above (if provided)
+- For new features: ensure ALL integration layers are covered (Repository -> Service -> Routes -> Registration -> Page -> Template)
 """)
 
         planner_prompt = "\n".join(prompt_sections)
@@ -213,6 +225,11 @@ Remember:
         coverage_ok, coverage_msg = validate_plan_coverage(request, parse_result.plan) if parse_result.plan else (True, "")
         if not coverage_ok:
             self.console.print(f"  [yellow]Warning: {coverage_msg}[/yellow]")
+
+        # Check integration completeness for new features
+        integration_ok, integration_msg = validate_integration_completeness(request, parse_result.plan) if parse_result.plan else (True, "")
+        if not integration_ok:
+            self.console.print(f"  [yellow]Warning: {integration_msg}[/yellow]")
 
         # Add metadata header for raw content
         full_content = f"""# Plan: {plan_id}

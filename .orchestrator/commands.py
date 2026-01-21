@@ -3,6 +3,7 @@ import argparse
 import json
 import shutil
 import socket
+import sys
 from pathlib import Path
 
 ORCHESTRATOR_DIR = Path(__file__).parent
@@ -52,13 +53,15 @@ def run_setup(args=None) -> int:
         (ORCHESTRATOR_DIR / d).mkdir(parents=True, exist_ok=True)
     print("  [+] Directories created")
 
-    # Initialize SQLite database
+    # Initialize PostgreSQL database (tables auto-created by SQLAlchemy ORM)
     try:
-        from db import get_database, get_db_path
+        from db import get_database, DatabaseConfig
+        config = DatabaseConfig.load()
         db = get_database()
-        print(f"  [+] Database initialized: {get_db_path()}")
+        print(f"  [+] Database connected: {config.host}:{config.port}/{config.name}")
     except Exception as e:
         print(f"  [!] Database error: {e}")
+        print(f"      Set ORCH_DB_* environment variables to configure PostgreSQL")
         ok = False
 
     # Check and refresh documentation

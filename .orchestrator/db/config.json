@@ -1,8 +1,0 @@
-{
-  "db_name": "orchestrator.db",
-  "timeout": 30.0,
-  "journal_mode": "WAL",
-  "synchronous": "NORMAL",
-  "foreign_keys": true,
-  "cache_size_kb": 64000
-}

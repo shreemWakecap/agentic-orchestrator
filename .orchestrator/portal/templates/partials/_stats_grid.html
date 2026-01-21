@@ -1,0 +1,52 @@
+{# Stats Grid Component
+
+   Displays 4 stat cards in a responsive grid.
+
+   Parameters (via parent context):
+     counts: object with .pending, .in_progress, .completed, .failed
+
+   Usage:
+     {% include 'partials/_stats_grid.html' %}
+#}
+
+{% set stat_cards = [
+    {
+        'href': '/plans?state=pending',
+        'count': counts.pending,
+        'count_id': 'count-pending',
+        'label': 'Pending Plans',
+        'icon': 'clock',
+        'color': 'amber'
+    },
+    {
+        'href': '/plans?state=in-progress',
+        'count': counts.in_progress,
+        'count_id': 'count-in-progress',
+        'label': 'In Progress',
+        'icon': 'bolt',
+        'color': 'blue'
+    },
+    {
+        'href': '/plans?state=completed',
+        'count': counts.completed,
+        'count_id': 'count-completed',
+        'label': 'Completed',
+        'icon': 'check',
+        'color': 'emerald'
+    },
+    {
+        'href': '/plans?state=failed',
+        'count': counts.failed,
+        'count_id': 'count-failed',
+        'label': 'Failed',
+        'icon': 'x',
+        'color': 'red'
+    }
+] %}
+
+<!-- Stats Cards Grid -->
+<div class="grid grid-cols-2 gap-5 sm:gap-6 lg:grid-cols-4 mb-10">
+    {% for card in stat_cards %}
+    {% include 'partials/_stat_card.html' %}
+    {% endfor %}
+</div>

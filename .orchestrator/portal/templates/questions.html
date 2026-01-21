@@ -594,14 +594,16 @@ document.addEventListener('DOMContentLoaded', function() {
         exploreBtn.disabled = true;
 
         try {
-            const response = await fetch('/api/questions', {
+            const response = await fetch('/api/explore', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    question_text: query,
-                    source: 'codebase'
+                    query: query,
+                    scope: 'all',
+                    include_snippets: true,
+                    max_results: 10
                 })
             });
 

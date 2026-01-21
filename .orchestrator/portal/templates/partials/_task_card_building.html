@@ -1,0 +1,109 @@
+{# Building Task Card
+
+   Displays an active build task with phases, progress, and elapsed time.
+
+   Parameters (via run object in loop):
+     run.id: string - Run ID
+     run.workflow: string - Workflow type
+     run.status: string - Status (running, pending, completed, failed)
+     run.progress: int - Progress percentage (0-100)
+     run.current_step: string - Current step description
+     run.started_at: string - ISO timestamp
+     run.phase: string - Current phase (planning, initializing, executing, validating, completing, completed)
+     run.total_steps: int (optional) - Total number of steps
+     run.current_step_num: int (optional) - Current step number
+
+   Required data attributes (for JS SSE connections):
+     data-run-id, data-run-status, data-started-at
+
+   Usage:
+     {% for run in active_runs %}
+     {% include 'partials/_task_card_building.html' %}
+     {% endfor %}
+#}
+
+<div class="glass rounded-2xl p-6 active-task-card group hover:shadow-lg transition-all duration-300"
+     data-run-id="{{ run.id }}"
+     data-run-status="{{ run.status }}"
+     data-started-at="{{ run.started_at }}">
+
+    <!-- Header Row -->
+    <div class="flex items-center justify-between mb-5">
+        <div class="flex items-center">
+            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-4 shadow-md group-hover:scale-105 transition-transform">
+                <svg class="h-6 w-6 text-white {% if run.status == 'running' %}animate-spin{% endif %}" fill="none" {% if run.status == 'running' %}viewBox="0 0 24 24"{% else %}stroke="currentColor" viewBox="0 0 24 24"{% endif %}>
+                    {% if run.status == 'running' %}
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    {% else %}
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                    {% endif %}
+                </svg>
+            </div>
+            <div>
+                <a href="/runs/{{ run.id }}" class="text-lg font-semibold text-primary dark:text-primary hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                    {{ run.workflow|title }} Workflow
+                </a>
+                <div class="text-xs text-tertiary dark:text-tertiary mt-0.5 font-mono">ID: {{ run.id[:8] }}</div>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4">
+            <span class="text-sm font-mono text-secondary dark:text-secondary elapsed-time bg-tertiary dark:bg-tertiary px-3 py-1 rounded-lg" data-started="{{ run.started_at }}">--:--</span>
+            <span class="status-badge pill {% if run.status == 'completed' %}status-badge-completed{% elif run.status == 'running' %}status-badge-running{% elif run.status == 'pending' %}status-badge-pending{% else %}status-badge-failed{% endif %}">
+                <span class="status-dot {% if run.status == 'completed' %}status-dot-completed{% elif run.status == 'running' %}status-dot-running{% elif run.status == 'pending' %}status-dot-pending{% else %}status-dot-failed{% endif %}"></span>
+                {{ run.status|title }}
+            </span>
+        </div>
+    </div>
+
+    <!-- Phase Progress Indicators -->
+    <div class="task-phase-indicator mb-4">
+        <div class="task-phase-list w-full flex items-center">
+            {% set phases = ['planning', 'initializing', 'executing', 'validating', 'completing'] %}
+            {% set phase_labels = {'planning': 'Plan', 'initializing': 'Init', 'executing': 'Build', 'validating': 'Verify', 'completing': 'Done'} %}
+            {% for phase_name in phases %}
+            {% set is_active = run.phase == phase_name %}
+            {% set is_completed = phases.index(run.phase) > phases.index(phase_name) if run.phase in phases else run.phase == 'completed' %}
+            <span class="task-phase-badge {% if is_active %}active{% elif is_completed or run.phase == 'completed' %}completed{% else %}pending{% endif %}">
+                <span class="task-phase-badge-dot"></span>
+                {{ phase_labels[phase_name] }}
+            </span>
+            {% if not loop.last %}
+            <span class="task-phase-connector {% if is_completed or (run.phase == 'completed') %}completed{% elif is_active %}active{% endif %}"></span>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="space-y-3">
+        <div class="flex items-center justify-between text-sm">
+            <span class="current-step text-secondary dark:text-secondary font-medium">{{ run.current_step|default('Initializing...', true) }}</span>
+            <span class="progress-percent font-bold text-primary dark:text-primary text-lg">{{ run.progress|default(0, true) }}%</span>
+        </div>
+        <div class="relative w-full h-3 bg-tertiary dark:bg-tertiary rounded-full overflow-hidden">
+            <div class="absolute inset-0 opacity-30">
+                <div class="h-full w-full bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer" style="background-size: 200% 100%;"></div>
+            </div>
+            <div class="progress-bar h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden
+                {% if run.status == 'completed' %}bg-gradient-to-r from-emerald-500 to-teal-500
+                {% elif run.status == 'failed' %}bg-gradient-to-r from-red-500 to-rose-500
+                {% else %}bg-gradient-to-r from-blue-500 to-indigo-500{% endif %}"
+                 style="width: {{ run.progress|default(0, true) }}%">
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step Details -->
+    {% if run.total_steps %}
+    <div class="mt-4 flex items-center text-sm text-tertiary dark:text-tertiary">
+        <div class="flex items-center glass rounded-lg px-3 py-1.5">
+            <svg class="h-4 w-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+            </svg>
+            <span class="font-medium">Step {{ run.current_step_num|default(0, true) }} of {{ run.total_steps }}</span>
+        </div>
+    </div>
+    {% endif %}
+</div>

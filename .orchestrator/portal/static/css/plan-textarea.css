@@ -1,0 +1,534 @@
+/* ============================================
+   PLAN TEXTAREA COMPONENT - Unified Styles
+   A reusable textarea component for planning views
+   Compatible with modern.css CSS variables
+   ============================================ */
+
+/* ============================================
+   WRAPPER COMPONENT
+   ============================================ */
+.plan-textarea-wrapper {
+    position: relative;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Label styling */
+.plan-textarea-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    margin-bottom: var(--space-2);
+    transition: color var(--transition-fast);
+}
+
+.plan-textarea-label.required::after {
+    content: ' *';
+    color: var(--color-danger-500);
+}
+
+/* ============================================
+   CORE TEXTAREA STYLES
+   ============================================ */
+.plan-textarea {
+    /* Base Sizing & Layout */
+    width: 100%;
+    min-height: 180px;
+    max-height: 500px;
+    padding: var(--space-4);
+    padding-bottom: var(--space-8); /* Extra space for counter */
+    font-family: inherit;
+    font-size: 0.9375rem;
+    line-height: 1.7;
+
+    /* Visual Styling */
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 2px solid var(--border-default);
+    border-radius: var(--radius-lg);
+
+    /* Smooth Transitions */
+    transition:
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast),
+        background-color var(--transition-fast),
+        transform var(--transition-fast);
+
+    /* Text Handling */
+    resize: vertical;
+    overflow-y: auto;
+}
+
+/* Placeholder Styling */
+.plan-textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+    font-style: italic;
+}
+
+/* ============================================
+   FOCUS STATE WITH ANIMATED RING
+   ============================================ */
+.plan-textarea:focus {
+    outline: none;
+    border-color: var(--color-primary-500);
+    box-shadow:
+        0 0 0 3px rgba(59, 130, 246, 0.2),
+        var(--shadow-sm);
+    background: var(--bg-primary);
+}
+
+/* Focus ring animation */
+@keyframes plan-textarea-focus-pulse {
+    0% {
+        box-shadow:
+            0 0 0 3px rgba(59, 130, 246, 0.2),
+            var(--shadow-sm);
+    }
+    50% {
+        box-shadow:
+            0 0 0 4px rgba(59, 130, 246, 0.15),
+            var(--shadow-md);
+    }
+    100% {
+        box-shadow:
+            0 0 0 3px rgba(59, 130, 246, 0.2),
+            var(--shadow-sm);
+    }
+}
+
+.plan-textarea:focus-visible {
+    animation: plan-textarea-focus-pulse 2s ease-in-out infinite;
+}
+
+/* ============================================
+   HOVER STATE
+   ============================================ */
+.plan-textarea:hover:not(:focus):not(:disabled) {
+    border-color: var(--color-primary-300);
+    box-shadow: var(--shadow-xs);
+}
+
+/* ============================================
+   DISABLED STATE
+   ============================================ */
+.plan-textarea:disabled {
+    background: var(--bg-tertiary);
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+    border-color: var(--border-light);
+}
+
+/* ============================================
+   READ-ONLY STATE
+   ============================================ */
+.plan-textarea:read-only {
+    background: var(--bg-secondary);
+    border-color: var(--border-light);
+    cursor: default;
+}
+
+.plan-textarea:read-only:focus {
+    border-color: var(--border-default);
+    box-shadow: none;
+    animation: none;
+}
+
+/* ============================================
+   ERROR STATE
+   ============================================ */
+.plan-textarea-wrapper.plan-textarea-error .plan-textarea,
+.plan-textarea.plan-textarea-error {
+    border-color: var(--color-danger-500);
+    background: var(--color-danger-50);
+}
+
+.plan-textarea-wrapper.plan-textarea-error .plan-textarea:focus,
+.plan-textarea.plan-textarea-error:focus {
+    border-color: var(--color-danger-500);
+    box-shadow:
+        0 0 0 3px rgba(239, 68, 68, 0.2),
+        var(--shadow-sm);
+    animation: none;
+}
+
+.plan-textarea-wrapper.plan-textarea-error .plan-textarea:hover:not(:focus),
+.plan-textarea.plan-textarea-error:hover:not(:focus) {
+    border-color: var(--color-danger-400);
+}
+
+/* Error label color */
+.plan-textarea-wrapper.plan-textarea-error .plan-textarea-label {
+    color: var(--color-danger-600);
+}
+
+/* ============================================
+   WARNING STATE
+   ============================================ */
+.plan-textarea-wrapper.plan-textarea-warning .plan-textarea,
+.plan-textarea.plan-textarea-warning {
+    border-color: var(--color-warning-500);
+    background: var(--color-warning-50);
+}
+
+.plan-textarea-wrapper.plan-textarea-warning .plan-textarea:focus,
+.plan-textarea.plan-textarea-warning:focus {
+    border-color: var(--color-warning-500);
+    box-shadow:
+        0 0 0 3px rgba(245, 158, 11, 0.2),
+        var(--shadow-sm);
+    animation: none;
+}
+
+.plan-textarea-wrapper.plan-textarea-warning .plan-textarea:hover:not(:focus),
+.plan-textarea.plan-textarea-warning:hover:not(:focus) {
+    border-color: var(--color-warning-400);
+}
+
+/* Warning label color */
+.plan-textarea-wrapper.plan-textarea-warning .plan-textarea-label {
+    color: var(--color-warning-600);
+}
+
+/* ============================================
+   SUCCESS STATE
+   ============================================ */
+.plan-textarea-wrapper.plan-textarea-success .plan-textarea,
+.plan-textarea.plan-textarea-success {
+    border-color: var(--color-success-500);
+    background: var(--color-success-50);
+}
+
+.plan-textarea-wrapper.plan-textarea-success .plan-textarea:focus,
+.plan-textarea.plan-textarea-success:focus {
+    border-color: var(--color-success-500);
+    box-shadow:
+        0 0 0 3px rgba(16, 185, 129, 0.2),
+        var(--shadow-sm);
+    animation: none;
+}
+
+/* Success label color */
+.plan-textarea-wrapper.plan-textarea-success .plan-textarea-label {
+    color: var(--color-success-600);
+}
+
+/* ============================================
+   CHARACTER COUNTER - INSIDE TEXTAREA
+   ============================================ */
+.plan-textarea-counter {
+    position: absolute;
+    bottom: var(--space-3);
+    right: var(--space-4);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: var(--bg-primary);
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    pointer-events: none;
+    transition:
+        color var(--transition-fast),
+        background-color var(--transition-fast),
+        transform var(--transition-fast);
+    z-index: 1;
+}
+
+/* Counter states */
+.plan-textarea-counter.plan-textarea-counter-warning {
+    color: var(--color-warning-600);
+    background: var(--color-warning-50);
+}
+
+.plan-textarea-counter.plan-textarea-counter-danger {
+    color: var(--color-danger-500);
+    background: var(--color-danger-50);
+    font-weight: 600;
+}
+
+/* Counter animation when approaching limit */
+@keyframes plan-textarea-counter-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+}
+
+.plan-textarea-counter.plan-textarea-counter-danger {
+    animation: plan-textarea-counter-pulse 1s ease-in-out infinite;
+}
+
+/* ============================================
+   FOOTER (HINT TEXT & EXTERNAL COUNTER)
+   ============================================ */
+.plan-textarea-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: var(--space-2);
+    padding: 0 var(--space-1);
+    font-size: 0.75rem;
+    min-height: 1.25rem;
+}
+
+.plan-textarea-hint {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.plan-textarea-hint a {
+    color: var(--color-primary-500);
+    text-decoration: none;
+}
+
+.plan-textarea-hint a:hover {
+    text-decoration: underline;
+}
+
+/* External counter positioning */
+.plan-textarea-footer .plan-textarea-counter {
+    position: static;
+    background: transparent;
+    padding: 0;
+}
+
+/* ============================================
+   ERROR/WARNING MESSAGE
+   ============================================ */
+.plan-textarea-message {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+    font-size: 0.8125rem;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.plan-textarea-message-error {
+    color: var(--color-danger-700);
+    background: var(--color-danger-50);
+    border: 1px solid var(--color-danger-200);
+}
+
+.plan-textarea-message-warning {
+    color: var(--color-warning-700);
+    background: var(--color-warning-50);
+    border: 1px solid var(--color-warning-200);
+}
+
+.plan-textarea-message-success {
+    color: var(--color-success-700);
+    background: var(--color-success-50);
+    border: 1px solid var(--color-success-200);
+}
+
+.plan-textarea-message-icon {
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ============================================
+   SIZE VARIANTS
+   ============================================ */
+.plan-textarea.plan-textarea-sm {
+    min-height: 100px;
+    padding: var(--space-3);
+    padding-bottom: var(--space-6);
+    font-size: 0.875rem;
+    line-height: 1.6;
+}
+
+.plan-textarea.plan-textarea-lg {
+    min-height: 250px;
+    padding: var(--space-5);
+    padding-bottom: var(--space-10);
+    font-size: 1rem;
+    line-height: 1.75;
+}
+
+/* ============================================
+   AUTO-RESIZE MODIFIER
+   ============================================ */
+.plan-textarea.plan-textarea-auto-resize {
+    resize: none;
+    overflow: hidden;
+    min-height: 120px;
+    max-height: none;
+    transition:
+        height var(--transition-base),
+        border-color var(--transition-fast),
+        box-shadow var(--transition-fast);
+}
+
+/* ============================================
+   CUSTOM SCROLLBAR
+   ============================================ */
+.plan-textarea::-webkit-scrollbar {
+    width: 8px;
+}
+
+.plan-textarea::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+}
+
+.plan-textarea::-webkit-scrollbar-thumb {
+    background: var(--border-dark);
+    border-radius: var(--radius-full);
+    border: 2px solid var(--bg-secondary);
+}
+
+.plan-textarea::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Firefox Scrollbar */
+.plan-textarea {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-dark) var(--bg-secondary);
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+.dark .plan-textarea,
+[data-theme="dark"] .plan-textarea {
+    background: var(--bg-secondary);
+}
+
+.dark .plan-textarea:focus,
+[data-theme="dark"] .plan-textarea:focus {
+    background: var(--bg-primary);
+    box-shadow:
+        0 0 0 3px rgba(59, 130, 246, 0.3),
+        var(--shadow-md);
+}
+
+.dark .plan-textarea-counter,
+[data-theme="dark"] .plan-textarea-counter {
+    background: var(--bg-secondary);
+}
+
+/* Error state dark mode */
+.dark .plan-textarea-wrapper.plan-textarea-error .plan-textarea,
+[data-theme="dark"] .plan-textarea-wrapper.plan-textarea-error .plan-textarea,
+.dark .plan-textarea.plan-textarea-error,
+[data-theme="dark"] .plan-textarea.plan-textarea-error {
+    background: rgba(239, 68, 68, 0.1);
+}
+
+/* Warning state dark mode */
+.dark .plan-textarea-wrapper.plan-textarea-warning .plan-textarea,
+[data-theme="dark"] .plan-textarea-wrapper.plan-textarea-warning .plan-textarea,
+.dark .plan-textarea.plan-textarea-warning,
+[data-theme="dark"] .plan-textarea.plan-textarea-warning {
+    background: rgba(245, 158, 11, 0.1);
+}
+
+/* Success state dark mode */
+.dark .plan-textarea-wrapper.plan-textarea-success .plan-textarea,
+[data-theme="dark"] .plan-textarea-wrapper.plan-textarea-success .plan-textarea,
+.dark .plan-textarea.plan-textarea-success,
+[data-theme="dark"] .plan-textarea.plan-textarea-success {
+    background: rgba(16, 185, 129, 0.1);
+}
+
+/* Counter dark mode states */
+.dark .plan-textarea-counter.plan-textarea-counter-warning,
+[data-theme="dark"] .plan-textarea-counter.plan-textarea-counter-warning {
+    background: rgba(245, 158, 11, 0.15);
+}
+
+.dark .plan-textarea-counter.plan-textarea-counter-danger,
+[data-theme="dark"] .plan-textarea-counter.plan-textarea-counter-danger {
+    background: rgba(239, 68, 68, 0.15);
+}
+
+/* Message dark mode */
+.dark .plan-textarea-message-error,
+[data-theme="dark"] .plan-textarea-message-error {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: var(--color-danger-400);
+}
+
+.dark .plan-textarea-message-warning,
+[data-theme="dark"] .plan-textarea-message-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+    color: var(--color-warning-400);
+}
+
+.dark .plan-textarea-message-success,
+[data-theme="dark"] .plan-textarea-message-success {
+    background: rgba(16, 185, 129, 0.1);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: var(--color-success-400);
+}
+
+/* ============================================
+   LOADING STATE
+   ============================================ */
+.plan-textarea-wrapper.plan-textarea-loading .plan-textarea {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.plan-textarea-wrapper.plan-textarea-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border: 2px solid var(--border-default);
+    border-top-color: var(--color-primary-500);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+@media (max-width: 640px) {
+    .plan-textarea {
+        min-height: 150px;
+        padding: var(--space-3);
+        padding-bottom: var(--space-6);
+        font-size: 1rem; /* Prevent zoom on iOS */
+    }
+
+    .plan-textarea.plan-textarea-lg {
+        min-height: 200px;
+    }
+
+    .plan-textarea-counter {
+        bottom: var(--space-2);
+        right: var(--space-3);
+    }
+
+    .plan-textarea-footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-1);
+    }
+}
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+@media print {
+    .plan-textarea {
+        border: 1px solid #ccc;
+        box-shadow: none;
+    }
+
+    .plan-textarea-counter {
+        display: none;
+    }
+}

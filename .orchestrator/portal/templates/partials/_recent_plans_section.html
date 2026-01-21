@@ -1,0 +1,49 @@
+{# Recent Plans Section
+
+   Displays a grid of recent plans with a header and "View all" link.
+   Shows empty state when no plans exist.
+
+   Parameters (via parent context):
+     recent_plans: list of plan objects
+
+   Usage:
+     {% include 'partials/_recent_plans_section.html' %}
+#}
+
+<div class="glass-card overflow-hidden mb-10">
+    <div class="p-8">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mr-4 shadow-lg">
+                    <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-primary dark:text-primary">Recent Plans</h2>
+            </div>
+            <a href="/plans" class="btn btn-sm btn-secondary btn-modern group">
+                View all
+                <svg class="h-4 w-4 ml-1.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </a>
+        </div>
+
+        {% if recent_plans %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {% for plan in recent_plans %}
+            {% include 'partials/_plan_card_mini.html' %}
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-12">
+            <div class="w-16 h-16 mx-auto bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
+                <svg class="h-8 w-8 text-tertiary dark:text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            </div>
+            <p class="text-sm text-secondary dark:text-secondary">No plans yet. Create your first plan below!</p>
+        </div>
+        {% endif %}
+    </div>
+</div>

@@ -240,7 +240,7 @@ const CodebaseExplorer = (function() {
          * @returns {Promise<Object>} Exploration results
          */
         async submitExploration(query, scope = 'all', options = {}) {
-            const response = await fetch(CONFIG.API_BASE + '/query', {
+            const response = await fetch(CONFIG.API_BASE, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

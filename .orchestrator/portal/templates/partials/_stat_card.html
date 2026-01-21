@@ -1,0 +1,46 @@
+{# Stat Card Component
+
+   A glassmorphism stat card with icon, count, and label.
+
+   Parameters (via card object):
+     card.href: string - Link destination
+     card.count: int - Numeric count value
+     card.count_id: string - DOM ID for JS updates
+     card.label: string - Display label
+     card.icon: string - Icon type: 'clock', 'bolt', 'check', 'x'
+     card.color: string - Color theme: 'amber', 'blue', 'emerald', 'red'
+
+   Usage:
+     {% set card = {'href': '/plans?state=pending', 'count': 5, 'count_id': 'count-pending', 'label': 'Pending Plans', 'icon': 'clock', 'color': 'amber'} %}
+     {% include 'partials/_stat_card.html' %}
+#}
+
+{# Color mappings #}
+{% set colors = {
+    'amber': {'from': 'amber-400', 'to': 'orange-500', 'hover': 'amber'},
+    'blue': {'from': 'blue-400', 'to': 'indigo-500', 'hover': 'blue'},
+    'emerald': {'from': 'emerald-400', 'to': 'teal-500', 'hover': 'emerald'},
+    'red': {'from': 'red-400', 'to': 'rose-500', 'hover': 'red'}
+} %}
+{% set c = colors[card.color] | default(colors['blue']) %}
+
+{# Icon SVG paths #}
+{% set icons = {
+    'clock': 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+    'bolt': 'M13 10V3L4 14h7v7l9-11h-7z',
+    'check': 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    'x': 'M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z'
+} %}
+
+<a href="{{ card.href }}" class="glass-card group relative overflow-hidden p-6 hover-lift cursor-pointer">
+    <div class="absolute inset-0 bg-gradient-to-br from-{{ c.from }}/10 to-{{ c.to }}/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+    <div class="relative z-10">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-{{ c.from }} to-{{ c.to }} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 group-hover:shadow-xl transition-all duration-300">
+            <svg class="h-7 w-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="{{ icons[card.icon] }}"></path>
+            </svg>
+        </div>
+        <div id="{{ card.count_id }}" class="text-4xl font-bold text-primary dark:text-primary mb-1 group-hover:text-{{ c.hover }}-600 dark:group-hover:text-{{ c.hover }}-400 transition-colors">{{ card.count }}</div>
+        <div class="text-sm font-medium text-tertiary dark:text-tertiary">{{ card.label }}</div>
+    </div>
+</a>

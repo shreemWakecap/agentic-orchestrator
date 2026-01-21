@@ -14,6 +14,7 @@ from .questions import router as explore_router  # Codebase exploration (refacto
 from .background_tasks import router as background_tasks_router
 from .websocket import router as websocket_router
 from .file_knowledge import router as file_knowledge_router
+from .tasks import router as tasks_router
 
 __all__ = [
     "plans_router",
@@ -27,4 +28,5 @@ __all__ = [
     "background_tasks_router",
     "websocket_router",
     "file_knowledge_router",
+    "tasks_router",
 ]

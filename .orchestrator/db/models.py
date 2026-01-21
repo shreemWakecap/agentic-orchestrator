@@ -414,42 +414,6 @@ class FileScanHistory(Base):
 
 
 # =============================================================================
-# QUESTIONS AND ANSWERS
-# =============================================================================
-
-class Question(Base):
-    """Question model - stores codebase exploration questions."""
-    __tablename__ = "questions"
-
-    id = Column(Integer, primary_key=True)
-    question_id = Column(String(255), unique=True, nullable=False, index=True)
-    question_text = Column(Text, nullable=False)
-    source_type = Column(String(50), default="knowledge_base", index=True)
-    status = Column(String(50), default="pending", index=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    answers = relationship("Answer", back_populates="question", cascade="all, delete-orphan")
-
-
-class Answer(Base):
-    """Answer model - stores answers to questions."""
-    __tablename__ = "answers"
-
-    id = Column(Integer, primary_key=True)
-    answer_id = Column(String(255), unique=True, nullable=False, index=True)
-    question_id = Column(String(255), ForeignKey("questions.question_id", ondelete="CASCADE"), nullable=False, index=True)
-    answer_text = Column(Text, nullable=False)
-    source_details_json = Column(Text)
-    is_obsolete = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    # Relationships
-    question = relationship("Question", back_populates="answers")
-
-
-# =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
 

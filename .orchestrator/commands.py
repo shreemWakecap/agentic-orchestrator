@@ -53,16 +53,83 @@ def run_setup(args=None) -> int:
         (ORCHESTRATOR_DIR / d).mkdir(parents=True, exist_ok=True)
     print("  [+] Directories created")
 
-    # Initialize PostgreSQL database (tables auto-created by SQLAlchemy ORM)
+    # Initialize PostgreSQL database
+    db_ok = False
     try:
-        from db import get_database, DatabaseConfig
+        from db.config import DatabaseConfig
         config = DatabaseConfig.load()
-        db = get_database()
-        print(f"  [+] Database connected: {config.host}:{config.port}/{config.name}")
+
+        # Step 1: Check PostgreSQL server and create database if needed
+        import psycopg2
+        from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
+        # Connect to 'postgres' database to check server and create our database
+        try:
+            admin_conn = psycopg2.connect(
+                host=config.host,
+                port=config.port,
+                user=config.user,
+                password=config.password,
+                database="postgres"
+            )
+            admin_conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            cursor = admin_conn.cursor()
+
+            # Check if our database exists
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (config.name,))
+            exists = cursor.fetchone()
+
+            if not exists:
+                print(f"  [*] Creating database '{config.name}'...")
+                cursor.execute(f'CREATE DATABASE "{config.name}"')
+                print(f"  [+] Database '{config.name}' created")
+
+            cursor.close()
+            admin_conn.close()
+
+        except psycopg2.OperationalError as e:
+            if "connection refused" in str(e).lower():
+                print(f"  [!] PostgreSQL server not running at {config.host}:{config.port}")
+            else:
+                print(f"  [!] PostgreSQL error: {e}")
+            print(f"      Ensure PostgreSQL is running and ORCH_DB_* environment variables are set")
+            ok = False
+
+        # Step 2: Connect to our database and create tables
+        if ok:
+            from db import get_database
+            db = get_database()
+            print(f"  [+] Database connected: {config.host}:{config.port}/{config.name}")
+            db_ok = True
+
     except Exception as e:
         print(f"  [!] Database error: {e}")
         print(f"      Set ORCH_DB_* environment variables to configure PostgreSQL")
         ok = False
+
+    # Run database migrations (only if database is connected)
+    if db_ok:
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["alembic", "-c", "db/alembic.ini", "upgrade", "head"],
+                cwd=ORCHESTRATOR_DIR,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                print("  [+] Database migrations applied")
+            else:
+                # Log error but don't fail setup - tables might already exist
+                stderr = result.stderr.strip()
+                if stderr:
+                    print(f"  [*] Migration note: {stderr[:100]}")
+        except FileNotFoundError:
+            print("  [!] Alembic not found - run: uv sync")
+            ok = False
+        except Exception as e:
+            print(f"  [!] Migration error: {e}")
+            ok = False
 
     # Check and refresh documentation
     try:

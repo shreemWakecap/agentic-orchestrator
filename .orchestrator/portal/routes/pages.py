@@ -11,11 +11,9 @@ from portal.dependencies import (
     get_run_repo,
     get_knowledge_repo,
     get_build_state_repo,
-    get_codebase_explorer_service,
 )
 from portal.services.plan_service import PlanService
 from portal.services.knowledge_service import KnowledgeService
-from portal.services.codebase_explorer_service import CodebaseExplorerService
 
 # Setup templates
 PORTAL_DIR = Path(__file__).parent.parent
@@ -62,20 +60,12 @@ def _get_knowledge_service(
     return KnowledgeService(knowledge_repo)
 
 
-def _get_codebase_explorer_service(
-    explorer_service: CodebaseExplorerService = Depends(get_codebase_explorer_service),
-) -> CodebaseExplorerService:
-    """Get codebase explorer service with injected dependencies."""
-    return explorer_service
-
-
 @router.get("/", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
     plan_repo: PlanRepository = Depends(get_plan_repo),
     run_repo: RunRepository = Depends(get_run_repo),
     plan_service: PlanService = Depends(_get_plan_service),
-    explorer_service: CodebaseExplorerService = Depends(_get_codebase_explorer_service),
 ):
     """Render main dashboard."""
     # Count plans by state from database
@@ -114,20 +104,6 @@ async def dashboard(
     )
     completed_runs = _transform_runs_for_template(all_finished[:5])
 
-    # Get architecture overview for codebase exploration widget
-    architecture = await explorer_service.get_architecture_overview()
-    architecture_summary = {
-        "project_name": architecture.project_name,
-        "project_type": architecture.project_type,
-        "primary_language": architecture.primary_language,
-        "architecture_pattern": architecture.architecture_pattern,
-        "modules_count": len(architecture.modules),
-        "domains_count": len(architecture.domains),
-    }
-
-    # Get recent explorations for dashboard widget (domains and modules)
-    recent_explorations = await explorer_service.get_recent_explorations(limit=4)
-
     # Get planning tasks (background tasks of type 'plan' that are pending/running)
     from portal.services.task_manager import get_task_manager
     task_manager = get_task_manager()
@@ -151,8 +127,6 @@ async def dashboard(
             "active_runs": runs,
             "completed_runs": completed_runs,
             "planning_tasks": planning_tasks,
-            "architecture_summary": architecture_summary,
-            "recent_explorations": recent_explorations,
         },
     )
 
@@ -233,109 +207,6 @@ async def knowledge_page(
             "knowledge": knowledge,
             "scan_meta": scan_meta,
             "expert_count": expert_count,
-        },
-    )
-
-
-@router.get("/questions", response_class=HTMLResponse)
-async def questions_page(
-    request: Request,
-    explorer_service: CodebaseExplorerService = Depends(_get_codebase_explorer_service),
-):
-    """Render codebase exploration page.
-
-    Provides an interface for exploring and understanding the codebase
-    including architecture overview, domains, modules, and patterns.
-    """
-    # Get architecture overview
-    architecture = await explorer_service.get_architecture_overview()
-
-    # Build architecture summary
-    architecture_summary = {
-        "project_name": architecture.project_name,
-        "project_type": architecture.project_type,
-        "primary_language": architecture.primary_language,
-        "architecture_pattern": architecture.architecture_pattern,
-        "entry_points": architecture.entry_points,
-        "conventions": architecture.conventions,
-        "technologies": architecture.technologies,
-    }
-
-    # Build domain list with details
-    domain_list = [
-        {
-            "name": d.get("name", ""),
-            "keywords": d.get("keywords", []),
-            "file_count": d.get("file_count", 0),
-        }
-        for d in architecture.domains
-    ]
-
-    # Build module list (patterns)
-    pattern_list = [
-        {
-            "name": m.get("name", ""),
-            "path": m.get("path", ""),
-            "purpose": m.get("purpose", ""),
-            "depends_on": m.get("depends_on", []),
-        }
-        for m in architecture.modules
-    ]
-
-    # Get exploration stats
-    exploration_data = await explorer_service.get_exploration_data_for_template()
-    stats = exploration_data.get("stats", {})
-
-    return templates.TemplateResponse(
-        request,
-        "questions.html",
-        {
-            "architecture_summary": architecture_summary,
-            "domain_list": domain_list,
-            "pattern_list": pattern_list,
-            "stats": stats,
-        },
-    )
-
-
-@router.get("/explore/{path:path}", response_class=HTMLResponse)
-async def explore_file_page(
-    request: Request,
-    path: str,
-    explorer_service: CodebaseExplorerService = Depends(_get_codebase_explorer_service),
-):
-    """Render file exploration detail page.
-
-    Shows detailed analysis of a specific file including classes,
-    functions, imports, dependencies, and domain/module context.
-    """
-    # Get file analysis
-    analysis = await explorer_service.get_file_analysis(path)
-
-    if not analysis.exists and not analysis.has_knowledge:
-        raise HTTPException(status_code=404, detail=f"File '{path}' not found or not analyzed")
-
-    return templates.TemplateResponse(
-        request,
-        "question_detail.html",
-        {
-            "file_analysis": {
-                "file_path": analysis.file_path,
-                "file_name": analysis.file_name,
-                "exists": analysis.exists,
-                "has_knowledge": analysis.has_knowledge,
-                "language": analysis.language,
-                "size_bytes": analysis.size_bytes,
-                "line_count": analysis.line_count,
-                "imports": analysis.imports,
-                "exports": analysis.exports,
-                "classes": analysis.classes,
-                "functions": analysis.functions,
-                "dependencies": analysis.dependencies,
-                "domain_context": analysis.domain_context,
-                "module_context": analysis.module_context,
-                "related_files": analysis.related_files,
-            },
         },
     )
 

@@ -13,7 +13,8 @@ from alembic import context
 
 # Add orchestrator directory to path for imports
 MIGRATIONS_DIR = Path(__file__).parent
-ORCHESTRATOR_DIR = MIGRATIONS_DIR.parent
+DB_DIR = MIGRATIONS_DIR.parent
+ORCHESTRATOR_DIR = DB_DIR.parent
 sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
 # Import unified config (this loads dotenv automatically)
@@ -29,7 +30,6 @@ from db.models import (
     CodebaseKnowledge, Technology, ArchitectureInfo, ArchitectureModule, Domain, Pattern,
     ExpertIndex, ExpertEntry,
     ScanMetadata, FileKnowledge, FileScanHistory,
-    Question, Answer,
 )
 
 # Import portal models

@@ -35,7 +35,6 @@ from portal.routes import (
     pages_router,
     health_router,
     knowledge_router,
-    explore_router,  # Codebase exploration (refactored from questions)
     background_tasks_router,
     websocket_router,
     file_knowledge_router,
@@ -163,7 +162,6 @@ app.include_router(workflows_router)
 app.include_router(cost_router)
 app.include_router(pages_router)
 app.include_router(knowledge_router)
-app.include_router(explore_router)  # Codebase exploration API
 app.include_router(background_tasks_router)
 app.include_router(websocket_router)
 app.include_router(file_knowledge_router)

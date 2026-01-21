@@ -34,8 +34,6 @@ from .models import (
     ScanMetadata,
     FileKnowledge,
     FileScanHistory,
-    Question,
-    Answer,
 )
 
 # Aliases for backward compatibility
@@ -48,7 +46,6 @@ from .repositories import (
     KnowledgeRepository,
     CostRepository,
     RunRepository,
-    QuestionRepository,
     FileKnowledgeRepository,
 )
 
@@ -83,10 +80,6 @@ def get_cost_repository() -> CostRepository:
 
 def get_run_repository() -> RunRepository:
     return RunRepository(get_database())
-
-
-def get_question_repository() -> QuestionRepository:
-    return QuestionRepository(get_database())
 
 
 def get_file_knowledge_repository() -> FileKnowledgeRepository:

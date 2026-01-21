@@ -11,7 +11,6 @@ from .interfaces import (
     IRunRepository,
     IKnowledgeRepository,
     ICostRepository,
-    IQuestionRepository,
     IFileKnowledgeRepository,
 )
 from .plans import PlanRepository
@@ -19,7 +18,6 @@ from .build_state import BuildStateRepository
 from .knowledge import KnowledgeRepository
 from .cost import CostRepository
 from .runs import RunRepository
-from .questions import QuestionRepository
 from .file_knowledge import FileKnowledgeRepository
 
 __all__ = [
@@ -30,7 +28,6 @@ __all__ = [
     "IRunRepository",
     "IKnowledgeRepository",
     "ICostRepository",
-    "IQuestionRepository",
     "IFileKnowledgeRepository",
     # Implementations
     "PlanRepository",
@@ -38,6 +35,5 @@ __all__ = [
     "KnowledgeRepository",
     "CostRepository",
     "RunRepository",
-    "QuestionRepository",
     "FileKnowledgeRepository",
 ]

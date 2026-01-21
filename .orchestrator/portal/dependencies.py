@@ -27,7 +27,6 @@ from db import (
 from portal.services.task_manager import TaskManager, get_task_manager as _get_task_manager
 from portal.services.recovery_service import RecoveryService, get_recovery_service as _get_recovery_service
 from portal.services.plan_status_service import PlanStatusService
-from portal.services.codebase_explorer_service import CodebaseExplorerService
 
 # Project paths
 PORTAL_DIR = Path(__file__).parent
@@ -98,16 +97,3 @@ def get_plan_status_service() -> PlanStatusService:
     )
 
 
-def get_codebase_explorer_service() -> CodebaseExplorerService:
-    """Get CodebaseExplorerService instance for dependency injection.
-
-    This service provides codebase exploration and understanding capabilities
-    by combining KnowledgeRepository (bulk scan data) and FileKnowledgeRepository
-    (file-level analysis) to help users understand architecture, patterns,
-    dependencies, and implementation details.
-    """
-    return CodebaseExplorerService(
-        knowledge_repo=get_knowledge_repository(),
-        file_knowledge_repo=get_file_knowledge_repository(),
-        project_root=PROJECT_ROOT
-    )

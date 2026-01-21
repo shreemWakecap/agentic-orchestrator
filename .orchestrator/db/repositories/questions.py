@@ -479,7 +479,7 @@ class QuestionRepository:
         row = self.db.fetchone("SELECT COUNT(*) as count FROM answers")
         stats["total_answers"] = row["count"] if row else 0
 
-        row = self.db.fetchone("SELECT COUNT(*) as count FROM answers WHERE is_obsolete = 1")
+        row = self.db.fetchone("SELECT COUNT(*) as count FROM answers WHERE is_obsolete = true")
         stats["obsolete_answers"] = row["count"] if row else 0
 
         return stats

@@ -79,27 +79,52 @@ class ScoutingWorkflow(Workflow):
             self.console.print("[red]Error: scout agent not found[/red]")
             raise
 
+    def _get_exclude_paths(self) -> list[str]:
+        """Get paths to exclude from scanning from config."""
+        default_excludes = [
+            ".orchestrator", ".git", ".venv", "venv", "node_modules",
+            "__pycache__", "dist", "build", "bin", "obj", ".vs", ".idea", "packages"
+        ]
+        try:
+            scan_config = self._config.get("scan", {})
+            return scan_config.get("exclude_paths", default_excludes)
+        except Exception:
+            return default_excludes
+
+    def _get_solution_paths(self) -> list[str]:
+        """Get specific solution paths to scan (empty means scan all non-excluded)."""
+        try:
+            scan_config = self._config.get("scan", {})
+            return scan_config.get("solution_paths", [])
+        except Exception:
+            return []
+
     def _get_quick_context(self) -> str:
         """Get minimal context for quick scan."""
         parts = []
+        exclude_paths = set(self._get_exclude_paths())
 
-        # Top-level directories
+        # Top-level directories (excluding orchestrator and generated)
         try:
             dirs = [d.name for d in self.project_root.iterdir()
-                    if d.is_dir() and not d.name.startswith(".")][:10]
+                    if d.is_dir() and d.name not in exclude_paths][:10]
             if dirs:
                 parts.append(f"Directories: {', '.join(sorted(dirs))}")
         except Exception:
             pass
 
-        # Config files
-        config_files = [
-            "package.json", "pyproject.toml", "Cargo.toml",
-            "go.mod", "requirements.txt", "tsconfig.json"
-        ]
-        found = [f for f in config_files if (self.project_root / f).exists()]
-        if found:
-            parts.append(f"Config files: {', '.join(found)}")
+        # Detect config files dynamically (any common project config patterns)
+        try:
+            config_patterns = ["*.json", "*.toml", "*.yaml", "*.yml", "*.xml", "*.sln", "*.csproj", "*.mod"]
+            found = []
+            for pattern in config_patterns:
+                for f in self.project_root.glob(pattern):
+                    if f.is_file() and f.name not in exclude_paths:
+                        found.append(f.name)
+            if found:
+                parts.append(f"Config files: {', '.join(sorted(found)[:10])}")
+        except Exception:
+            pass
 
         return "\n".join(parts)
 
@@ -121,10 +146,16 @@ class ScoutingWorkflow(Workflow):
         scan_id = str(uuid.uuid4())[:8]
         started_at = datetime.now()
 
+        # Get exclude paths from config
+        exclude_paths = self._get_exclude_paths()
+        exclude_note = f"CRITICAL: Exclude these paths (NOT part of solution): {', '.join(exclude_paths)}"
+
         # Build scout prompt based on scan type
         if self.scan_type == "quick":
             context = self._get_quick_context()
             scout_prompt = f"""Perform a quick analysis of this codebase:
+
+{exclude_note}
 
 {context}
 
@@ -137,8 +168,24 @@ Output the JSON with at least: project, technologies, architecture.entry_points
 Skip detailed domain analysis for quick scan.
 """
         else:
-            scout_prompt = """Perform a thorough analysis of this codebase.
+            # Get solution paths from config
+            solution_paths = self._get_solution_paths()
 
+            exclude_note_detailed = f"""
+CRITICAL: Exclude these paths from your analysis (they are NOT part of the solution):
+{chr(10).join(f'- {p}/' for p in exclude_paths)}
+"""
+
+            solution_note = ""
+            if solution_paths:
+                solution_note = f"""
+Focus your analysis on these solution directories:
+{chr(10).join(f'- {p}/' for p in solution_paths)}
+"""
+
+            scout_prompt = f"""Perform a thorough analysis of this codebase.
+{exclude_note_detailed}
+{solution_note}
 Follow all 5 phases:
 1. STRUCTURE - Map directories and identify project type
 2. TECHNOLOGY - Detect languages, frameworks, tools with confidence
@@ -148,6 +195,7 @@ Follow all 5 phases:
 
 Output complete JSON with all sections populated.
 Explore deeply - read actual files, don't just guess from names.
+Remember: Focus on the SOLUTION code, not the orchestration tooling.
 """
 
         # Run scout agent

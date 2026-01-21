@@ -11,6 +11,7 @@ WORKFLOWS = {
     'build': 'building',
     'sync': 'syncing',
     'scout': 'scouting',
+    'smart-scout': 'smart_scouting',
 }
 
 # Commands: simple utilities
@@ -30,7 +31,8 @@ def main():
         print("  plan <request>   Create implementation plan from request")
         print("  build <path>     Execute plan and implement code")
         print("  sync             Sync changes: create PR, merge, and pull to local")
-        print("  scout            Analyze codebase and build knowledge store")
+        print("  scout            Analyze codebase and build knowledge store (legacy)")
+        print("  smart-scout      Multi-phase, guided codebase analysis (recommended)")
         print("\nCommands:")
         print("  portal           Start web portal")
         print("  setup            Initialize orchestrator environment")

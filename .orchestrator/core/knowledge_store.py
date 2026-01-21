@@ -93,6 +93,136 @@ class CodebaseKnowledge:
     statistics: dict = field(default_factory=dict)
 
 
+# --- Smart Scout: Layered Knowledge Models ---
+
+@dataclass
+class ScanCriteria:
+    """User-provided scan criteria (Phase 1)."""
+    focus: str = "overview"  # overview, domains, audit, architecture
+    areas: list[str] = field(default_factory=list)  # backend, frontend, infra, data, testing
+    depth: str = "standard"  # quick, standard, deep
+    specific_paths: list[str] = field(default_factory=list)
+
+
+@dataclass
+class DetectedDomain:
+    """Domain detected during Phase 2."""
+    path: str
+    name: str
+    classification: str = "unknown"  # code, config, docs, generated, unknown
+    file_count: int = 0
+    subdirectory_count: int = 0
+    detected_languages: list[str] = field(default_factory=list)
+    confidence: float = 0.0
+
+
+@dataclass
+class ApprovedDomain:
+    """User-approved domain for scanning (Phase 3)."""
+    path: str
+    name: str
+    scan_depth: str = "standard"  # quick, standard, deep
+    priority: int = 0
+
+
+@dataclass
+class SolutionOverview:
+    """Layer 1: High-level solution overview."""
+    purpose: str = ""
+    domains: list[str] = field(default_factory=list)
+    estimated_size: str = "unknown"  # small, medium, large, enterprise
+    structure_type: str = "unknown"  # single, multi-project, monorepo, microservices
+    root_directories: list[str] = field(default_factory=list)
+    primary_language: str = ""
+
+
+@dataclass
+class TechStackInfo:
+    """Layer 2: Technology stack details."""
+    domain: str = ""
+    languages: list[TechInfo] = field(default_factory=list)
+    frameworks: list[TechInfo] = field(default_factory=list)
+    tools: list[TechInfo] = field(default_factory=list)
+    build_system: str = ""
+    package_manager: str = ""
+    test_framework: str = ""
+
+
+@dataclass
+class DomainDetails:
+    """Layer 3: Domain responsibilities and boundaries."""
+    name: str = ""
+    responsibilities: list[str] = field(default_factory=list)
+    boundaries: list[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    key_files: list[str] = field(default_factory=list)
+    entry_points: list[str] = field(default_factory=list)
+    public_apis: list[str] = field(default_factory=list)
+
+
+@dataclass
+class RiskInfo:
+    """Identified risk in codebase."""
+    category: str = ""  # security, performance, maintainability
+    description: str = ""
+    severity: str = "low"  # low, medium, high, critical
+    location: str = ""
+    recommendation: str = ""
+
+
+@dataclass
+class RuleInfo:
+    """Extracted coding rule."""
+    name: str = ""
+    description: str = ""
+    scope: str = "global"  # global, domain-specific
+    examples: list[str] = field(default_factory=list)
+    rationale: str = ""
+
+
+@dataclass
+class DeepTechnicalInfo:
+    """Layer 4: Patterns, rules, risks."""
+    domain: str = ""
+    patterns: list[str] = field(default_factory=list)
+    conventions: list[str] = field(default_factory=list)
+    risks: list[RiskInfo] = field(default_factory=list)
+    rules: list[RuleInfo] = field(default_factory=list)
+    constraints: list[str] = field(default_factory=list)
+    assumptions: list[str] = field(default_factory=list)
+    gaps: list[str] = field(default_factory=list)
+
+
+@dataclass
+class LayeredKnowledge:
+    """Complete layered knowledge for a domain."""
+    domain: str = ""
+    overview: Optional[SolutionOverview] = None
+    tech_stack: Optional[TechStackInfo] = None
+    domain_details: Optional[DomainDetails] = None
+    deep_technical: Optional[DeepTechnicalInfo] = None
+    scan_depth_reached: str = ""  # quick, standard, deep
+    last_scanned: str = ""
+
+
+@dataclass
+class SmartScanSession:
+    """Tracks a multi-phase scan session."""
+    session_id: str = ""
+    started_at: str = ""
+    completed_at: str = ""
+    criteria: Optional[ScanCriteria] = None
+    detected_domains: list[DetectedDomain] = field(default_factory=list)
+    approved_domains: list[ApprovedDomain] = field(default_factory=list)
+    current_phase: int = 0  # 1-5
+    status: str = "pending"  # pending, in_progress, paused, completed, failed
+    knowledge: dict[str, LayeredKnowledge] = field(default_factory=dict)  # domain -> knowledge
+    experts_generated: list[str] = field(default_factory=list)
+    rules_extracted: list[RuleInfo] = field(default_factory=list)
+
+
+# --- Original Models (Legacy) ---
+
 @dataclass
 class ExpertTriggers:
     """Triggers for expert selection."""

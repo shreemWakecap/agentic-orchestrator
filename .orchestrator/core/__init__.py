@@ -15,6 +15,7 @@ from .config import (
     get_budget_config,
 )
 from .system_explorer import TechDetection, detect_technologies, find_missing_experts
+from .domain_scanner import DomainScanner, detect_project_domains
 from .plan_parser import (
     PlanParser,
     ParseResult,
@@ -65,6 +66,9 @@ __all__ = [
     "TechDetection",
     "detect_technologies",
     "find_missing_experts",
+    # Domain scanner
+    "DomainScanner",
+    "detect_project_domains",
     # Plan parser (deterministic)
     "PlanParser",
     "ParseResult",

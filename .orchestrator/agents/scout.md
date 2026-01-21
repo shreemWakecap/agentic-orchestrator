@@ -168,6 +168,17 @@ OUTPUT_JSON:
 5. **Actual paths** - Use real paths you discovered, not examples
 6. **Skip generated** - Ignore node_modules, .venv, __pycache__, dist, build
 7. **Output JSON only** - After exploration, output ONLY the JSON block
+8. **CRITICAL: Exclude .orchestrator** - NEVER scan or include the `.orchestrator/` folder in your analysis. This folder contains the orchestration tooling itself, NOT the solution code. Focus ONLY on the actual project source code.
+
+## Excluded Paths (NEVER scan these)
+
+These paths should be completely ignored during analysis:
+- `.orchestrator/` - The orchestration tooling (THIS IS NOT YOUR TARGET)
+- `.git/` - Version control
+- `node_modules/`, `.venv/`, `venv/` - Dependencies
+- `__pycache__/`, `dist/`, `build/` - Generated files
+- `bin/`, `obj/`, `.vs/`, `.idea/` - IDE and build artifacts
+- `packages/` - NuGet packages
 
 ## Example Exploration
 

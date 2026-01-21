@@ -3,7 +3,13 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+# Add orchestrator directory to path
+ORCHESTRATOR_DIR = Path(__file__).parent
+sys.path.insert(0, str(ORCHESTRATOR_DIR))
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv(ORCHESTRATOR_DIR / ".env")
 
 # Workflows: complex multi-step agent orchestration
 WORKFLOWS = {

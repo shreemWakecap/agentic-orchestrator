@@ -15,15 +15,33 @@ from .connection import Database
 from .models import (
     Base,
     Plan,
+    PlanPhase,
     PlanStep,
     BuildState,
-    Run,
-    Cost,
-    Knowledge,
+    StepState,
+    GoalVerificationState,
+    ActiveRun,
+    RunEvent,
+    CostHistory,
+    CodebaseKnowledge,
+    Technology,
+    ArchitectureInfo,
+    ArchitectureModule,
+    Domain,
+    Pattern,
+    ExpertIndex,
+    ExpertEntry,
+    ScanMetadata,
     FileKnowledge,
+    FileScanHistory,
     Question,
     Answer,
 )
+
+# Aliases for backward compatibility
+Run = ActiveRun
+Cost = CostHistory
+Knowledge = CodebaseKnowledge
 from .repositories import (
     PlanRepository,
     BuildStateRepository,

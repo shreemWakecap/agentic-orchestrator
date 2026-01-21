@@ -1,10 +1,12 @@
 """
 PostgreSQL Database Connection using SQLAlchemy ORM.
 """
+import json
 import logging
 import threading
 from contextlib import contextmanager
-from typing import Generator
+from datetime import datetime
+from typing import Any, Generator, List, Optional
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
@@ -14,6 +16,36 @@ from .config import DatabaseConfig
 from .models import Base
 
 logger = logging.getLogger(__name__)
+
+
+def _convert_row_to_dict(row) -> dict:
+    """Convert a database row to a dict, converting datetime objects to ISO strings."""
+    result = dict(row._mapping)
+    for key, value in result.items():
+        if isinstance(value, datetime):
+            result[key] = value.isoformat()
+    return result
+
+
+def _convert_query(query: str, params: tuple) -> tuple:
+    """Convert ? placeholders to :param style for SQLAlchemy.
+
+    Args:
+        query: SQL query with ? placeholders
+        params: Query parameters as tuple
+
+    Returns:
+        Tuple of (converted_query, params_dict)
+    """
+    converted_query = query
+    params_dict = {}
+
+    for i, param in enumerate(params):
+        placeholder = f":p{i}"
+        converted_query = converted_query.replace("?", placeholder, 1)
+        params_dict[f"p{i}"] = param
+
+    return converted_query, params_dict
 
 
 class Database:
@@ -77,3 +109,136 @@ class Database:
             cls._engine = None
             cls._session_factory = None
             cls._initialized = False
+
+    # =========================================================================
+    # Raw SQL query methods (for repositories that use raw SQL)
+    # =========================================================================
+
+    @contextmanager
+    def transaction(self):
+        """Context manager for raw SQL transactions.
+
+        Usage:
+            with db.transaction() as conn:
+                conn.execute("INSERT INTO ...", (param1, param2))
+        """
+        with Database._engine.connect() as conn:
+            trans = conn.begin()
+            try:
+                yield _ConnectionWrapper(conn)
+                trans.commit()
+            except Exception:
+                trans.rollback()
+                raise
+
+    def fetchone(self, query: str, params: tuple = ()) -> Optional[dict]:
+        """Execute query and return single row as dict.
+
+        Args:
+            query: SQL query with ? placeholders
+            params: Query parameters
+
+        Returns:
+            Row as dict or None if no results
+        """
+        converted_query, converted_params = _convert_query(query, params)
+
+        with Database._engine.connect() as conn:
+            result = conn.execute(text(converted_query), converted_params)
+            row = result.fetchone()
+            if row:
+                return _convert_row_to_dict(row)
+            return None
+
+    def fetchall(self, query: str, params: tuple = ()) -> List[dict]:
+        """Execute query and return all rows as dicts.
+
+        Args:
+            query: SQL query with ? placeholders
+            params: Query parameters
+
+        Returns:
+            List of rows as dicts
+        """
+        converted_query, converted_params = _convert_query(query, params)
+
+        with Database._engine.connect() as conn:
+            result = conn.execute(text(converted_query), converted_params)
+            rows = result.fetchall()
+            return [_convert_row_to_dict(row) for row in rows]
+
+    # =========================================================================
+    # JSON serialization helpers
+    # =========================================================================
+
+    @staticmethod
+    def to_json(value: Any) -> str:
+        """Convert Python object to JSON string."""
+        return json.dumps(value)
+
+    @staticmethod
+    def from_json(value: Optional[str], default: Any = None) -> Any:
+        """Parse JSON string to Python object."""
+        if value is None:
+            return default
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return default
+
+
+class _ConnectionWrapper:
+    """Wrapper around SQLAlchemy connection to handle ? placeholder conversion."""
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, query: str, params: tuple = ()):
+        """Execute a SQL query with ? placeholders.
+
+        Args:
+            query: SQL query with ? placeholders
+            params: Query parameters as tuple
+
+        Returns:
+            Result proxy with lastrowid and rowcount attributes
+        """
+        converted_query, converted_params = _convert_query(query, params)
+        result = self._conn.execute(text(converted_query), converted_params)
+        return _ResultWrapper(result)
+
+
+class _ResultWrapper:
+    """Wrapper around SQLAlchemy result to provide lastrowid."""
+
+    def __init__(self, result):
+        self._result = result
+        self.rowcount = result.rowcount
+        # Cache lastrowid immediately after execution
+        self._lastrowid = None
+        try:
+            if hasattr(result, 'lastrowid'):
+                self._lastrowid = result.lastrowid
+        except Exception:
+            pass
+
+    @property
+    def lastrowid(self):
+        """Get the last inserted row ID.
+
+        Note: For PostgreSQL with raw SQL, this may return None or 0.
+        Use RETURNING clause in INSERT statements for reliable ID retrieval.
+        """
+        return self._lastrowid or 0
+
+    def fetchone(self):
+        """Fetch one row as dict."""
+        row = self._result.fetchone()
+        if row:
+            return _convert_row_to_dict(row)
+        return None
+
+    def fetchall(self):
+        """Fetch all rows as dicts."""
+        rows = self._result.fetchall()
+        return [_convert_row_to_dict(row) for row in rows]

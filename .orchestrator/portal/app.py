@@ -14,15 +14,19 @@ import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
-from fastapi.staticfiles import StaticFiles
-
 # Add parent directory to path for imports
 PORTAL_DIR = Path(__file__).parent
 ORCHESTRATOR_DIR = PORTAL_DIR.parent
 PROJECT_ROOT = ORCHESTRATOR_DIR.parent
 
 sys.path.insert(0, str(ORCHESTRATOR_DIR))
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv(ORCHESTRATOR_DIR / ".env")
+
+from fastapi import Depends, FastAPI
+from fastapi.staticfiles import StaticFiles
 
 # Import routers
 from portal.routes import (
@@ -54,6 +58,7 @@ from portal.streaming.websocket import (
     init_websocket_manager,
     shutdown_websocket_manager,
 )
+from portal.models import init_db, close_db
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +70,15 @@ _task_manager: TaskManager | None = None
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup/shutdown events.
 
-    Initializes the TaskManager and auto-recovery task on startup,
+    Initializes the database, TaskManager and auto-recovery task on startup,
     and gracefully shuts them down when the application stops.
     """
     global _task_manager
+
+    # Startup: Initialize database (creates tables if they don't exist)
+    logger.info("Initializing database...")
+    await init_db()
+    logger.info("Database initialized successfully")
 
     # Startup: Initialize TaskManager
     logger.info("Starting TaskManager...")
@@ -107,6 +117,11 @@ async def lifespan(app: FastAPI):
     shutdown_task_manager(wait=True)
     _task_manager = None
     logger.info("TaskManager shutdown complete")
+
+    # Shutdown: Close database connections
+    logger.info("Closing database connections...")
+    await close_db()
+    logger.info("Database connections closed")
 
 
 # FastAPI app

@@ -217,3 +217,44 @@ uv run cli.py portal --port 3000
 ## License
 
 MIT
+
+
+
+
+  Files Summary
+
+  .orchestrator/
+  ├── agents/
+  │   ├── scout.md              # Original (legacy)
+  │   ├── scout-overview.md     # NEW: Layer 1
+  │   ├── scout-techstack.md    # NEW: Layer 2
+  │   ├── scout-domain.md       # NEW: Layer 3
+  │   └── scout-deep.md         # NEW: Layer 4
+  ├── core/
+  │   ├── domain_scanner.py     # NEW: Tech-agnostic detection
+  │   └── knowledge_store.py    # UPDATED: Layered models
+  ├── workflows/
+  │   ├── scouting.py           # Original (legacy)
+  │   └── smart_scouting.py     # NEW: Multi-phase workflow
+  ├── docs/
+  │   └── smart-scout-design.md # NEW: Architecture doc
+  └── cli.py                    # UPDATED: smart-scout command
+
+  Usage
+
+  # Interactive mode (recommended)
+  orchestrator smart-scout
+
+  # Non-interactive with deep scan
+  orchestrator smart-scout -n --depth deep
+
+  # Quick scan only
+  orchestrator smart-scout -n --depth quick
+
+  The system now:
+  1. Detects domains without assuming technology
+  2. Asks you what to scan and how deep
+  3. Uses AI agents for intelligent analysis at each layer
+  4. Falls back gracefully if agents fail
+  5. Generates experts based on discovered technologies
+  6. Extracts rules from patterns found

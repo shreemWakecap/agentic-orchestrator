@@ -887,6 +887,40 @@ STEPS:
 
         raise ValueError(f"Plan not found in database: {plan_id}")
 
+    def _run_post_build_scout(self):
+        """
+        Run incremental scout on files modified during the build.
+
+        This keeps knowledge up-to-date with the changes made during building.
+        """
+        # Gather all modified paths
+        modified_paths = list(set(
+            self.build_state.files_created +
+            self.build_state.files_modified
+        ))
+
+        if not modified_paths:
+            return
+
+        try:
+            from workflows.unified_scout import UnifiedScoutWorkflow
+
+            self.console.print(f"\n[dim]Updating knowledge for {len(modified_paths)} modified files...[/dim]")
+
+            scout_workflow = UnifiedScoutWorkflow(self.project_root)
+            result = scout_workflow.run(
+                target_paths=modified_paths,
+                trigger="post_build"
+            )
+
+            if result.success:
+                self.console.print(f"[dim]  Knowledge updated successfully[/dim]")
+            else:
+                self.console.print(f"[dim]  Knowledge update skipped (scout failed)[/dim]")
+        except Exception as e:
+            # Don't fail the build if scout fails - just log it
+            self.console.print(f"[dim]  Knowledge update skipped: {e}[/dim]")
+
     def _archive_plan(self, plan_id: str, destination: str):
         """
         Update plan status through aggregate root pattern.
@@ -2335,6 +2369,9 @@ Ensure all features work together correctly.""",
             self.console.print(f"  Files created: {len(self.build_state.files_created)}")
             self.console.print(f"  Files modified: {len(self.build_state.files_modified)}")
             self.console.print(f"  Status: completed")
+
+            # Post-build scout hook: Update knowledge for modified files
+            self._run_post_build_scout()
         else:
             # Check if this is a pausable failure (can resume) or permanent failure
             is_paused = result.data and result.data.get("can_resume", False)

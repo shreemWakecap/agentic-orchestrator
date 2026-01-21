@@ -57,6 +57,47 @@ class PatternInfo:
 
 
 @dataclass
+class CodingRule:
+    """
+    Coding rule extracted from codebase analysis.
+
+    Used for soft-enforcement of conventions during planning.
+    """
+    id: str                           # e.g., "naming-001"
+    category: str                     # naming, structure, patterns, security, testing, documentation
+    rule: str                         # "Use snake_case for Python files"
+    severity: str = "info"            # info, warning, error
+    examples: list[str] = field(default_factory=list)  # Good/bad examples
+    source_files: list[str] = field(default_factory=list)  # Where this was inferred from
+    confidence: float = 0.5           # 0-1
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            "id": self.id,
+            "category": self.category,
+            "rule": self.rule,
+            "severity": self.severity,
+            "examples": self.examples,
+            "source_files": self.source_files,
+            "confidence": self.confidence,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "CodingRule":
+        """Create from dictionary."""
+        return cls(
+            id=data.get("id", ""),
+            category=data.get("category", "general"),
+            rule=data.get("rule", ""),
+            severity=data.get("severity", "info"),
+            examples=data.get("examples", []),
+            source_files=data.get("source_files", []),
+            confidence=data.get("confidence", 0.5),
+        )
+
+
+@dataclass
 class ArchitectureInfo:
     """Architecture overview."""
     pattern: str = "unknown"  # layered, hexagonal, mvc, etc.
@@ -91,6 +132,115 @@ class CodebaseKnowledge:
     domains: list[DomainInfo] = field(default_factory=list)
     patterns: PatternInfo = field(default_factory=PatternInfo)
     statistics: dict = field(default_factory=dict)
+    coding_rules: list[CodingRule] = field(default_factory=list)
+
+    # Backward compatibility properties
+    @property
+    def project_name(self) -> str:
+        return self.project.name
+
+    @property
+    def project_type(self) -> str:
+        return self.project.type
+
+    @property
+    def primary_language(self) -> str:
+        return self.project.primary_language
+
+    @property
+    def languages(self) -> list[TechInfo]:
+        return self.technologies.languages
+
+    @property
+    def frameworks(self) -> list[TechInfo]:
+        return self.technologies.frameworks
+
+    @property
+    def tools(self) -> list[TechInfo]:
+        return self.technologies.tools
+
+    @property
+    def architecture_pattern(self) -> str:
+        return self.architecture.pattern
+
+    @property
+    def modules(self) -> list[ModuleInfo]:
+        return self.architecture.modules
+
+    @property
+    def entry_points(self) -> list[str]:
+        return self.architecture.entry_points
+
+    @property
+    def naming_conventions(self) -> dict[str, str]:
+        return self.patterns.naming
+
+    @property
+    def structure_conventions(self) -> dict[str, str]:
+        return self.patterns.structure
+
+    @property
+    def code_conventions(self) -> list[str]:
+        return self.patterns.conventions
+
+    @property
+    def last_scan(self) -> str:
+        return self.last_updated
+
+    @property
+    def experts(self) -> list:
+        """Placeholder for expert list - populated separately."""
+        return []
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for serialization."""
+        return {
+            "version": self.version,
+            "last_updated": self.last_updated,
+            "project": {
+                "name": self.project.name,
+                "type": self.project.type,
+                "primary_language": self.project.primary_language,
+            },
+            "technologies": {
+                "languages": [{"name": t.name, "confidence": t.confidence, "version": t.version} for t in self.technologies.languages],
+                "frameworks": [{"name": t.name, "confidence": t.confidence, "version": t.version} for t in self.technologies.frameworks],
+                "tools": [{"name": t.name, "confidence": t.confidence, "version": t.version} for t in self.technologies.tools],
+            },
+            "architecture": {
+                "pattern": self.architecture.pattern,
+                "modules": [{"name": m.name, "path": m.path, "purpose": m.purpose, "depends_on": m.depends_on} for m in self.architecture.modules],
+                "entry_points": self.architecture.entry_points,
+            },
+            "domains": [{"name": d.name, "keywords": d.keywords, "files": d.files, "models": d.models, "routes": d.routes} for d in self.domains],
+            "patterns": {
+                "naming": self.patterns.naming,
+                "structure": self.patterns.structure,
+                "conventions": self.patterns.conventions,
+            },
+            "statistics": self.statistics,
+            "coding_rules": [r.to_dict() for r in self.coding_rules],
+        }
+
+
+# --- Aliases for unified scout workflow compatibility ---
+
+# Technology is an alias for TechInfo
+Technology = TechInfo
+
+# Module is an alias for ModuleInfo
+Module = ModuleInfo
+
+# Domain is an alias for DomainInfo
+Domain = DomainInfo
+
+# Expert placeholder dataclass for unified scout
+@dataclass
+class Expert:
+    """Expert profile (placeholder for unified scout compatibility)."""
+    name: str
+    description: str = ""
+    triggers: list[str] = field(default_factory=list)
 
 
 # --- Smart Scout: Layered Knowledge Models ---

@@ -185,6 +185,7 @@ async def run_detail(
 async def knowledge_page(
     request: Request,
     knowledge_service: KnowledgeService = Depends(_get_knowledge_service),
+    knowledge_repo: KnowledgeRepository = Depends(get_knowledge_repo),
 ):
     """Render knowledge management page."""
     # Get knowledge data transformed for template
@@ -200,6 +201,18 @@ async def knowledge_page(
         experts = expert_index.get("experts", [])
         expert_count = len(experts)
 
+    # Get staleness status
+    staleness = None
+    try:
+        from core.staleness_checker import get_staleness_summary
+        project_root = Path(__file__).parent.parent.parent.parent
+        staleness = get_staleness_summary(project_root)
+    except Exception:
+        pass
+
+    # Get coding rules for display
+    coding_rules = knowledge_repo.get_coding_rules()
+
     return templates.TemplateResponse(
         request,
         "knowledge.html",
@@ -207,6 +220,8 @@ async def knowledge_page(
             "knowledge": knowledge,
             "scan_meta": scan_meta,
             "expert_count": expert_count,
+            "staleness": staleness,
+            "coding_rules": coding_rules,
         },
     )
 

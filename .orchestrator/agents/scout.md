@@ -150,6 +150,35 @@ OUTPUT_JSON:
       "Models use Pydantic BaseModel"
     ]
   },
+  "coding_rules": [
+    {
+      "id": "naming-001",
+      "category": "naming",
+      "rule": "Use snake_case for Python file names",
+      "severity": "warning",
+      "examples": ["user_service.py (good)", "UserService.py (bad)"],
+      "source_files": ["src/services/user_service.py", "src/api/users.py"],
+      "confidence": 0.9
+    },
+    {
+      "id": "structure-001",
+      "category": "structure",
+      "rule": "API routes go in routes/ directory with _router suffix",
+      "severity": "warning",
+      "examples": ["routes/users.py (good)", "api/user_endpoints.py (bad)"],
+      "source_files": ["routes/plans.py", "routes/runs.py"],
+      "confidence": 0.85
+    },
+    {
+      "id": "patterns-001",
+      "category": "patterns",
+      "rule": "Services use dependency injection via FastAPI Depends",
+      "severity": "info",
+      "examples": ["def get_users(service: UserService = Depends(get_user_service))"],
+      "source_files": ["routes/plans.py"],
+      "confidence": 0.8
+    }
+  ],
   "statistics": {
     "total_files": 156,
     "by_extension": {".py": 89, ".ts": 34, ".json": 15},
@@ -158,6 +187,22 @@ OUTPUT_JSON:
   }
 }
 ```
+
+## Coding Rules Categories
+
+Extract coding rules in these categories:
+- **naming**: File naming, class naming, function naming, variable naming
+- **structure**: Where files go, directory organization, module boundaries
+- **patterns**: Design patterns, architectural patterns, code patterns
+- **security**: Security-related conventions (auth, validation, etc.)
+- **testing**: Test naming, test organization, test patterns
+- **documentation**: Docstring style, comment style, README patterns
+
+## Severity Levels
+
+- **info**: Good practice, optional to follow
+- **warning**: Should follow for consistency
+- **error**: Must follow, violations cause issues
 
 ## Rules
 

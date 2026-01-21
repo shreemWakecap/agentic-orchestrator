@@ -26,6 +26,8 @@ from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.plan_parser import PlanParser, validate_plan_coverage, validate_integration_completeness
 from core.knowledge_store import KnowledgeStore
 from core.expert_selector import ExpertSelector
+from core.staleness_checker import StalenessChecker
+from core.rule_checker import RuleChecker
 from db import get_plan_repository, get_build_state_repository
 
 
@@ -39,9 +41,10 @@ class PlanningWorkflow(Workflow):
     - Expert guidance injected into planner context
     """
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, auto_scout_on_stale: bool = True):
         self.project_root = project_root
         self._config = get_agent_config(project_root)
+        self.auto_scout_on_stale = auto_scout_on_stale
 
         super().__init__(name="Planning Workflow")
 
@@ -52,6 +55,7 @@ class PlanningWorkflow(Workflow):
         # Knowledge and expert systems
         self.knowledge_store = KnowledgeStore(project_root)
         self.expert_selector = ExpertSelector(project_root)
+        self.staleness_checker = StalenessChecker(project_root)
 
         # Load the planner agent
         self._load_agents()
@@ -110,9 +114,37 @@ class PlanningWorkflow(Workflow):
         Returns:
             WorkflowResult with the path to the created plan
         """
-        from core.symbols import CHECK, CROSS, ARROW_RIGHT
+        from core.symbols import CHECK, CROSS, ARROW_RIGHT, WARNING
 
         self.console.print(f"\n[bold]Planning:[/bold] {request[:80]}...")
+
+        # Check if knowledge is stale
+        is_stale, stale_reason = self.staleness_checker.is_stale()
+
+        if is_stale:
+            if self.auto_scout_on_stale:
+                self.console.print(f"\n[yellow]{WARNING}[/yellow] Knowledge is stale: {stale_reason}")
+                self.console.print(f"  [dim]Running scout to refresh knowledge...[/dim]")
+
+                # Run unified scout
+                try:
+                    from workflows.unified_scout import UnifiedScoutWorkflow
+                    scout_workflow = UnifiedScoutWorkflow(self.project_root)
+                    changed_paths = self.staleness_checker.get_changed_paths()
+                    scout_result = scout_workflow.run(
+                        target_paths=changed_paths if changed_paths else None,
+                        trigger="auto_pre_planning"
+                    )
+
+                    if scout_result.success:
+                        self.console.print(f"  [green]{CHECK}[/green] Knowledge refreshed")
+                    else:
+                        self.console.print(f"  [yellow]Warning: Scout failed, continuing with stale knowledge[/yellow]")
+                except Exception as e:
+                    self.console.print(f"  [yellow]Warning: Could not run scout: {e}[/yellow]")
+            else:
+                self.console.print(f"\n[yellow]{WARNING}[/yellow] Warning: Knowledge may be stale ({stale_reason})")
+                self.console.print(f"  [dim]Consider running 'scout' before planning[/dim]")
 
         # Generate plan ID
         plan_id = self._generate_plan_id(request)
@@ -294,12 +326,31 @@ Status: pending
             self.console.print(f"  Goal: [dim]{parse_result.plan.goal[:60]}...[/dim]" if len(parse_result.plan.goal) > 60 else f"  Goal: [dim]{parse_result.plan.goal}[/dim]")
             self.console.print(f"  Steps: [cyan]{parse_result.plan.total_steps}[/cyan]")
 
+        # Check plan against coding rules
+        rule_warnings = []
+        if parse_result.plan:
+            try:
+                rule_checker = RuleChecker(self.project_root)
+                rule_result = rule_checker.check_plan(parse_result.plan)
+
+                if rule_result.violations:
+                    rule_warnings = rule_result.warnings
+                    self.console.print(f"\n[yellow]{WARNING}[/yellow] Coding rule checks ({len(rule_result.violations)} issues):")
+                    for violation in rule_result.violations[:5]:  # Show first 5
+                        severity_color = "red" if violation.severity == "error" else "yellow"
+                        self.console.print(f"  [{severity_color}][{violation.severity}][/{severity_color}] {violation.description}")
+                    if len(rule_result.violations) > 5:
+                        self.console.print(f"  [dim]...and {len(rule_result.violations) - 5} more[/dim]")
+            except Exception as e:
+                self.console.print(f"  [dim]Could not check coding rules: {e}[/dim]")
+
         return WorkflowResult(
             success=True,
             data={
                 "plan_id": plan_id,
                 "steps": parse_result.plan.total_steps if parse_result.plan else 0,
-                "goal": parse_result.plan.goal if parse_result.plan else ""
+                "goal": parse_result.plan.goal if parse_result.plan else "",
+                "rule_warnings": rule_warnings
             }
         )
 

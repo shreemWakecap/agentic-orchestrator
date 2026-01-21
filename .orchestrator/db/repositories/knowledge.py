@@ -455,3 +455,173 @@ class KnowledgeRepository:
             'structure': self.db.from_json(pattern_row['structure_json'], {}),
             'conventions': self.db.from_json(pattern_row['conventions_json'], []),
         }
+
+    # --- Coding Rules ---
+
+    def save_coding_rule(self, rule) -> int:
+        """Save a coding rule to the database.
+
+        Args:
+            rule: CodingRule object with id, category, rule, severity, examples, source_files, confidence
+
+        Returns:
+            Row ID of the inserted/updated rule.
+        """
+        with self.db.transaction() as conn:
+            # Get knowledge ID
+            knowledge_row = conn.execute("SELECT id FROM codebase_knowledge LIMIT 1").fetchone()
+            knowledge_id = knowledge_row['id'] if knowledge_row else None
+
+            cursor = conn.execute("""
+                INSERT INTO coding_rules (knowledge_id, rule_id, category, rule_text, severity,
+                                         examples_json, source_files_json, confidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(rule_id) DO UPDATE SET
+                    category = excluded.category,
+                    rule_text = excluded.rule_text,
+                    severity = excluded.severity,
+                    examples_json = excluded.examples_json,
+                    source_files_json = excluded.source_files_json,
+                    confidence = MAX(coding_rules.confidence, excluded.confidence),
+                    updated_at = CURRENT_TIMESTAMP
+            """, (
+                knowledge_id,
+                rule.id,
+                rule.category,
+                rule.rule,
+                rule.severity,
+                self.db.to_json(rule.examples),
+                self.db.to_json(rule.source_files),
+                rule.confidence
+            ))
+            return cursor.lastrowid
+
+    def get_coding_rules(self, category: str = None, min_confidence: float = 0.0) -> list[dict]:
+        """Get coding rules from the database.
+
+        Args:
+            category: Optional category filter (naming, structure, patterns, etc.)
+            min_confidence: Minimum confidence threshold (0.0 - 1.0)
+
+        Returns:
+            List of coding rule dictionaries.
+        """
+        query = "SELECT * FROM coding_rules WHERE confidence >= ?"
+        params = [min_confidence]
+
+        if category:
+            query += " AND category = ?"
+            params.append(category)
+
+        query += " ORDER BY severity DESC, confidence DESC"
+
+        rows = self.db.fetchall(query, tuple(params))
+
+        return [{
+            'id': r['rule_id'],
+            'category': r['category'],
+            'rule': r['rule_text'],
+            'severity': r['severity'],
+            'examples': self.db.from_json(r['examples_json'], []),
+            'source_files': self.db.from_json(r['source_files_json'], []),
+            'confidence': r['confidence'],
+        } for r in rows]
+
+    def delete_coding_rule(self, rule_id: str) -> bool:
+        """Delete a coding rule by its ID.
+
+        Args:
+            rule_id: The rule ID to delete.
+
+        Returns:
+            True if a rule was deleted, False otherwise.
+        """
+        with self.db.transaction() as conn:
+            cursor = conn.execute("DELETE FROM coding_rules WHERE rule_id = ?", (rule_id,))
+            return cursor.rowcount > 0
+
+    def clear_coding_rules(self):
+        """Clear all coding rules."""
+        with self.db.transaction() as conn:
+            conn.execute("DELETE FROM coding_rules")
+
+    # --- Extended Scan Metadata (with Git State) ---
+
+    def save_scan_metadata(self, metadata: dict) -> int:
+        """Save extended scan metadata including git state.
+
+        Args:
+            metadata: Dictionary with keys:
+                - git_commit_hash: Current HEAD commit hash
+                - git_branch: Current branch name
+                - scanned_paths: List of paths that were scanned
+                - trigger: What triggered the scan (manual, auto, post_build)
+                - scan_time: ISO timestamp of the scan
+                - mode: full or incremental
+
+        Returns:
+            Row ID of the inserted record.
+        """
+        with self.db.transaction() as conn:
+            cursor = conn.execute("""
+                INSERT INTO extended_scan_metadata
+                    (git_commit_hash, git_branch, scanned_paths_json, trigger_type,
+                     scan_time, scan_mode)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (
+                metadata.get('git_commit_hash'),
+                metadata.get('git_branch'),
+                self.db.to_json(metadata.get('scanned_paths', [])),
+                metadata.get('trigger', 'manual'),
+                metadata.get('scan_time', datetime.now().isoformat()),
+                metadata.get('mode', 'full')
+            ))
+            return cursor.lastrowid
+
+    def get_scan_metadata(self) -> Optional[dict]:
+        """Get the most recent extended scan metadata.
+
+        Returns:
+            Dictionary with git_commit_hash, git_branch, scanned_paths, etc.
+        """
+        row = self.db.fetchone("""
+            SELECT * FROM extended_scan_metadata
+            ORDER BY scan_time DESC LIMIT 1
+        """)
+
+        if not row:
+            return None
+
+        return {
+            'id': row['id'],
+            'git_commit_hash': row['git_commit_hash'],
+            'git_branch': row['git_branch'],
+            'scanned_paths': self.db.from_json(row['scanned_paths_json'], []),
+            'trigger': row['trigger_type'],
+            'scan_time': row['scan_time'],
+            'mode': row['scan_mode'],
+        }
+
+    def get_scan_history(self, limit: int = 10) -> list[dict]:
+        """Get recent scan history.
+
+        Args:
+            limit: Maximum number of records to return.
+
+        Returns:
+            List of scan metadata dictionaries.
+        """
+        rows = self.db.fetchall("""
+            SELECT * FROM extended_scan_metadata
+            ORDER BY scan_time DESC LIMIT ?
+        """, (limit,))
+
+        return [{
+            'id': r['id'],
+            'git_commit_hash': r['git_commit_hash'],
+            'git_branch': r['git_branch'],
+            'scanned_paths': self.db.from_json(r['scanned_paths_json'], []),
+            'trigger': r['trigger_type'],
+            'scan_time': r['scan_time'],
+            'mode': r['scan_mode'],
+        } for r in rows]

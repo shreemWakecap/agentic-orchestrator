@@ -1,0 +1,81 @@
+{#
+    Unified Plan Form Component
+
+    A reusable "Create New Plan" section that works identically across
+    Dashboard and Plans pages. All styling and behavior is consistent.
+
+    Parameters:
+        variant: 'default' | 'compact' (optional, defaults to 'default')
+
+    Usage:
+        {% include 'partials/_plan_form.html' %}
+        {% include 'partials/_plan_form.html' with context %}
+
+    Required JS:
+        - plan-form.js (unified form handler)
+        - plan-textarea.js
+        - textarea-enhancer.js
+        - unified-plan-dialog.js
+#}
+
+{% set form_variant = variant | default('default') %}
+
+<div class="glass-card p-8 hover:shadow-lg transition-all duration-300 relative overflow-hidden" id="plan-form-section">
+    {# Subtle AI gradient background #}
+    <div class="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-indigo-500/5 pointer-events-none"></div>
+
+    <div class="relative">
+        {# Header with icon and title #}
+        <div class="flex items-start mb-6">
+            <div class="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <svg class="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>
+                </svg>
+            </div>
+            <div class="ml-5">
+                <h3 class="text-2xl font-semibold bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                    Create New Plan
+                </h3>
+                <p class="text-sm text-secondary dark:text-secondary mt-1">
+                    Describe your feature - AI will automatically enhance your request
+                </p>
+            </div>
+        </div>
+
+        {# Plan creation form #}
+        <form id="plan-form" class="space-y-5" data-plan-form>
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <label for="plan-description" class="block text-sm font-medium text-secondary dark:text-secondary">
+                        Draft Your Fucking Idea
+                    </label>
+                    <span class="text-xs text-tertiary dark:text-tertiary italic">
+                        Don't worry about details - AI can help!
+                    </span>
+                </div>
+
+                {# Plan Textarea Container - initialized by PlanForm module #}
+                <div id="plan-textarea-container"
+                     data-plan-textarea
+                     data-placeholder="Describe what you want to build...
+
+Examples:
+• Add user authentication with email/password login
+• Create a dashboard showing sales analytics
+• Implement dark mode toggle for the entire app
+• Fix the bug where users can't upload images"></div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <button type="submit"
+                        class="btn btn-primary btn-modern group"
+                        data-plan-submit>
+                    <svg class="h-4 w-4 mr-2 group-hover:rotate-12 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    Create Plan
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

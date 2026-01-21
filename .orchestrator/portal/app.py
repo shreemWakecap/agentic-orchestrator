@@ -37,6 +37,7 @@ from portal.routes import (
     background_tasks_router,
     websocket_router,
     file_knowledge_router,
+    tasks_router,
 )
 from portal.routes.health import set_version
 from portal.exception_handlers import register_exception_handlers
@@ -153,6 +154,7 @@ app.include_router(explore_router)  # Codebase exploration API
 app.include_router(background_tasks_router)
 app.include_router(websocket_router)
 app.include_router(file_knowledge_router)
+app.include_router(tasks_router)
 
 
 def run_portal(host: str = "127.0.0.1", port: int = 8000):

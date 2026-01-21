@@ -322,6 +322,16 @@ class KnowledgeStore:
         self.project_root = project_root.resolve()
         self._repo = get_knowledge_repository()
 
+    @property
+    def codebase_file(self) -> Path:
+        """Return path to the knowledge database file.
+
+        This property provides backward compatibility for code that
+        expects a file path for the knowledge storage.
+        """
+        from db import get_db_path
+        return get_db_path()
+
     def exists(self) -> bool:
         """Check if codebase knowledge exists."""
         return self._repo.exists()

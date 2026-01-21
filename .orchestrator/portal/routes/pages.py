@@ -128,6 +128,20 @@ async def dashboard(
     # Get recent explorations for dashboard widget (domains and modules)
     recent_explorations = await explorer_service.get_recent_explorations(limit=4)
 
+    # Get planning tasks (background tasks of type 'plan' that are pending/running)
+    from portal.services.task_manager import get_task_manager
+    task_manager = get_task_manager()
+    all_tasks = task_manager.list_all_tasks() if task_manager else []
+    planning_tasks = [
+        {
+            "id": t.get("task_id", t.get("id", "")),
+            "name": t.get("name", t.get("description", "Planning workflow...")),
+            "description": t.get("description", "Analyzing requirements and generating plan..."),
+        }
+        for t in all_tasks
+        if t.get("task_type") == "plan" and t.get("status") in ["pending", "running"]
+    ]
+
     return templates.TemplateResponse(
         request,
         "dashboard.html",
@@ -136,6 +150,7 @@ async def dashboard(
             "recent_plans": recent_plans,
             "active_runs": runs,
             "completed_runs": completed_runs,
+            "planning_tasks": planning_tasks,
             "architecture_summary": architecture_summary,
             "recent_explorations": recent_explorations,
         },
@@ -323,3 +338,9 @@ async def explore_file_page(
             },
         },
     )
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """Render settings page for database configuration and system settings."""
+    return templates.TemplateResponse(request, "settings.html", {})

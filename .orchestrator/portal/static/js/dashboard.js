@@ -1,7 +1,14 @@
 /**
  * Dashboard page functionality
- * Handles plan creation form submission using unified AI-enhanced dialog
- * Integrates with TaskActivityPanel for real-time task visibility
+ *
+ * This module handles dashboard-specific features:
+ * - Sync remote functionality
+ * - Live builds display
+ * - Stuck plans recovery
+ * - Task activity panel integration
+ *
+ * Note: Plan form is now handled by the unified PlanForm component
+ * (see components/plan-form.js)
  */
 
 // Task Activity Panel integration state
@@ -10,72 +17,6 @@ let taskActivityState = {
     logEventSources: {}, // Track SSE connections for task logs
     planningWorkflows: new Map() // Track planning workflows by ID
 };
-
-// PlanTextarea instance for plan description
-let planTextareaInstance = null;
-
-function initDashboard() {
-    const form = document.getElementById('plan-form');
-    if (!form) return;
-
-    // Initialize PlanTextarea for the plan description field
-    if (typeof PlanTextarea !== 'undefined') {
-        planTextareaInstance = PlanTextarea.init('plan-textarea-container', {
-            placeholder: 'Describe what you want to build...',
-            ariaLabel: 'Plan description',
-            onSubmit: function(value) {
-                // Trigger form submission programmatically
-                handlePlanSubmission(value);
-            }
-        });
-    }
-
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        // Get value and validate using PlanTextarea
-        if (planTextareaInstance) {
-            var validation = planTextareaInstance.validate();
-            if (!validation.valid) {
-                planTextareaInstance.focus();
-                return;
-            }
-            var description = planTextareaInstance.getValue().trim();
-            await handlePlanSubmission(description);
-        } else {
-            // Fallback if PlanTextarea not available
-            var descriptionInput = document.getElementById('plan-description');
-            var description = descriptionInput ? descriptionInput.value.trim() : '';
-            if (!description) {
-                if (descriptionInput) {
-                    descriptionInput.focus();
-                }
-                return;
-            }
-            await handlePlanSubmission(description);
-        }
-    });
-}
-
-/**
- * Handle plan submission via unified dialog
- * @param {string} description - The plan description
- */
-async function handlePlanSubmission(description) {
-    // Use unified dialog which handles AI improvement and plan creation
-    if (typeof UnifiedPlanDialog !== 'undefined' && UnifiedPlanDialog.showCreatePlanDialog) {
-        var result = await UnifiedPlanDialog.showCreatePlanDialog(description);
-        if (result.created) {
-            // Dialog handles redirect, but clear input as backup
-            if (planTextareaInstance) {
-                planTextareaInstance.clear();
-            }
-        }
-    } else {
-        console.error('UnifiedPlanDialog not available');
-        alert('Plan creation dialog is not available. Please refresh the page.');
-    }
-}
 
 function initSyncRemote() {
     const button = document.getElementById('sync-remote-btn');
@@ -1580,7 +1521,7 @@ function cleanupStuckPlans() {
 
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', function() {
-    initDashboard();
+    // Note: Plan form is auto-initialized by PlanForm module (components/plan-form.js)
     initSyncRemote();
     initSyncFileListToggle();
     initLiveBuilds();

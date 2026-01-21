@@ -1,0 +1,48 @@
+{# Mini Plan Card Component
+
+   A compact plan card showing name, date, and status.
+
+   Parameters (via plan object in loop):
+     plan.id: string - Plan ID for link
+     plan.name: string - Plan name
+     plan.state: string - Status (pending, in-progress, completed, failed)
+     plan.modified: string - ISO date string
+
+   Usage:
+     {% for plan in recent_plans %}
+     {% include 'partials/_plan_card_mini.html' %}
+     {% endfor %}
+#}
+
+{# Status badge class mapping #}
+{% set status_classes = {
+    'completed': 'status-badge-completed',
+    'pending': 'status-badge-pending',
+    'in-progress': 'status-badge-in-progress',
+    'building': 'status-badge-in-progress',
+    'running': 'status-badge-in-progress',
+    'failed': 'status-badge-failed'
+} %}
+{% set dot_classes = {
+    'completed': 'status-dot-completed',
+    'pending': 'status-dot-pending',
+    'in-progress': 'status-dot-in-progress',
+    'building': 'status-dot-in-progress',
+    'running': 'status-dot-in-progress',
+    'failed': 'status-dot-failed'
+} %}
+
+<a href="/plans/{{ plan.id }}" class="glass rounded-xl p-5 hover:shadow-md transition-all duration-200 group block">
+    <div class="flex items-start justify-between">
+        <div class="min-w-0 flex-1">
+            <h3 class="text-base font-semibold text-primary dark:text-primary group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors truncate">
+                {{ plan.name }}
+            </h3>
+            <p class="text-sm text-tertiary dark:text-tertiary mt-1">{{ plan.modified[:10] }}</p>
+        </div>
+        <span class="status-badge pill ml-3 flex-shrink-0 {{ status_classes[plan.state] | default('status-badge-failed') }}">
+            <span class="status-dot {{ dot_classes[plan.state] | default('status-dot-failed') }}"></span>
+            {{ plan.state }}
+        </span>
+    </div>
+</a>

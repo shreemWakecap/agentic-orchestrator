@@ -1,26 +1,17 @@
 /**
- * Plans Page Form Handlers Module
+ * Plans Page Action Handlers Module
  *
- * Handles plan form submission and related actions on the plans list page.
- * Manages the create plan form with PlanTextarea integration.
- *
- * Features:
- * - Plan creation form handling
- * - PlanTextarea integration
+ * Provides action handlers for plans list page:
  * - Build start/retry functionality
  * - Plan deletion with animation
  * - Keyboard shortcuts initialization
  *
+ * Note: Plan form is now handled by the unified PlanForm component
+ * (see components/plan-form.js)
+ *
  * Dependencies:
- * - PlanTextarea (plan-textarea.js) - for textarea component
- * - UnifiedPlanDialog (unified-plan-dialog.js) - for plan creation dialog
  * - PlanManager (plan-manager.js) - for plan operations
  * - Toast (toast.js) - for notifications
- *
- * DOM Requirements:
- * - #plan-form - Plan creation form
- * - #plan-textarea-container - Container for PlanTextarea
- * - #plans-list - List container for plan items
  *
  * @module PlansFormHandlers
  */
@@ -32,70 +23,7 @@ const PlansFormHandlers = (function() {
     // State
     // =========================================================================
 
-    let planTextareaInstance = null;
     let isInitialized = false;
-
-    // =========================================================================
-    // Form Initialization
-    // =========================================================================
-
-    /**
-     * Initialize the plan creation form
-     */
-    function initPlanForm() {
-        var form = document.getElementById('plan-form');
-        var container = document.getElementById('plan-textarea-container');
-        if (!form || !container) return;
-
-        // Check if PlanTextarea is available
-        if (typeof PlanTextarea === 'undefined') {
-            console.error('PlansFormHandlers: PlanTextarea module not found');
-            return;
-        }
-
-        // Initialize PlanTextarea component
-        planTextareaInstance = PlanTextarea.init('plan-textarea-container', {
-            placeholder: 'Describe the feature you want to implement...\n\ne.g., Add user authentication with JWT tokens\n- Include login and logout endpoints\n- Support password reset via email',
-            ariaLabel: 'Feature description for plan creation',
-            onSubmit: function(value) {
-                // Ctrl+Enter submission - trigger form submit
-                form.dispatchEvent(new Event('submit', { cancelable: true }));
-            }
-        });
-
-        if (!planTextareaInstance) {
-            console.error('PlansFormHandlers: Failed to initialize PlanTextarea');
-            return;
-        }
-
-        // Handle form submission
-        form.addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            // Validate using PlanTextarea
-            var validation = planTextareaInstance.validate();
-            if (!validation.valid) {
-                planTextareaInstance.focus();
-                return;
-            }
-
-            var description = planTextareaInstance.getValue().trim();
-
-            // Open the unified dialog which handles AI improvement and plan creation
-            if (typeof UnifiedPlanDialog !== 'undefined') {
-                var result = await UnifiedPlanDialog.showCreatePlanDialog(description);
-
-                // If plan was created successfully, the dialog handles the redirect
-                // If user cancelled or closed the dialog, clear the form for a fresh start
-                if (result && result.created) {
-                    planTextareaInstance.clear();
-                }
-            } else {
-                console.error('PlansFormHandlers: UnifiedPlanDialog not found');
-                showToast('Plan dialog not available', 'error');
-            }
-        });
-    }
 
     // =========================================================================
     // Plan Actions
@@ -276,26 +204,18 @@ const PlansFormHandlers = (function() {
     // =========================================================================
 
     /**
-     * Initialize all form handlers
+     * Initialize action handlers
      */
     function init() {
         if (isInitialized) return;
 
-        initPlanForm();
+        // Note: Plan form is now auto-initialized by PlanForm module (components/plan-form.js)
         initKeyboardShortcuts();
 
         // Listen for list refresh events
         document.addEventListener('orchestrator:planManager:listRefreshed', rebindAfterRefresh);
 
         isInitialized = true;
-    }
-
-    /**
-     * Get the plan textarea instance
-     * @returns {Object|null} PlanTextarea instance
-     */
-    function getTextareaInstance() {
-        return planTextareaInstance;
     }
 
     // =========================================================================
@@ -315,13 +235,11 @@ const PlansFormHandlers = (function() {
 
     return {
         init: init,
-        initPlanForm: initPlanForm,
         initKeyboardShortcuts: initKeyboardShortcuts,
         startBuild: startBuild,
         retryBuild: retryBuild,
         deletePlan: deletePlan,
-        updatePlanCount: updatePlanCount,
-        getTextareaInstance: getTextareaInstance
+        updatePlanCount: updatePlanCount
     };
 })();
 

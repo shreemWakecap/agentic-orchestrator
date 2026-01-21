@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "puppeteer": {
-      "command": "npx",
-      "args": ["-y", "puppeteer-mcp-claude", "serve"],
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "puppeteer-mcp-claude", "serve"],
       "env": {
         "NODE_ENV": "production"
       }

@@ -16,11 +16,10 @@ import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-# Load environment variables from .env file
+# Note: dotenv is loaded automatically by the unified config module
 PORTAL_DIR = Path(__file__).parent
 ORCHESTRATOR_DIR = PORTAL_DIR.parent
-from dotenv import load_dotenv
-load_dotenv(ORCHESTRATOR_DIR / ".env")
+sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles

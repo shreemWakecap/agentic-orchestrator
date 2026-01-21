@@ -19,6 +19,7 @@ Quick Start:
 
     # Access API docs at http://localhost:8000/api/docs
 """
+# Config import triggers unified config loading (including dotenv)
 from .config import config, Config, get_config, reload_config
 from .lifecycle import (
     LifecycleManager,

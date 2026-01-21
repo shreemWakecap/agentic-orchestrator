@@ -32,6 +32,15 @@ from .models import Base
 logger = logging.getLogger(__name__)
 
 
+def _convert_row_to_dict(row) -> dict:
+    """Convert a database row to a dict, converting datetime objects to ISO strings."""
+    result = dict(row._mapping)
+    for key, value in result.items():
+        if isinstance(value, datetime):
+            result[key] = value.isoformat()
+    return result
+
+
 def _convert_query(query: str, params: tuple) -> tuple:
     """
     Convert ? placeholders to :param style for SQLAlchemy.

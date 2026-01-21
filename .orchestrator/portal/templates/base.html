@@ -602,13 +602,12 @@
     <!-- Background Tasks Floating Indicator -->
     <div id="background-tasks-indicator"></div>
 
-    <!-- Generic Side Popup JavaScript -->
+    <!-- 1. Core Utilities (must be loaded first - other modules depend on these) -->
+    <script src="/static/js/core/utils.js"></script>
+
+    <!-- 2. UI Components -->
     <script src="/static/js/side-popup.js"></script>
-
-    <!-- Keyboard Shortcuts Module (loaded early for other modules to register shortcuts) -->
     <script src="/static/js/keyboard-shortcuts.js"></script>
-
-    <!-- Toast Notification System -->
     <script src="/static/js/toast.js"></script>
     <script>
         // Expose showToast as global convenience function
@@ -617,16 +616,12 @@
         };
     </script>
 
-    <!-- Dark Mode Theme Toggle -->
+    <!-- 3. Global Initialization Scripts -->
     <script src="/static/js/theme.js"></script>
-
-    <!-- Animations Module -->
     <script src="/static/js/animations.js"></script>
-
-    <!-- Background Tasks Indicator -->
     <script src="/static/js/background-tasks.js"></script>
 
-    <!-- Plan Recovery Module -->
+    <!-- 4. Feature Modules -->
     <script src="/static/js/plan-recovery.js"></script>
 
     <!-- Initialize Dark Mode, Scroll Animations, and Background Tasks -->

@@ -11,151 +11,69 @@ let taskActivityState = {
     planningWorkflows: new Map() // Track planning workflows by ID
 };
 
-// Textarea enhancer instance for plan description
-let planDescriptionEnhancer = null;
+// PlanTextarea instance for plan description
+let planTextareaInstance = null;
 
 function initDashboard() {
     const form = document.getElementById('plan-form');
     if (!form) return;
 
-    const descriptionInput = document.getElementById('plan-description');
-
-    // Initialize TextareaEnhancer for the plan description field
-    if (descriptionInput && typeof TextareaEnhancer !== 'undefined') {
-        planDescriptionEnhancer = TextareaEnhancer.init(descriptionInput, {
-            minHeight: 120,
-            maxHeight: 300,
-            showCharCount: true,
-            minChars: 10,
-            maxChars: 5000,
-            warnThreshold: 0.9,
-            errorThreshold: 0.98,
-            ariaLabel: 'Plan description'
+    // Initialize PlanTextarea for the plan description field
+    if (typeof PlanTextarea !== 'undefined') {
+        planTextareaInstance = PlanTextarea.init('plan-textarea-container', {
+            placeholder: 'Describe what you want to build...',
+            ariaLabel: 'Plan description',
+            onSubmit: function(value) {
+                // Trigger form submission programmatically
+                handlePlanSubmission(value);
+            }
         });
     }
 
     form.addEventListener('submit', async function(e) {
         e.preventDefault();
-        const description = descriptionInput ? descriptionInput.value.trim() : '';
 
-        // Validate using TextareaEnhancer API if available
-        if (planDescriptionEnhancer) {
-            var charInfo = planDescriptionEnhancer.updateCharCount();
-
-            // Check for empty input
-            if (!description) {
-                showTextareaError(descriptionInput, 'Please describe what you want to build');
-                planDescriptionEnhancer.focus();
+        // Get value and validate using PlanTextarea
+        if (planTextareaInstance) {
+            var validation = planTextareaInstance.validate();
+            if (!validation.valid) {
+                planTextareaInstance.focus();
                 return;
             }
-
-            // Check minimum character requirement
-            if (charInfo.count < 10) {
-                showTextareaError(descriptionInput, 'Please provide more detail (at least 10 characters)');
-                planDescriptionEnhancer.focus();
-                return;
-            }
-
-            // Check if over max characters
-            if (charInfo.status === 'error') {
-                showTextareaError(descriptionInput, 'Description is too long. Please shorten it.');
-                planDescriptionEnhancer.focus();
-                return;
-            }
-
-            // Clear any previous error state
-            clearTextareaError(descriptionInput);
+            var description = planTextareaInstance.getValue().trim();
+            await handlePlanSubmission(description);
         } else {
-            // Fallback validation without enhancer
+            // Fallback if PlanTextarea not available
+            var descriptionInput = document.getElementById('plan-description');
+            var description = descriptionInput ? descriptionInput.value.trim() : '';
             if (!description) {
                 if (descriptionInput) {
                     descriptionInput.focus();
-                    descriptionInput.classList.add('textarea-enhanced-error');
-                    setTimeout(function() {
-                        descriptionInput.classList.remove('textarea-enhanced-error');
-                    }, 2000);
                 }
                 return;
             }
-        }
-
-        // Use unified dialog which handles AI improvement and plan creation
-        if (typeof UnifiedPlanDialog !== 'undefined' && UnifiedPlanDialog.showCreatePlanDialog) {
-            var result = await UnifiedPlanDialog.showCreatePlanDialog(description);
-            if (result.created) {
-                // Dialog handles redirect, but clear input as backup
-                if (descriptionInput) {
-                    descriptionInput.value = '';
-                    // Reset the enhancer state
-                    if (planDescriptionEnhancer) {
-                        planDescriptionEnhancer.setValue('');
-                    }
-                }
-            }
-        } else {
-            console.error('UnifiedPlanDialog not available');
-            alert('Plan creation dialog is not available. Please refresh the page.');
+            await handlePlanSubmission(description);
         }
     });
 }
 
 /**
- * Show error state on textarea with smooth visual feedback
- * @param {HTMLTextAreaElement} textarea - The textarea element
- * @param {string} message - Error message to display
+ * Handle plan submission via unified dialog
+ * @param {string} description - The plan description
  */
-function showTextareaError(textarea, message) {
-    if (!textarea) return;
-
-    // Add error class for visual feedback
-    textarea.classList.add('textarea-enhanced-error');
-
-    // Find or create error message element
-    var errorEl = textarea.parentNode.querySelector('.textarea-error-message');
-    if (!errorEl) {
-        errorEl = document.createElement('div');
-        errorEl.className = 'textarea-error-message text-sm text-red-600 dark:text-red-400 mt-1 flex items-center animate-shake';
-        errorEl.setAttribute('role', 'alert');
-        errorEl.setAttribute('aria-live', 'polite');
-
-        // Insert after char count if it exists, otherwise after textarea
-        var charCount = textarea.parentNode.querySelector('.textarea-char-count');
-        if (charCount) {
-            charCount.parentNode.insertBefore(errorEl, charCount.nextSibling);
-        } else {
-            textarea.parentNode.insertBefore(errorEl, textarea.nextSibling);
-        }
-    }
-
-    // Set error message with icon
-    errorEl.innerHTML = '<svg class="h-4 w-4 mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
-        '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
-        '</svg>' +
-        '<span>' + escapeHtml(message) + '</span>';
-
-    // Remove error after delay
-    setTimeout(function() {
-        clearTextareaError(textarea);
-    }, 4000);
-}
-
-/**
- * Clear error state from textarea
- * @param {HTMLTextAreaElement} textarea - The textarea element
- */
-function clearTextareaError(textarea) {
-    if (!textarea) return;
-
-    textarea.classList.remove('textarea-enhanced-error');
-
-    var errorEl = textarea.parentNode.querySelector('.textarea-error-message');
-    if (errorEl) {
-        errorEl.classList.add('animate-fade-out');
-        setTimeout(function() {
-            if (errorEl.parentNode) {
-                errorEl.parentNode.removeChild(errorEl);
+async function handlePlanSubmission(description) {
+    // Use unified dialog which handles AI improvement and plan creation
+    if (typeof UnifiedPlanDialog !== 'undefined' && UnifiedPlanDialog.showCreatePlanDialog) {
+        var result = await UnifiedPlanDialog.showCreatePlanDialog(description);
+        if (result.created) {
+            // Dialog handles redirect, but clear input as backup
+            if (planTextareaInstance) {
+                planTextareaInstance.clear();
             }
-        }, 200);
+        }
+    } else {
+        console.error('UnifiedPlanDialog not available');
+        alert('Plan creation dialog is not available. Please refresh the page.');
     }
 }
 

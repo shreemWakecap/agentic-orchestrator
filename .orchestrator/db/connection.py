@@ -5,6 +5,7 @@ import json
 import logging
 import threading
 from contextlib import contextmanager
+from datetime import datetime
 from typing import Any, Generator, List, Optional
 
 from sqlalchemy import create_engine, text
@@ -15,6 +16,15 @@ from .config import DatabaseConfig
 from .models import Base
 
 logger = logging.getLogger(__name__)
+
+
+def _convert_row_to_dict(row) -> dict:
+    """Convert a database row to a dict, converting datetime objects to ISO strings."""
+    result = dict(row._mapping)
+    for key, value in result.items():
+        if isinstance(value, datetime):
+            result[key] = value.isoformat()
+    return result
 
 
 def _convert_query(query: str, params: tuple) -> tuple:
@@ -137,7 +147,7 @@ class Database:
             result = conn.execute(text(converted_query), converted_params)
             row = result.fetchone()
             if row:
-                return dict(row._mapping)
+                return _convert_row_to_dict(row)
             return None
 
     def fetchall(self, query: str, params: tuple = ()) -> List[dict]:
@@ -155,7 +165,7 @@ class Database:
         with Database._engine.connect() as conn:
             result = conn.execute(text(converted_query), converted_params)
             rows = result.fetchall()
-            return [dict(row._mapping) for row in rows]
+            return [_convert_row_to_dict(row) for row in rows]
 
     # =========================================================================
     # JSON serialization helpers
@@ -225,10 +235,10 @@ class _ResultWrapper:
         """Fetch one row as dict."""
         row = self._result.fetchone()
         if row:
-            return dict(row._mapping)
+            return _convert_row_to_dict(row)
         return None
 
     def fetchall(self):
         """Fetch all rows as dicts."""
         rows = self._result.fetchall()
-        return [dict(row._mapping) for row in rows]
+        return [_convert_row_to_dict(row) for row in rows]

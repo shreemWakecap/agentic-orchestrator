@@ -372,6 +372,40 @@ class ScanMetadata(Base):
     experts_generated_json = Column(Text, default="[]")
 
 
+class ExtendedScanMetadata(Base):
+    """Extended scan metadata with git state tracking for staleness detection."""
+    __tablename__ = "extended_scan_metadata"
+
+    id = Column(Integer, primary_key=True)
+    git_commit_hash = Column(String(64), index=True)
+    git_branch = Column(String(255))
+    scanned_paths_json = Column(Text, default="[]")
+    trigger_type = Column(String(50), default="manual")  # manual, auto, post_build
+    scan_time = Column(DateTime, default=datetime.utcnow, index=True)
+    scan_mode = Column(String(50), default="full")  # full, incremental
+
+
+# =============================================================================
+# CODING RULES
+# =============================================================================
+
+class CodingRule(Base):
+    """Coding rule model - stores extracted coding rules for enforcement."""
+    __tablename__ = "coding_rules"
+
+    id = Column(Integer, primary_key=True)
+    knowledge_id = Column(Integer, ForeignKey("codebase_knowledge.id", ondelete="CASCADE"), index=True)
+    rule_id = Column(String(255), unique=True, nullable=False, index=True)
+    category = Column(String(50), nullable=False, index=True)  # naming, structure, patterns, security, testing, documentation
+    rule_text = Column(Text, nullable=False)
+    severity = Column(String(20), default="info", index=True)  # info, warning, error
+    examples_json = Column(Text, default="[]")
+    source_files_json = Column(Text, default="[]")
+    confidence = Column(Float, default=0.5)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 # =============================================================================
 # FILE KNOWLEDGE
 # =============================================================================

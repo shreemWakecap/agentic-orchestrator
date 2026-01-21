@@ -209,6 +209,55 @@ async def scout_keywords(
     return WorkflowStartResponse(run_id=run_id, status="started")
 
 
+@router.get("/coding-rules")
+async def get_coding_rules(
+    category: Optional[str] = None,
+    min_confidence: float = 0.0,
+    knowledge_repo: KnowledgeRepository = Depends(get_knowledge_repo),
+) -> Dict[str, Any]:
+    """Get coding rules extracted from the codebase.
+
+    Args:
+        category: Optional filter by category (naming, structure, patterns, etc.)
+        min_confidence: Minimum confidence threshold (0.0 - 1.0)
+
+    Returns:
+        List of coding rules with their details.
+    """
+    rules = knowledge_repo.get_coding_rules(category=category, min_confidence=min_confidence)
+    return {
+        "rules": rules,
+        "count": len(rules),
+        "categories": list(set(r.get("category", "general") for r in rules)),
+    }
+
+
+@router.get("/staleness")
+async def get_staleness_status() -> Dict[str, Any]:
+    """Get staleness status of the knowledge base.
+
+    Returns information about how current the knowledge is,
+    including commits behind, hours since scan, etc.
+    """
+    from pathlib import Path
+    from core.staleness_checker import get_staleness_summary
+
+    project_root = Path(__file__).parent.parent.parent.parent
+    summary = get_staleness_summary(project_root)
+
+    return {
+        "is_stale": summary.get("is_stale", True),
+        "reason": summary.get("reason", "Unknown"),
+        "has_knowledge": summary.get("has_knowledge", False),
+        "last_scan_time": summary.get("last_scan_time"),
+        "hours_since_scan": summary.get("hours_since_scan"),
+        "commits_behind": summary.get("commits_behind", 0),
+        "changed_files_count": summary.get("changed_files_count", 0),
+        "last_commit": summary.get("last_commit"),
+        "current_commit": summary.get("current_commit"),
+    }
+
+
 @router.delete("")
 async def clear_knowledge(
     knowledge_service: KnowledgeService = Depends(_get_knowledge_service),

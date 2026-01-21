@@ -1,0 +1,64 @@
+<!-- Plan Warnings/Violations Display -->
+<!-- Include with: {% include 'partials/_plan_warnings.html' %} -->
+<!-- Required context: warnings (list of warning strings) or violations (list of violation dicts) -->
+
+{% if warnings or violations %}
+<div class="bg-warning-900/20 border border-warning-700/50 rounded-lg p-4 mb-4">
+    <div class="flex items-start space-x-3">
+        <div class="flex-shrink-0">
+            <svg class="w-5 h-5 text-warning-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <div class="flex-1">
+            <h4 class="text-sm font-medium text-warning-400">Coding Rule Warnings</h4>
+            <p class="mt-1 text-xs text-secondary-400">
+                This plan may not follow some coding conventions. Review before building.
+            </p>
+
+            <ul class="mt-3 space-y-2">
+                {% if violations %}
+                    {% for violation in violations %}
+                    <li class="flex items-start space-x-2">
+                        <span class="flex-shrink-0 mt-0.5">
+                            {% if violation.severity == 'error' %}
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-danger-900/50 text-danger-400">
+                                error
+                            </span>
+                            {% elif violation.severity == 'warning' %}
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning-900/50 text-warning-400">
+                                warning
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary-900/50 text-primary-400">
+                                info
+                            </span>
+                            {% endif %}
+                        </span>
+                        <span class="text-xs text-secondary-300">{{ violation.description }}</span>
+                    </li>
+                    {% endfor %}
+                {% elif warnings %}
+                    {% for warning in warnings %}
+                    <li class="flex items-start space-x-2">
+                        <span class="flex-shrink-0 text-warning-500 mt-0.5">
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                        </span>
+                        <span class="text-xs text-secondary-300">{{ warning }}</span>
+                    </li>
+                    {% endfor %}
+                {% endif %}
+            </ul>
+
+            {% if violations|length > 5 or warnings|length > 5 %}
+            <p class="mt-2 text-xs text-secondary-500">
+                Showing {{ [violations|length, warnings|length]|max if violations else warnings|length }} of {{ violations|length if violations else warnings|length }} issues.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}

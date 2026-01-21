@@ -21,9 +21,7 @@ PROJECT_ROOT = ORCHESTRATOR_DIR.parent
 
 sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
-# Load environment variables from .env file
-from dotenv import load_dotenv
-load_dotenv(ORCHESTRATOR_DIR / ".env")
+# Note: dotenv is loaded automatically by the unified config module
 
 from fastapi import Depends, FastAPI
 from fastapi.staticfiles import StaticFiles

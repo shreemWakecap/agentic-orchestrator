@@ -1,25 +1,28 @@
 """
-Application Configuration
+Portal Configuration.
 
-All configuration is loaded from environment variables with sensible defaults.
-Provides centralized configuration management for the Orchestrator Portal.
+DEPRECATED: This module now delegates to the unified config module.
+Import from `config` directly for new code.
 
-Usage:
-    from .config import config
-
-    # Access settings
-    max_workers = config.worker.max_workers
-    db_url = config.database.url
+Backward compatibility is maintained for existing code.
 """
-import os
+import sys
 from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Optional, List
 
+# Ensure orchestrator directory is in path for unified config import
+PORTAL_DIR = Path(__file__).parent
+ORCHESTRATOR_DIR = PORTAL_DIR.parent
+if str(ORCHESTRATOR_DIR) not in sys.path:
+    sys.path.insert(0, str(ORCHESTRATOR_DIR))
+
+# Import from unified config (this also loads dotenv)
+from config import get_config as _get_unified_config, get_database_config as _get_db_config
+
 
 def get_project_root() -> Path:
     """Get the project root directory."""
-    # Start from current file and go up to find .orchestrator
     current = Path(__file__).resolve().parent
     while current != current.parent:
         if (current / ".orchestrator").exists():
@@ -35,73 +38,57 @@ PROJECT_ROOT = get_project_root()
 
 @dataclass
 class DatabaseConfig:
-    """Database configuration settings."""
-    url: str = field(default_factory=lambda: os.getenv(
-        "DATABASE_URL",
-        f"sqlite+aiosqlite:///{PROJECT_ROOT / '.orchestrator' / 'jobs.db'}"
-    ))
-    echo: bool = field(default_factory=lambda: os.getenv("SQL_ECHO", "false").lower() == "true")
-    pool_size: int = field(default_factory=lambda: int(os.getenv("DB_POOL_SIZE", "5")))
-    pool_recycle: int = field(default_factory=lambda: int(os.getenv("DB_POOL_RECYCLE", "3600")))
+    """Database configuration - delegates to unified config."""
+    url: str = field(default_factory=lambda: _get_db_config().async_url)
+    echo: bool = field(default_factory=lambda: _get_db_config().echo)
+    pool_size: int = field(default_factory=lambda: _get_db_config().pool_min)
+    pool_recycle: int = field(default_factory=lambda: _get_db_config().pool_recycle)
 
 
 @dataclass
 class WorkerConfig:
-    """Worker pool configuration settings."""
-    max_workers: int = field(default_factory=lambda: int(os.getenv("MAX_WORKERS", "4")))
-    max_queue_size: int = field(default_factory=lambda: int(os.getenv("MAX_QUEUE_SIZE", "100")))
-    default_timeout: int = field(default_factory=lambda: int(os.getenv("DEFAULT_JOB_TIMEOUT", "3600")))
-    graceful_timeout: float = field(default_factory=lambda: float(os.getenv("GRACEFUL_TIMEOUT", "30.0")))
+    """Worker pool configuration - delegates to unified config."""
+    max_workers: int = field(default_factory=lambda: _get_unified_config().worker.max_workers)
+    max_queue_size: int = field(default_factory=lambda: _get_unified_config().worker.max_queue_size)
+    default_timeout: int = field(default_factory=lambda: _get_unified_config().worker.default_timeout)
+    graceful_timeout: float = field(default_factory=lambda: _get_unified_config().worker.graceful_timeout)
 
 
 @dataclass
 class CLIConfig:
-    """CLI execution configuration settings."""
-    command: str = field(default_factory=lambda: os.getenv("CLI_COMMAND", "uv run cli.py"))
-    project_root: Path = field(default_factory=lambda: Path(os.getenv("PROJECT_ROOT", str(PROJECT_ROOT))))
-    working_directory: Optional[Path] = field(default_factory=lambda: (
-        Path(os.getenv("CLI_WORKING_DIR")) if os.getenv("CLI_WORKING_DIR") else None
-    ))
+    """CLI execution configuration - delegates to unified config."""
+    command: str = field(default_factory=lambda: _get_unified_config().cli.command)
+    project_root: Path = field(default_factory=lambda: _get_unified_config().cli.project_root)
+    working_directory: Optional[Path] = field(default_factory=lambda: _get_unified_config().cli.working_directory)
 
 
 @dataclass
 class StreamingConfig:
-    """SSE streaming configuration settings."""
-    max_connections_per_job: int = field(default_factory=lambda: int(os.getenv("MAX_SSE_CONNECTIONS", "100")))
-    heartbeat_interval: float = field(default_factory=lambda: float(os.getenv("SSE_HEARTBEAT", "30")))
-    buffer_size: int = field(default_factory=lambda: int(os.getenv("EVENT_BUFFER_SIZE", "1000")))
-    batch_size: int = field(default_factory=lambda: int(os.getenv("EVENT_BATCH_SIZE", "10")))
-    flush_interval: float = field(default_factory=lambda: float(os.getenv("EVENT_FLUSH_INTERVAL", "1.0")))
+    """SSE streaming configuration - delegates to unified config."""
+    max_connections_per_job: int = field(default_factory=lambda: _get_unified_config().streaming.max_connections_per_job)
+    heartbeat_interval: float = field(default_factory=lambda: _get_unified_config().streaming.heartbeat_interval)
+    buffer_size: int = field(default_factory=lambda: _get_unified_config().streaming.buffer_size)
+    batch_size: int = field(default_factory=lambda: _get_unified_config().streaming.batch_size)
+    flush_interval: float = field(default_factory=lambda: _get_unified_config().streaming.flush_interval)
 
 
 @dataclass
 class ServerConfig:
-    """HTTP server configuration settings."""
-    host: str = field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))
-    port: int = field(default_factory=lambda: int(os.getenv("PORT", "8000")))
-    reload: bool = field(default_factory=lambda: os.getenv("RELOAD", "false").lower() == "true")
-    log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
-    cors_origins: List[str] = field(default_factory=lambda: os.getenv("CORS_ORIGINS", "*").split(","))
+    """HTTP server configuration - delegates to unified config."""
+    host: str = field(default_factory=lambda: _get_unified_config().server.host)
+    port: int = field(default_factory=lambda: _get_unified_config().server.port)
+    reload: bool = field(default_factory=lambda: _get_unified_config().server.reload)
+    log_level: str = field(default_factory=lambda: _get_unified_config().server.log_level)
+    cors_origins: List[str] = field(default_factory=lambda: list(_get_unified_config().server.cors_origins))
 
 
 @dataclass
 class Config:
     """
-    Main configuration container.
+    Main configuration container - delegates to unified config.
 
-    Provides access to all configuration subsections.
-
-    Example:
-        from .config import config
-
-        # Database settings
-        print(config.database.url)
-
-        # Worker settings
-        print(config.worker.max_workers)
-
-        # Server settings
-        print(config.server.port)
+    For new code, use:
+        from config import get_config
     """
     database: DatabaseConfig = field(default_factory=DatabaseConfig)
     worker: WorkerConfig = field(default_factory=WorkerConfig)
@@ -111,7 +98,6 @@ class Config:
 
     def __post_init__(self):
         """Validate configuration after initialization."""
-        # Ensure project root exists
         if not self.cli.project_root.exists():
             self.cli.project_root = Path.cwd()
 

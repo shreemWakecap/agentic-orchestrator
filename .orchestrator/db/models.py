@@ -173,10 +173,12 @@ class ActiveRun(Base):
     workflow = Column(String(50), nullable=False)
     status = Column(String(50), default="pending", index=True)
     started_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime)
     plan_id = Column(String(255), index=True)
     plan_path = Column(Text)
     description = Column(Text)
     progress = Column(Integer, default=0)
+    error = Column(Text)
     data_json = Column(Text, default="{}")
 
     # Relationships

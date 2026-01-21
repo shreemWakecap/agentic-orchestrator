@@ -1,36 +1,69 @@
 """
-Database Configuration - loads from environment variables.
+Database Configuration.
+
+DEPRECATED: This module now delegates to the unified config module.
+Import from `config` directly for new code.
+
+Backward compatibility is maintained for existing code.
 """
-import os
+import sys
+from pathlib import Path
+
+# Ensure orchestrator directory is in path for unified config import
+ORCHESTRATOR_DIR = Path(__file__).parent.parent
+if str(ORCHESTRATOR_DIR) not in sys.path:
+    sys.path.insert(0, str(ORCHESTRATOR_DIR))
+
+# Import from unified config (this also loads dotenv)
+from config import get_database_config as _get_db_config
 
 
 class DatabaseConfig:
     """
-    PostgreSQL configuration from environment variables.
+    PostgreSQL configuration - delegates to unified config.
 
-    Environment variables:
-        ORCH_DB_HOST     - Database host (default: localhost)
-        ORCH_DB_PORT     - Database port (default: 5432)
-        ORCH_DB_NAME     - Database name (default: orchestrator)
-        ORCH_DB_USER     - Database user (default: postgres)
-        ORCH_DB_PASSWORD - Database password (default: postgres)
-        ORCH_DB_POOL_MIN - Min pool connections (default: 1)
-        ORCH_DB_POOL_MAX - Max pool connections (default: 10)
+    This class maintains backward compatibility with existing code
+    that uses DatabaseConfig directly.
+
+    For new code, use:
+        from config import get_database_config
     """
 
     def __init__(self):
-        self.host = os.getenv("ORCH_DB_HOST", "localhost")
-        self.port = int(os.getenv("ORCH_DB_PORT", "5432"))
-        self.name = os.getenv("ORCH_DB_NAME", "orchestrator")
-        self.user = os.getenv("ORCH_DB_USER", "postgres")
-        self.password = os.getenv("ORCH_DB_PASSWORD", "postgres")
-        self.pool_min = int(os.getenv("ORCH_DB_POOL_MIN", "1"))
-        self.pool_max = int(os.getenv("ORCH_DB_POOL_MAX", "10"))
+        self._config = _get_db_config()
+
+    @property
+    def host(self) -> str:
+        return self._config.host
+
+    @property
+    def port(self) -> int:
+        return self._config.port
+
+    @property
+    def name(self) -> str:
+        return self._config.name
+
+    @property
+    def user(self) -> str:
+        return self._config.user
+
+    @property
+    def password(self) -> str:
+        return self._config.password
+
+    @property
+    def pool_min(self) -> int:
+        return self._config.pool_min
+
+    @property
+    def pool_max(self) -> int:
+        return self._config.pool_max
 
     @property
     def connection_string(self) -> str:
-        """Build PostgreSQL connection string."""
-        return f"postgresql://{self.user}:{self.password}@{self.host}:{self.port}/{self.name}"
+        """Build PostgreSQL connection string for sync operations."""
+        return self._config.sync_url
 
     @classmethod
     def load(cls) -> "DatabaseConfig":

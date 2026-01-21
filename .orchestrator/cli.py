@@ -7,9 +7,8 @@ from pathlib import Path
 ORCHESTRATOR_DIR = Path(__file__).parent
 sys.path.insert(0, str(ORCHESTRATOR_DIR))
 
-# Load environment variables from .env file
-from dotenv import load_dotenv
-load_dotenv(ORCHESTRATOR_DIR / ".env")
+# Import unified config to ensure dotenv is loaded
+import config as _  # noqa: F401
 
 # Workflows: complex multi-step agent orchestration
 WORKFLOWS = {

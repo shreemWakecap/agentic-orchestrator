@@ -106,8 +106,8 @@ async def start_scouting(
 
     run_id = str(uuid.uuid4())[:8]
 
-    # Create run entry in database
-    run_repo.create(run_id, workflow="scouting")
+    # Create run entry in database (triggered by user via portal)
+    run_repo.create(run_id, workflow="scouting", triggered_by="manual")
 
     # Submit to TaskManager for background execution
     task_manager.submit_task(
@@ -144,8 +144,8 @@ async def scout_path(
 
     run_id = str(uuid.uuid4())[:8]
 
-    # Create run entry in database
-    run_repo.create(run_id, workflow="scouting")
+    # Create run entry in database (triggered by user via portal)
+    run_repo.create(run_id, workflow="scouting", triggered_by="manual")
 
     # Submit to TaskManager for background execution
     task_manager.submit_task(
@@ -186,8 +186,8 @@ async def scout_keywords(
     # Parse comma-separated keywords into list
     keywords_list = [kw.strip() for kw in request.keywords.split(",") if kw.strip()]
 
-    # Create run entry in database
-    run_repo.create(run_id, workflow="scouting")
+    # Create run entry in database (triggered by user via portal)
+    run_repo.create(run_id, workflow="scouting", triggered_by="manual")
 
     # Submit to TaskManager for background execution
     task_manager.submit_task(

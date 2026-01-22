@@ -191,7 +191,7 @@ class PlanningWorkflow(Workflow):
                     from workflows.unified_scout import UnifiedScoutWorkflow
                     scout_workflow = UnifiedScoutWorkflow(self.project_root)
                     changed_paths = self.staleness_checker.get_changed_paths()
-                    scout_result = scout_workflow.run(
+                    scout_result = scout_workflow.execute(
                         target_paths=changed_paths if changed_paths else None,
                         trigger="auto_pre_planning"
                     )
@@ -241,7 +241,7 @@ class PlanningWorkflow(Workflow):
                 plan_id=plan_id,
                 estimated_input_tokens=estimated_input,
                 estimated_output_tokens=estimated_output,
-                model=self._config.get("model", "claude-sonnet-4-20250514"),
+                model="claude-sonnet-4-20250514",
                 cost_estimate=self._calculate_cost_estimate(estimated_input, estimated_output),
                 metadata={
                     "workflow": "planning",
@@ -323,7 +323,7 @@ Remember:
                     output_tokens=0,
                     estimated_input_tokens=estimated_input,
                     estimated_output_tokens=estimated_output,
-                    model=self._config.get("model", "claude-sonnet-4-20250514"),
+                    model="claude-sonnet-4-20250514",
                     actual_cost=0.0,
                     cost_estimate=self._calculate_cost_estimate(estimated_input, estimated_output),
                     metadata={
@@ -469,7 +469,7 @@ Status: pending
                 output_tokens=actual_output_tokens,
                 estimated_input_tokens=estimated_input,
                 estimated_output_tokens=estimated_output,
-                model=self._config.get("model", "claude-sonnet-4-20250514"),
+                model="claude-sonnet-4-20250514",
                 actual_cost=actual_cost,
                 cost_estimate=self._calculate_cost_estimate(estimated_input, estimated_output),
                 metadata={

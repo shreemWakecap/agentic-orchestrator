@@ -166,48 +166,48 @@
 }
 
 /* ============================================
-   STATUS VARIANTS - IN PROGRESS (Primary)
+   STATUS VARIANTS - IN PROGRESS (Green Primary)
    ============================================ */
 .status-badge-in-progress,
 .status-badge--in-progress {
-    background: linear-gradient(135deg, var(--color-primary-100, #dbeafe) 0%, var(--color-primary-50, #eff6ff) 100%);
-    color: var(--color-primary-700, #1d4ed8);
-    border-color: var(--color-primary-200, #bfdbfe);
+    background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
+    color: #15803d;
+    border-color: #bbf7d0;
 }
 
 .status-badge-in-progress:hover,
 .status-badge--in-progress:hover {
-    background: linear-gradient(135deg, var(--color-primary-200, #bfdbfe) 0%, var(--color-primary-100, #dbeafe) 100%);
-    border-color: var(--color-primary-300, #93c5fd);
+    background: linear-gradient(135deg, #bbf7d0 0%, #dcfce7 100%);
+    border-color: #86efac;
 }
 
 .status-dot-in-progress,
 .status-dot--in-progress {
-    background: var(--color-primary-500, #3b82f6);
+    background: #22c55e;
     animation: statusPulse 1.5s ease-in-out infinite;
 }
 
 /* ============================================
-   STATUS VARIANTS - RUNNING (Primary - Animated)
+   STATUS VARIANTS - RUNNING (Green Primary - Animated)
    ============================================ */
 .status-badge-running,
 .status-badge--running {
-    background: linear-gradient(135deg, var(--color-primary-100, #dbeafe) 0%, var(--color-primary-50, #eff6ff) 100%);
-    color: var(--color-primary-700, #1d4ed8);
-    border-color: var(--color-primary-200, #bfdbfe);
+    background: linear-gradient(135deg, #dcfce7 0%, #f0fdf4 100%);
+    color: #15803d;
+    border-color: #bbf7d0;
 }
 
 .status-badge-running:hover,
 .status-badge--running:hover {
-    background: linear-gradient(135deg, var(--color-primary-200, #bfdbfe) 0%, var(--color-primary-100, #dbeafe) 100%);
-    border-color: var(--color-primary-300, #93c5fd);
+    background: linear-gradient(135deg, #bbf7d0 0%, #dcfce7 100%);
+    border-color: #86efac;
 }
 
 .status-dot-running,
 .status-dot--running {
-    background: var(--color-primary-500, #3b82f6);
+    background: #22c55e;
     animation: statusPulse 1.5s ease-in-out infinite;
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.5);
 }
 
 /* ============================================
@@ -376,55 +376,55 @@
     background: var(--color-warning-400, #fbbf24);
 }
 
-/* In Progress - Dark */
+/* In Progress - Dark (Green) */
 .dark .status-badge-in-progress,
 .dark .status-badge--in-progress,
 [data-theme="dark"] .status-badge-in-progress,
 [data-theme="dark"] .status-badge--in-progress {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
-    color: var(--color-primary-400, #60a5fa);
-    border-color: rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+    color: #4ade80;
+    border-color: rgba(34, 197, 94, 0.3);
 }
 
 .dark .status-badge-in-progress:hover,
 .dark .status-badge--in-progress:hover,
 [data-theme="dark"] .status-badge-in-progress:hover,
 [data-theme="dark"] .status-badge--in-progress:hover {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.2) 100%);
-    border-color: rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.2) 100%);
+    border-color: rgba(34, 197, 94, 0.4);
 }
 
 .dark .status-dot-in-progress,
 .dark .status-dot--in-progress,
 [data-theme="dark"] .status-dot-in-progress,
 [data-theme="dark"] .status-dot--in-progress {
-    background: var(--color-primary-400, #60a5fa);
+    background: #4ade80;
 }
 
-/* Running - Dark */
+/* Running - Dark (Green) */
 .dark .status-badge-running,
 .dark .status-badge--running,
 [data-theme="dark"] .status-badge-running,
 [data-theme="dark"] .status-badge--running {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(59, 130, 246, 0.1) 100%);
-    color: var(--color-primary-400, #60a5fa);
-    border-color: rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.1) 100%);
+    color: #4ade80;
+    border-color: rgba(34, 197, 94, 0.3);
 }
 
 .dark .status-badge-running:hover,
 .dark .status-badge--running:hover,
 [data-theme="dark"] .status-badge-running:hover,
 [data-theme="dark"] .status-badge--running:hover {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.2) 100%);
-    border-color: rgba(59, 130, 246, 0.4);
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.3) 0%, rgba(34, 197, 94, 0.2) 100%);
+    border-color: rgba(34, 197, 94, 0.4);
 }
 
 .dark .status-dot-running,
 .dark .status-dot--running,
 [data-theme="dark"] .status-dot-running,
 [data-theme="dark"] .status-dot--running {
-    background: var(--color-primary-400, #60a5fa);
-    box-shadow: 0 0 10px rgba(96, 165, 250, 0.6);
+    background: #4ade80;
+    box-shadow: 0 0 10px rgba(74, 222, 128, 0.6);
 }
 
 /* Failed - Dark */
@@ -606,8 +606,8 @@
 .status-badge.outline.status-badge--in-progress,
 .status-badge.outline.status-badge-running,
 .status-badge.outline.status-badge--running {
-    border-color: var(--color-primary-500, #3b82f6);
-    color: var(--color-primary-600, #2563eb);
+    border-color: #22c55e;
+    color: #16a34a;
 }
 
 .status-badge.outline.status-badge-failed,
@@ -666,8 +666,8 @@
 [data-theme="dark"] .status-badge.outline.status-badge--in-progress,
 [data-theme="dark"] .status-badge.outline.status-badge-running,
 [data-theme="dark"] .status-badge.outline.status-badge--running {
-    border-color: var(--color-primary-400, #60a5fa);
-    color: var(--color-primary-400, #60a5fa);
+    border-color: #4ade80;
+    color: #4ade80;
 }
 
 .dark .status-badge.outline.status-badge-failed,

@@ -1007,7 +1007,7 @@ STEPS:
             self.console.print(f"\n[dim]Updating knowledge for {len(modified_paths)} modified files...[/dim]")
 
             scout_workflow = UnifiedScoutWorkflow(self.project_root)
-            result = scout_workflow.run(
+            result = scout_workflow.execute(
                 target_paths=modified_paths,
                 trigger="post_build"
             )
@@ -2429,7 +2429,7 @@ Ensure all features work together correctly.""",
                 plan_id=plan_id,
                 estimated_input_tokens=self._estimated_input_tokens,
                 estimated_output_tokens=self._estimated_output_tokens,
-                model=self._config.get("model", "claude-sonnet-4-20250514"),
+                model="claude-sonnet-4-20250514",
                 cost_estimate=self._calculate_cost_estimate(
                     self._estimated_input_tokens, self._estimated_output_tokens
                 ),
@@ -2523,7 +2523,7 @@ Ensure all features work together correctly.""",
                     output_tokens=self._total_output_tokens,
                     estimated_input_tokens=self._estimated_input_tokens,
                     estimated_output_tokens=self._estimated_output_tokens,
-                    model=self._config.get("model", "claude-sonnet-4-20250514"),
+                    model="claude-sonnet-4-20250514",
                     actual_cost=actual_cost,
                     cost_estimate=self._calculate_cost_estimate(
                         self._estimated_input_tokens, self._estimated_output_tokens
@@ -2572,7 +2572,7 @@ Ensure all features work together correctly.""",
                     output_tokens=self._total_output_tokens,
                     estimated_input_tokens=self._estimated_input_tokens,
                     estimated_output_tokens=self._estimated_output_tokens,
-                    model=self._config.get("model", "claude-sonnet-4-20250514"),
+                    model="claude-sonnet-4-20250514",
                     actual_cost=actual_cost,
                     cost_estimate=self._calculate_cost_estimate(
                         self._estimated_input_tokens, self._estimated_output_tokens

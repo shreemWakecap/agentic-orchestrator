@@ -190,7 +190,7 @@ async def start_plan_build(
 
     # Create run entry in database
     run_id = str(uuid.uuid4())[:8]
-    run_repo.create(run_id, workflow="building", plan_id=plan_id)
+    run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
 
     # Start build workflow in background
     background_tasks.add_task(run_building_workflow, run_id, plan_id)
@@ -258,7 +258,7 @@ async def resume_plan_build(
 
     # Create run entry in database with resume flag
     run_id = str(uuid.uuid4())[:8]
-    run_repo.create(run_id, workflow="building", plan_id=plan_id)
+    run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
 
     # Start build workflow in background with resume flag
     background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, from_step)
@@ -804,7 +804,7 @@ async def recover_plan(
         from portal.services.workflow_runner import run_building_workflow
 
         run_id = str(uuid.uuid4())[:8]
-        run_repo.create(run_id, workflow="building", plan_id=plan_id)
+        run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
         background_tasks.add_task(run_building_workflow, run_id, plan_id)
 
         return WorkflowStartResponse(run_id=run_id, status="restarted", plan_id=plan_id)
@@ -817,7 +817,7 @@ async def recover_plan(
         from portal.services.workflow_runner import run_building_workflow_resume
 
         run_id = str(uuid.uuid4())[:8]
-        run_repo.create(run_id, workflow="building", plan_id=plan_id)
+        run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
         background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, from_step)
 
         return WorkflowStartResponse(run_id=run_id, status="resumed", plan_id=plan_id)
@@ -911,7 +911,7 @@ async def start_plan_review(
 
     # Create run entry in database
     run_id = str(uuid.uuid4())[:8]
-    run_repo.create(run_id, workflow="reviewing", plan_id=plan_id)
+    run_repo.create(run_id, workflow="reviewing", plan_id=plan_id, triggered_by="manual")
 
     # Start review workflow in background
     from portal.services.workflow_runner import run_review_workflow

@@ -60,7 +60,7 @@
     font-size: 0.75rem;
     font-weight: 700;
     color: #fff;
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: linear-gradient(135deg, var(--color-success-500) 0%, var(--color-success-600) 100%);
     border-radius: var(--radius-full);
 }
 
@@ -77,7 +77,7 @@
     transform: translateY(-50%);
     width: 0.5rem;
     height: 0.5rem;
-    background: #10b981;
+    background: var(--color-success-500);
     border-radius: var(--radius-full);
     animation: taskDot 1.5s ease-in-out infinite;
 }
@@ -138,7 +138,7 @@
     justify-content: space-between;
     padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-light);
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(5, 150, 105, 0.05) 100%);
 }
 
 .task-panel-title {
@@ -236,8 +236,8 @@
 
 /* Task item with running state */
 .task-item.running {
-    border-left: 3px solid var(--color-primary-500);
-    background: linear-gradient(90deg, rgba(59, 130, 246, 0.05) 0%, transparent 100%);
+    border-left: 3px solid var(--color-success-500);
+    background: linear-gradient(90deg, rgba(16, 185, 129, 0.05) 0%, transparent 100%);
 }
 
 /* Task item with completed state */
@@ -270,7 +270,7 @@
 }
 
 .task-item.running .task-item-icon {
-    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    background: linear-gradient(135deg, var(--color-success-500) 0%, var(--color-success-600) 100%);
 }
 
 .task-item.running .task-item-icon svg {
@@ -279,7 +279,7 @@
 }
 
 .task-item.completed .task-item-icon {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    background: linear-gradient(135deg, var(--color-success-500) 0%, var(--color-success-600) 100%);
 }
 
 .task-item.completed .task-item-icon svg {
@@ -333,7 +333,7 @@
 
 .task-item-progress-bar {
     height: 100%;
-    background: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+    background: linear-gradient(90deg, var(--color-success-500) 0%, var(--color-success-600) 100%);
     border-radius: var(--radius-full);
     transition: width var(--transition-smooth);
 }
@@ -366,13 +366,13 @@
 }
 
 .task-status-badge.running {
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.15) 100%);
-    color: #1d4ed8;
-    border: 1px solid rgba(59, 130, 246, 0.3);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
+    color: var(--color-success-700);
+    border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
 .dark .task-status-badge.running {
-    color: #93c5fd;
+    color: var(--color-success-300);
 }
 
 .task-status-badge.completed {
@@ -407,12 +407,12 @@
 }
 
 .task-status-badge.running .task-status-badge-dot {
-    background: #3b82f6;
+    background: var(--color-success-500);
     animation: taskDot 1.5s ease-in-out infinite;
 }
 
 .task-status-badge.completed .task-status-badge-dot {
-    background: #10b981;
+    background: var(--color-success-500);
 }
 
 .task-status-badge.failed .task-status-badge-dot {
@@ -424,10 +424,10 @@
    ============================================ */
 @keyframes taskPulse {
     0%, 100% {
-        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
     }
     50% {
-        box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
     }
 }
 
@@ -531,13 +531,13 @@
    KEYBOARD SHORTCUT HINT HIGHLIGHT
    ============================================ */
 .shortcut-hint-active {
-    background: rgba(59, 130, 246, 0.4) !important;
+    background: rgba(16, 185, 129, 0.4) !important;
     animation: shortcutHintFlash 0.3s ease-out;
 }
 
 @keyframes shortcutHintFlash {
     0% {
-        background: rgba(59, 130, 246, 0.6);
+        background: rgba(16, 185, 129, 0.6);
         transform: scale(1.02);
     }
     100% {

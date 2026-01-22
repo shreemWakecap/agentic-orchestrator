@@ -41,6 +41,7 @@ from portal.routes import (
     tasks_router,
     chat_router,
     token_analytics_router,
+    experts_router,
 )
 from portal.routes.health import set_version
 from portal.exception_handlers import register_exception_handlers
@@ -170,6 +171,7 @@ app.include_router(file_knowledge_router)
 app.include_router(tasks_router)
 app.include_router(chat_router)
 app.include_router(token_analytics_router)
+app.include_router(experts_router)
 
 
 def run_portal(host: str = "127.0.0.1", port: int = 8000):

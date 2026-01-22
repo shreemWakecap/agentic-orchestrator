@@ -33,7 +33,7 @@ from core.knowledge_store import (
     ArchitectureInfo,
     PatternInfo,
 )
-from db import get_knowledge_repository
+from db import get_knowledge_repository, get_run_repository
 
 
 class UnifiedScoutWorkflow(Workflow):
@@ -54,6 +54,7 @@ class UnifiedScoutWorkflow(Workflow):
         # Knowledge systems
         self.knowledge_store = KnowledgeStore(project_root)
         self._knowledge_repo = get_knowledge_repository()
+        self._run_repo = get_run_repository()
 
         # Load the scout agent
         self._load_agents()
@@ -231,7 +232,8 @@ class UnifiedScoutWorkflow(Workflow):
         self,
         force_full: bool = False,
         target_paths: Optional[list[str]] = None,
-        trigger: str = "manual"
+        trigger: str = "manual",
+        run_id: str = None
     ) -> WorkflowResult:
         """
         Execute the unified scout workflow.
@@ -239,20 +241,37 @@ class UnifiedScoutWorkflow(Workflow):
         Args:
             force_full: Force a full scan even if incremental would work
             target_paths: Specific paths to scan (for targeted scans)
-            trigger: What triggered this scan (manual, auto, post_build)
+            trigger: What triggered this scan (manual, system, auto_pre_planning, post_build)
+            run_id: Optional run_id if already created by caller
 
         Returns:
             WorkflowResult with scan results
         """
+        import uuid
         from core.symbols import CHECK, CROSS, ARROW_RIGHT
 
         self.console.print(f"\n[bold]Scout:[/bold] Analyzing codebase...")
+
+        # Create run entry if not provided
+        if not run_id:
+            run_id = str(uuid.uuid4())[:8]
+            self._run_repo.create(
+                run_id=run_id,
+                workflow="scouting",
+                description=f"Scout scan ({trigger})",
+                triggered_by=trigger
+            )
+        self._current_run_id = run_id
+
+        # Update run status to running
+        self._run_repo.update(run_id, status="running", progress=10)
 
         # Determine scan mode
         should_full, reason = self._should_do_full_scan(force_full, target_paths)
 
         self.console.print(f"  [dim]Mode: {'Full' if should_full else 'Incremental'} ({reason})[/dim]")
         self.console.print(f"  [dim]Trigger: {trigger}[/dim]")
+        self.console.print(f"  [dim]Run ID: {run_id}[/dim]")
 
         # Get current git state
         git_state = self._get_git_state()
@@ -286,16 +305,20 @@ class UnifiedScoutWorkflow(Workflow):
 
         if not result.success:
             self.console.print(f"  [red]{CROSS}[/red] Scout failed: {result.error}")
+            self._run_repo.update(run_id, status="failed", error=str(result.error), progress=100)
             return WorkflowResult(
                 success=False,
                 error=f"Scout failed: {result.error}"
             )
+
+        self._run_repo.update(run_id, progress=60)
 
         # Parse and store results
         knowledge_data = self._parse_scout_output(result.content)
 
         if not knowledge_data:
             self.console.print(f"  [yellow]Warning: Could not parse scout output[/yellow]")
+            self._run_repo.update(run_id, status="failed", error="Could not parse scout output", progress=100)
             return WorkflowResult(
                 success=False,
                 error="Could not parse scout output"
@@ -304,6 +327,8 @@ class UnifiedScoutWorkflow(Workflow):
         # Merge with existing knowledge if incremental
         if not should_full and self.knowledge_store.exists():
             knowledge_data = self._merge_knowledge(knowledge_data)
+
+        self._run_repo.update(run_id, progress=80)
 
         # Save to knowledge store
         self._save_knowledge(knowledge_data, git_state, paths_to_scan, trigger)
@@ -317,9 +342,25 @@ class UnifiedScoutWorkflow(Workflow):
         self.console.print(f"  Domains found: [cyan]{len(knowledge_data.get('domains', []))}[/cyan]")
         self.console.print(f"  Coding rules: [cyan]{len(coding_rules)}[/cyan]")
 
+        # Mark run as completed
+        from datetime import datetime
+        self._run_repo.update(
+            run_id,
+            status="completed",
+            progress=100,
+            completed_at=datetime.now(),
+            data={
+                "mode": "full" if should_full else "incremental",
+                "files_scanned": stats.get("total_files", 0),
+                "domains": len(knowledge_data.get("domains", [])),
+                "coding_rules": len(coding_rules),
+            }
+        )
+
         return WorkflowResult(
             success=True,
             data={
+                "run_id": run_id,
                 "mode": "full" if should_full else "incremental",
                 "files_scanned": stats.get("total_files", 0),
                 "domains": len(knowledge_data.get("domains", [])),

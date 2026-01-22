@@ -22,8 +22,8 @@ async def create_plan(
 
     run_id = str(uuid.uuid4())[:8]
 
-    # Create run entry in database
-    run_repo.create(run_id, workflow="planning", description=request.description)
+    # Create run entry in database (triggered by user via portal)
+    run_repo.create(run_id, workflow="planning", description=request.description, triggered_by="manual")
 
     # Submit to TaskManager for background execution
     task_manager.submit_task(
@@ -53,8 +53,8 @@ async def start_build(
     run_id = str(uuid.uuid4())[:8]
     plan_id = request.plan_path  # plan_path is now plan_id
 
-    # Create run entry in database
-    run_repo.create(run_id, workflow="building", plan_id=plan_id)
+    # Create run entry in database (triggered by user via portal)
+    run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
 
     # Submit to TaskManager for background execution
     task_manager.submit_task(
@@ -81,8 +81,8 @@ async def sync_remote(
     run_id = str(uuid.uuid4())[:8]
     auto_merge = request.auto_merge if request else True
 
-    # Create run entry in database
-    run_repo.create(run_id, workflow="syncing")
+    # Create run entry in database (triggered by user via portal)
+    run_repo.create(run_id, workflow="syncing", triggered_by="manual")
 
     # Submit to TaskManager for background execution
     task_manager.submit_task(

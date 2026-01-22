@@ -180,6 +180,7 @@ class ActiveRun(Base):
     progress = Column(Integer, default=0)
     error = Column(Text)
     data_json = Column(Text, default="{}")
+    triggered_by = Column(String(50), default="manual")  # manual, system, auto_pre_planning, post_build
 
     # Relationships
     events = relationship("RunEvent", back_populates="run", cascade="all, delete-orphan")

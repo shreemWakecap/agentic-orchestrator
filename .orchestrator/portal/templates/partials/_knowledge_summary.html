@@ -1,6 +1,6 @@
 <!-- Knowledge Summary Card -->
-<!-- Include with: {% include 'partials/_knowledge_summary.html' %} -->
-<!-- Required context: knowledge (CodebaseKnowledge object or dict), staleness (optional dict) -->
+{# Include with: {% include 'partials/_knowledge_summary.html' %} #}
+<!-- Required context: knowledge (flat dict from get_knowledge_for_template), staleness (optional dict) -->
 
 <div class="bg-secondary-800 rounded-lg border border-secondary-700 overflow-hidden">
     <div class="px-4 py-3 border-b border-secondary-700 flex items-center justify-between">
@@ -39,10 +39,10 @@
                 </svg>
             </div>
             <div>
-                <h4 class="text-lg font-semibold text-white">{{ knowledge.project.name or 'Unknown Project' }}</h4>
+                <h4 class="text-lg font-semibold text-white">{{ knowledge.project_name or 'Unknown Project' }}</h4>
                 <p class="text-sm text-secondary-400">
-                    {{ knowledge.project.type or 'Unknown' }} &bull;
-                    {{ knowledge.project.primary_language or 'Unknown Language' }}
+                    {{ knowledge.project_type or 'Unknown' }} &bull;
+                    {{ knowledge.primary_language or 'Unknown Language' }}
                 </p>
             </div>
         </div>
@@ -50,29 +50,29 @@
         <!-- Quick Stats -->
         <div class="grid grid-cols-2 gap-3 mb-4">
             <div class="bg-secondary-700/50 rounded-lg p-3">
-                <div class="text-2xl font-bold text-white">{{ knowledge.domains|length }}</div>
+                <div class="text-2xl font-bold text-white">{{ knowledge.domains|length if knowledge.domains else 0 }}</div>
                 <div class="text-xs text-secondary-400">Domains</div>
             </div>
             <div class="bg-secondary-700/50 rounded-lg p-3">
-                <div class="text-2xl font-bold text-white">{{ knowledge.architecture.modules|length if knowledge.architecture else 0 }}</div>
+                <div class="text-2xl font-bold text-white">{{ knowledge.modules|length if knowledge.modules else 0 }}</div>
                 <div class="text-xs text-secondary-400">Modules</div>
             </div>
             <div class="bg-secondary-700/50 rounded-lg p-3">
-                <div class="text-2xl font-bold text-white">{{ knowledge.coding_rules|length if knowledge.coding_rules else 0 }}</div>
+                <div class="text-2xl font-bold text-white">{{ coding_rules|length if coding_rules else 0 }}</div>
                 <div class="text-xs text-secondary-400">Coding Rules</div>
             </div>
             <div class="bg-secondary-700/50 rounded-lg p-3">
-                <div class="text-2xl font-bold text-white">{{ knowledge.architecture.pattern if knowledge.architecture else 'N/A' }}</div>
+                <div class="text-2xl font-bold text-white">{{ knowledge.architecture_pattern or 'N/A' }}</div>
                 <div class="text-xs text-secondary-400">Architecture</div>
             </div>
         </div>
 
         <!-- Tech Stack Quick View -->
-        {% if knowledge.technologies %}
+        {% if knowledge.frameworks or knowledge.languages %}
         <div class="space-y-2">
-            {% if knowledge.technologies.frameworks %}
+            {% if knowledge.frameworks %}
             <div class="flex flex-wrap gap-1.5">
-                {% for fw in knowledge.technologies.frameworks[:5] %}
+                {% for fw in knowledge.frameworks[:5] %}
                 <span class="px-2 py-1 bg-primary-900/30 text-primary-400 text-xs rounded-full border border-primary-700/50">
                     {{ fw.name }}
                 </span>
@@ -80,9 +80,9 @@
             </div>
             {% endif %}
 
-            {% if knowledge.technologies.languages %}
+            {% if knowledge.languages %}
             <div class="flex flex-wrap gap-1.5">
-                {% for lang in knowledge.technologies.languages[:5] %}
+                {% for lang in knowledge.languages[:5] %}
                 <span class="px-2 py-1 bg-secondary-700 text-secondary-300 text-xs rounded-full">
                     {{ lang.name }}{% if lang.version %} {{ lang.version }}{% endif %}
                 </span>

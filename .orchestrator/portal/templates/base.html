@@ -15,17 +15,17 @@
                 extend: {
                     colors: {
                         primary: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            200: '#bfdbfe',
-                            300: '#93c5fd',
-                            400: '#60a5fa',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            800: '#1e40af',
-                            900: '#1e3a8a',
-                            950: '#172554'
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                            950: '#052e16'
                         },
                         secondary: {
                             50: '#f8fafc',
@@ -78,6 +78,19 @@
                             800: '#991b1b',
                             900: '#7f1d1d',
                             950: '#450a0a'
+                        },
+                        info: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                            950: '#172554'
                         }
                     },
                     fontFamily: {
@@ -109,6 +122,8 @@
     </script>
     <!-- Modern UI CSS -->
     <link rel="stylesheet" href="/static/css/modern.css">
+    <!-- Accessibility CSS - WCAG 2.1 AA Compliant Utilities -->
+    <link rel="stylesheet" href="/static/css/accessibility.css">
     <!-- Unified Status Theme CSS -->
     <link rel="stylesheet" href="/static/css/status-theme.css">
     <!-- Unified Tags Theme CSS -->
@@ -155,18 +170,27 @@
             border: none;
             text-decoration: none;
         }
-        .btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3); }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
         .btn-primary {
-            background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+            background: linear-gradient(135deg, #22C55E 0%, #16A34A 100%);
             color: white;
-            box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+            box-shadow: 0 2px 4px rgba(22, 163, 74, 0.2);
         }
         .btn-primary:hover:not(:disabled) {
-            background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
-            box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3);
+            background: linear-gradient(135deg, #16A34A 0%, #15803D 100%);
+            box-shadow: 0 4px 8px rgba(22, 163, 74, 0.3);
             transform: translateY(-1px);
+        }
+        .btn-primary:active:not(:disabled) {
+            background: linear-gradient(135deg, #15803D 0%, #166534 100%);
+            box-shadow: 0 1px 2px rgba(22, 163, 74, 0.2);
+            transform: translateY(0);
+        }
+        .btn-primary:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
         }
 
         .btn-secondary {
@@ -260,8 +284,8 @@
         }
         .input:focus {
             outline: none;
-            border-color: #3B82F6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            border-color: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
         }
         .input::placeholder { color: #9CA3AF; }
 
@@ -281,8 +305,8 @@
         }
         .textarea-modern:focus {
             outline: none;
-            border-color: #3B82F6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            border-color: #22c55e;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.15);
         }
         .textarea-modern::placeholder { color: #9CA3AF; }
         .dark .textarea-modern {
@@ -291,8 +315,8 @@
             color: #e2e8f0;
         }
         .dark .textarea-modern:focus {
-            border-color: #60a5fa;
-            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+            border-color: #4ade80;
+            box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2);
         }
         .dark .textarea-modern::placeholder { color: #64748b; }
 
@@ -349,7 +373,7 @@
 
         /* Workflow Steps */
         .workflow-step { transition: all 0.3s ease; }
-        .workflow-step.active { background-color: #3B82F6; color: white; }
+        .workflow-step.active { background-color: #22c55e; color: white; }
         .workflow-step.completed { background-color: #10B981; color: white; }
         .workflow-step.failed { background-color: #EF4444; color: white; }
         .fade-in { animation: fadeIn 0.3s ease-in; }
@@ -476,7 +500,7 @@
         }
         .side-popup-close:focus {
             outline: none;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
         }
         .dark .side-popup-close {
             color: #94a3b8;
@@ -508,6 +532,95 @@
             background-color: #f3f4f6;
             transform: translateX(4px);
         }
+
+        /* Brand Link Styles */
+        .brand-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+        }
+        .brand-link:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        .brand-link:hover .text-gradient-primary {
+            filter: brightness(1.1);
+        }
+        .brand-text {
+            color: #334155;
+            transition: color 0.2s ease;
+        }
+        .brand-link:hover .brand-text {
+            color: #16a34a;
+        }
+        .dark .brand-text {
+            color: #e2e8f0;
+        }
+        .dark .brand-link:hover .brand-text {
+            color: #4ade80;
+        }
+
+        /* Navigation Link Styles - Green Accent */
+        .nav-link-green {
+            position: relative;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+        .nav-link-green::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            transition: width 0.2s ease, left 0.2s ease;
+            border-radius: 1px;
+        }
+        .nav-link-green:hover {
+            color: #16a34a;
+            background-color: rgba(34, 197, 94, 0.08);
+        }
+        .nav-link-green:hover::after {
+            width: 60%;
+            left: 20%;
+        }
+        .nav-link-green:active {
+            color: #15803d;
+            background-color: rgba(34, 197, 94, 0.12);
+        }
+        .nav-link-green.active {
+            color: #16a34a;
+            background-color: rgba(34, 197, 94, 0.1);
+            font-weight: 600;
+        }
+        .nav-link-green.active::after {
+            width: 60%;
+            left: 20%;
+        }
+        .nav-link-green:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.3);
+        }
+        /* Dark mode navigation */
+        .dark .nav-link-green {
+            color: var(--text-secondary);
+        }
+        .dark .nav-link-green:hover {
+            color: #4ade80;
+            background-color: rgba(74, 222, 128, 0.1);
+        }
+        .dark .nav-link-green:active {
+            color: #86efac;
+            background-color: rgba(74, 222, 128, 0.15);
+        }
+        .dark .nav-link-green.active {
+            color: #4ade80;
+            background-color: rgba(74, 222, 128, 0.12);
+        }
+        .dark .nav-link-green::after {
+            background: linear-gradient(90deg, #4ade80, #22c55e);
+        }
     </style>
 </head>
 <body class="bg-secondary min-h-screen transition-colors dark:bg-secondary">
@@ -517,24 +630,25 @@
             <div class="flex justify-between h-16 items-center">
                 <div class="flex items-center">
                     <div class="flex-shrink-0 flex items-center">
-                        <a href="/" class="text-xl font-bold text-primary dark:text-primary transition-colors hover:opacity-80">
-                            <span class="text-gradient-primary">SDLC</span> Orchestrator
+                        <a href="/" class="brand-link text-xl font-bold transition-all">
+                            <span class="text-gradient-primary">SDLC</span>
+                            <span class="brand-text">Orchestrator</span>
                         </a>
                     </div>
                     <div class="hidden sm:ml-8 sm:flex sm:space-x-2">
-                        <a href="/" class="nav-link px-4 py-2 rounded-lg text-secondary dark:text-secondary hover:bg-tertiary dark:hover:bg-tertiary transition-all text-sm font-medium">
+                        <a href="/" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
                             Dashboard
                         </a>
-                        <a href="/plans" class="nav-link px-4 py-2 rounded-lg text-secondary dark:text-secondary hover:bg-tertiary dark:hover:bg-tertiary transition-all text-sm font-medium">
+                        <a href="/plans" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
                             Plans
                         </a>
-                        <a href="/knowledge" class="nav-link px-4 py-2 rounded-lg text-secondary dark:text-secondary hover:bg-tertiary dark:hover:bg-tertiary transition-all text-sm font-medium">
+                        <a href="/knowledge" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
                             Knowledge
                         </a>
-                        <a href="/chat" class="nav-link px-4 py-2 rounded-lg text-secondary dark:text-secondary hover:bg-tertiary dark:hover:bg-tertiary transition-all text-sm font-medium">
+                        <a href="/chat" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
                             Chat
                         </a>
-                        <a href="/runs" class="nav-link px-4 py-2 rounded-lg text-secondary dark:text-secondary hover:bg-tertiary dark:hover:bg-tertiary transition-all text-sm font-medium">
+                        <a href="/runs" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
                             Runs
                         </a>
                     </div>
@@ -607,6 +721,7 @@
 
     <!-- 2. UI Components -->
     <script src="/static/js/side-popup.js"></script>
+    <script src="/static/js/markdown-viewer.js"></script>
     <script src="/static/js/keyboard-shortcuts.js"></script>
     <script src="/static/js/toast.js"></script>
     <script>

@@ -8,7 +8,7 @@
      card.count_id: string - DOM ID for JS updates
      card.label: string - Display label
      card.icon: string - Icon type: 'clock', 'bolt', 'check', 'x'
-     card.color: string - Color theme: 'amber', 'blue', 'emerald', 'red'
+     card.color: string - Color theme: 'green' (brand), 'amber', 'blue', 'emerald', 'red'
 
    Usage:
      {% set card = {'href': '/plans?state=pending', 'count': 5, 'count_id': 'count-pending', 'label': 'Pending Plans', 'icon': 'clock', 'color': 'amber'} %}
@@ -17,12 +17,13 @@
 
 {# Color mappings #}
 {% set colors = {
+    'green': {'from': 'emerald-500', 'to': 'teal-600', 'hover': 'emerald'},
     'amber': {'from': 'amber-400', 'to': 'orange-500', 'hover': 'amber'},
     'blue': {'from': 'blue-400', 'to': 'indigo-500', 'hover': 'blue'},
     'emerald': {'from': 'emerald-400', 'to': 'teal-500', 'hover': 'emerald'},
     'red': {'from': 'red-400', 'to': 'rose-500', 'hover': 'red'}
 } %}
-{% set c = colors[card.color] | default(colors['blue']) %}
+{% set c = colors[card.color] | default(colors['green']) %}
 
 {# Icon SVG paths #}
 {% set icons = {

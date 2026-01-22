@@ -137,35 +137,31 @@ class TokenUsageService:
         """
         total_tokens = input_tokens + output_tokens
 
-        # Calculate estimated cost from tokens
-        estimated_cost = self._calculate_cost(input_tokens, output_tokens)
-
-        timestamp = datetime.utcnow().isoformat() + "Z"
+        # Calculate cost from tokens (use actual_cost if provided, otherwise estimate)
+        cost_usd = actual_cost if actual_cost is not None else self._calculate_cost(input_tokens, output_tokens)
 
         # Store in repository
         repo = self._get_token_usage_repo()
-        record_id = repo.record_usage(
-            plan_id=plan_id,
-            run_id=run_id,
-            workflow=workflow,
+        repo.record_usage(
+            workflow_type=workflow,
+            event_type="execution",
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            total_tokens=total_tokens,
-            estimated_cost=estimated_cost,
-            actual_cost=actual_cost,
-            timestamp=timestamp,
+            cost_usd=cost_usd,
+            run_id=run_id,
+            plan_id=plan_id,
             metadata=metadata
         )
 
         record = TokenUsageRecord(
-            id=record_id,
+            id=None,
             plan_id=plan_id,
             run_id=run_id,
             workflow=workflow,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
             total_tokens=total_tokens,
-            estimated_cost=estimated_cost,
+            estimated_cost=cost_usd,
             actual_cost=actual_cost,
             timestamp=timestamp,
             metadata=metadata
@@ -200,20 +196,23 @@ class TokenUsageService:
         """
         timestamp = datetime.utcnow().isoformat() + "Z"
 
-        # Store in repository
+        # Store in repository using record_usage with event_type="estimation"
         repo = self._get_token_usage_repo()
-        record_id = repo.record_estimation(
-            plan_id=plan_id,
-            workflow=workflow,
+        # Add confidence to metadata
+        est_metadata = metadata.copy() if metadata else {}
+        est_metadata["confidence"] = confidence
+
+        repo.record_usage(
+            workflow_type=workflow,
+            event_type="estimation",
             estimated_tokens=estimated_tokens,
-            estimated_cost=estimated_cost,
-            confidence=confidence,
-            timestamp=timestamp,
-            metadata=metadata
+            estimated_cost_usd=estimated_cost,
+            plan_id=plan_id,
+            metadata=est_metadata
         )
 
         record = EstimationRecord(
-            id=record_id,
+            id=None,
             plan_id=plan_id,
             workflow=workflow,
             estimated_tokens=estimated_tokens,

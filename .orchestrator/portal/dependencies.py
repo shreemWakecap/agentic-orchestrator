@@ -30,6 +30,7 @@ from portal.services.task_manager import TaskManager, get_task_manager as _get_t
 from portal.services.recovery_service import RecoveryService, get_recovery_service as _get_recovery_service
 from portal.services.plan_status_service import PlanStatusService
 from portal.services.token_usage_service import TokenUsageService
+from portal.services.experts_service import ExpertsService
 
 # Project paths
 PORTAL_DIR = Path(__file__).parent
@@ -115,3 +116,12 @@ def get_token_usage_service() -> TokenUsageService:
         token_usage_repo=get_token_usage_repository(),
         cost_repo=get_cost_repository(),
     )
+
+
+def get_experts_service() -> ExpertsService:
+    """Get ExpertsService instance for dependency injection.
+
+    This service manages expert markdown files, providing listing and
+    content retrieval with token count estimation.
+    """
+    return ExpertsService(project_root=PROJECT_ROOT)

@@ -17,8 +17,11 @@ Enhanced with:
 - Knowledge store integration for architecture context
 - Expert selection and consultation
 - Displays "Consulting experts: ..." for transparency
+- Token usage signal emission for analytics tracking
 """
+import asyncio
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -29,6 +32,7 @@ from core.expert_selector import ExpertSelector
 from core.staleness_checker import StalenessChecker
 from core.rule_checker import RuleChecker
 from db import get_plan_repository, get_build_state_repository
+from portal.services.token_usage_signal import get_token_usage_signal, TokenUsageSignal
 
 
 class PlanningWorkflow(Workflow):
@@ -56,6 +60,9 @@ class PlanningWorkflow(Workflow):
         self.knowledge_store = KnowledgeStore(project_root)
         self.expert_selector = ExpertSelector(project_root)
         self.staleness_checker = StalenessChecker(project_root)
+
+        # Token usage signal for analytics
+        self._token_signal: TokenUsageSignal = get_token_usage_signal()
 
         # Load the planner agent
         self._load_agents()
@@ -104,6 +111,59 @@ class PlanningWorkflow(Workflow):
 
         return "\n".join(summary_parts) if summary_parts else "No codebase info available"
 
+    def _emit_signal_sync(self, coro) -> None:
+        """Emit a token usage signal from synchronous context."""
+        try:
+            # Try to get running loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're in an async context, create a task
+                asyncio.ensure_future(coro)
+            except RuntimeError:
+                # No running loop, create one
+                asyncio.run(coro)
+        except Exception as e:
+            self.console.print(f"  [dim]Token signal error: {e}[/dim]")
+
+    def _estimate_tokens_for_planning(self, request: str, arch_context: str, expert_context: str) -> tuple[int, int]:
+        """
+        Estimate tokens for planning based on prompt size.
+
+        Returns:
+            Tuple of (estimated_input_tokens, estimated_output_tokens)
+        """
+        # Base prompt size
+        base_prompt_tokens = 500  # Fixed instructions
+
+        # Variable content
+        request_tokens = len(request.split()) * 1.3  # Approx 1.3 tokens per word
+        arch_tokens = len(arch_context.split()) * 1.3 if arch_context else 0
+        expert_tokens = len(expert_context.split()) * 1.3 if expert_context else 0
+
+        estimated_input = int(base_prompt_tokens + request_tokens + arch_tokens + expert_tokens)
+
+        # Output estimation: plans typically 2-4x the request description
+        # Plus exploration output from the agent
+        estimated_output = int(estimated_input * 2.5) + 1000  # Base for plan structure
+
+        return estimated_input, estimated_output
+
+    def _calculate_cost_estimate(self, input_tokens: int, output_tokens: int) -> float:
+        """
+        Calculate estimated cost based on token counts.
+
+        Uses Claude Sonnet pricing as default:
+        - Input: $3 per 1M tokens
+        - Output: $15 per 1M tokens
+        """
+        input_cost_per_million = 3.0
+        output_cost_per_million = 15.0
+
+        input_cost = (input_tokens / 1_000_000) * input_cost_per_million
+        output_cost = (output_tokens / 1_000_000) * output_cost_per_million
+
+        return round(input_cost + output_cost, 6)
+
     def execute(self, request: str) -> WorkflowResult:
         """
         Execute the planning workflow.
@@ -131,7 +191,7 @@ class PlanningWorkflow(Workflow):
                     from workflows.unified_scout import UnifiedScoutWorkflow
                     scout_workflow = UnifiedScoutWorkflow(self.project_root)
                     changed_paths = self.staleness_checker.get_changed_paths()
-                    scout_result = scout_workflow.run(
+                    scout_result = scout_workflow.execute(
                         target_paths=changed_paths if changed_paths else None,
                         trigger="auto_pre_planning"
                     )
@@ -146,8 +206,9 @@ class PlanningWorkflow(Workflow):
                 self.console.print(f"\n[yellow]{WARNING}[/yellow] Warning: Knowledge may be stale ({stale_reason})")
                 self.console.print(f"  [dim]Consider running 'scout' before planning[/dim]")
 
-        # Generate plan ID
+        # Generate plan ID and job ID for tracking
         plan_id = self._generate_plan_id(request)
+        job_id = f"planning-{uuid.uuid4().hex[:8]}"
 
         self.console.print(f"  [dim]Plan ID: {plan_id}[/dim]")
 
@@ -167,6 +228,29 @@ class PlanningWorkflow(Workflow):
         if expert_names:
             self.console.print(f"  [dim]Consulting experts: {', '.join(expert_names)}[/dim]")
             expert_context = self.expert_selector.get_expert_context(expert_names)
+
+        # Estimate tokens for this planning run
+        estimated_input, estimated_output = self._estimate_tokens_for_planning(
+            request, arch_context, expert_context
+        )
+
+        # Emit estimation signal before planning starts
+        self._emit_signal_sync(
+            self._token_signal.emit_estimation_completed(
+                job_id=job_id,
+                plan_id=plan_id,
+                estimated_input_tokens=estimated_input,
+                estimated_output_tokens=estimated_output,
+                model="claude-sonnet-4-20250514",
+                cost_estimate=self._calculate_cost_estimate(estimated_input, estimated_output),
+                metadata={
+                    "workflow": "planning",
+                    "request": request[:200],
+                    "has_arch_context": bool(arch_context),
+                    "experts_consulted": expert_names,
+                }
+            )
+        )
 
         # Run planner agent
         self.console.print(f"\n[cyan]{ARROW_RIGHT}[/cyan] Running planner agent...")
@@ -230,6 +314,26 @@ Remember:
 
         if not result.success:
             self.console.print(f"  [red]{CROSS}[/red] Planner failed: {result.error}")
+            # Emit completion signal for failed execution
+            self._emit_signal_sync(
+                self._token_signal.emit_execution_completed(
+                    job_id=job_id,
+                    plan_id=plan_id,
+                    input_tokens=0,
+                    output_tokens=0,
+                    estimated_input_tokens=estimated_input,
+                    estimated_output_tokens=estimated_output,
+                    model="claude-sonnet-4-20250514",
+                    actual_cost=0.0,
+                    cost_estimate=self._calculate_cost_estimate(estimated_input, estimated_output),
+                    metadata={
+                        "workflow": "planning",
+                        "plan_id": plan_id,
+                        "success": False,
+                        "error": result.error,
+                    }
+                )
+            )
             return WorkflowResult(
                 success=False,
                 error=f"Planner failed: {result.error}"
@@ -343,6 +447,39 @@ Status: pending
                         self.console.print(f"  [dim]...and {len(rule_result.violations) - 5} more[/dim]")
             except Exception as e:
                 self.console.print(f"  [dim]Could not check coding rules: {e}[/dim]")
+
+        # Extract actual token usage from result if available
+        actual_input_tokens = getattr(result, 'input_tokens', 0) or 0
+        actual_output_tokens = getattr(result, 'output_tokens', 0) or 0
+
+        # Fallback: estimate from content length if no tokens reported
+        if actual_input_tokens == 0 and actual_output_tokens == 0:
+            # Rough estimation from content
+            actual_input_tokens = int(len(planner_prompt.split()) * 1.3)
+            actual_output_tokens = int(len(result.content.split()) * 1.3) if result.content else 0
+
+        actual_cost = self._calculate_cost_estimate(actual_input_tokens, actual_output_tokens)
+
+        # Emit execution completed signal
+        self._emit_signal_sync(
+            self._token_signal.emit_execution_completed(
+                job_id=job_id,
+                plan_id=plan_id,
+                input_tokens=actual_input_tokens,
+                output_tokens=actual_output_tokens,
+                estimated_input_tokens=estimated_input,
+                estimated_output_tokens=estimated_output,
+                model="claude-sonnet-4-20250514",
+                actual_cost=actual_cost,
+                cost_estimate=self._calculate_cost_estimate(estimated_input, estimated_output),
+                metadata={
+                    "workflow": "planning",
+                    "plan_id": plan_id,
+                    "total_steps": parse_result.plan.total_steps if parse_result.plan else 0,
+                    "success": True,
+                }
+            )
+        )
 
         return WorkflowResult(
             success=True,

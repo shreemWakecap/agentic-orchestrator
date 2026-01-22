@@ -47,6 +47,7 @@ from .repositories import (
     CostRepository,
     RunRepository,
     FileKnowledgeRepository,
+    TokenUsageRepository,
 )
 
 _db_instance: Database = None
@@ -84,3 +85,7 @@ def get_run_repository() -> RunRepository:
 
 def get_file_knowledge_repository() -> FileKnowledgeRepository:
     return FileKnowledgeRepository(get_database())
+
+
+def get_token_usage_repository() -> TokenUsageRepository:
+    return TokenUsageRepository(get_database())

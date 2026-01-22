@@ -20,8 +20,18 @@ class RunRepository:
         self.db = db
 
     def create(self, run_id: str, workflow: str, description: str = None,
-               plan_id: str = None, plan_path: str = None) -> int:
-        """Create a new run."""
+               plan_id: str = None, plan_path: str = None,
+               triggered_by: str = "manual") -> int:
+        """Create a new run.
+
+        Args:
+            run_id: Unique run identifier
+            workflow: Workflow type (planning, building, scouting, etc.)
+            description: Optional description of the run
+            plan_id: Associated plan ID (optional)
+            plan_path: Path to plan file (optional)
+            triggered_by: How this run was triggered (manual, system, auto_pre_planning, post_build)
+        """
         with self.db.session() as session:
             run = ActiveRun(
                 run_id=run_id,
@@ -32,7 +42,8 @@ class RunRepository:
                 plan_path=plan_path,
                 description=description,
                 progress=0,
-                data_json='{}'
+                data_json='{}',
+                triggered_by=triggered_by
             )
             session.add(run)
             session.flush()
@@ -117,4 +128,5 @@ class RunRepository:
             'progress': run.progress,
             'error': run.error,
             'data': json.loads(run.data_json or '{}'),
+            'triggered_by': run.triggered_by or 'manual',
         }

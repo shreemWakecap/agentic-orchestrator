@@ -29,4 +29,5 @@ web = [
     "jinja2>=3.1.0",
     "asyncpg>=0.29.0",
     "aiosqlite>=0.19.0",
+    "blinker>=1.9.0",
 ]

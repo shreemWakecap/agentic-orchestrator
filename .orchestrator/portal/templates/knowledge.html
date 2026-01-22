@@ -360,7 +360,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {% for expert in knowledge.experts[:9] %}
-            <div class="item-card">
+            <div class="item-card cursor-pointer" onclick="viewExpert('{{ expert.name }}')" data-expert-name="{{ expert.name }}">
                 <div class="w-8 h-8 bg-pink-100 dark:bg-pink-900 rounded flex items-center justify-center flex-shrink-0">
                     <svg class="w-4 h-4 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
@@ -433,6 +433,8 @@
 
 {% block scripts %}
 <script src="/static/js/toast.js"></script>
+<script src="/static/js/side-popup.js"></script>
+<script src="/static/js/markdown-viewer.js"></script>
 <script>
 /**
  * Knowledge Page - Simplified
@@ -535,5 +537,38 @@
 
     document.addEventListener('DOMContentLoaded', init);
 })();
+
+/**
+ * View expert content in the markdown viewer
+ * Fetches expert data from API and displays in side popup
+ *
+ * @param {string} name - The expert name to fetch and display
+ */
+async function viewExpert(name) {
+    // Show loading state via toast
+    Toast.show('Loading expert...', 'info');
+
+    try {
+        const response = await fetch(`/api/experts/${encodeURIComponent(name)}`);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || errorData.error || `Failed to load expert: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Extract content and token count from response
+        const title = data.name || name;
+        const content = data.content || '';
+        const tokenCount = data.token_count !== undefined ? data.token_count : null;
+
+        // Display in markdown viewer
+        MarkdownViewer.show(title, content, tokenCount);
+
+    } catch (error) {
+        Toast.show(error.message || 'Failed to load expert content', 'error');
+    }
+}
 </script>
 {% endblock %}

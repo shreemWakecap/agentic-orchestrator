@@ -90,8 +90,8 @@ async def scout_file(
 
     run_id = str(uuid.uuid4())[:8]
 
-    # Create run entry in database
-    run_repo.create(run_id, workflow="file_scouting")
+    # Create run entry in database (triggered by user via portal)
+    run_repo.create(run_id, workflow="file_scouting", triggered_by="manual")
 
     # Submit to TaskManager for background execution
     task_manager.submit_task(

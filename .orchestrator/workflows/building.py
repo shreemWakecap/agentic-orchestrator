@@ -10,10 +10,12 @@ Features:
 - Resume capability after failures
 - Automatic status updates in database (pending → completed/failed)
 """
+import asyncio
 import json
 import re
 import shutil
 import threading
+import uuid
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -23,6 +25,8 @@ from typing import Optional
 from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.plan_parser import PlanParser, ParseResult
 from db import get_plan_repository, get_build_state_repository
+from portal.services.token_usage_signal import get_token_usage_signal, TokenUsageSignal
+from portal.services.token_usage_service import TokenUsageService
 
 
 @dataclass
@@ -274,6 +278,15 @@ class BuildingWorkflow(Workflow):
         self._test_executor: Optional[ThreadPoolExecutor] = None
         self._test_futures: list[Future] = []
 
+        # Token usage tracking
+        self._token_signal: TokenUsageSignal = get_token_usage_signal()
+        self._token_usage_service: TokenUsageService = TokenUsageService()
+        self._job_id: Optional[str] = None
+        self._total_input_tokens: int = 0
+        self._total_output_tokens: int = 0
+        self._estimated_input_tokens: int = 0
+        self._estimated_output_tokens: int = 0
+
     def _load_agents(self):
         """Load all agents needed for building."""
         # Note: parser agent removed - using deterministic core/plan_parser.py
@@ -325,6 +338,89 @@ class BuildingWorkflow(Workflow):
             verify_commands=verify_commands,
             context_notes=context_notes
         )
+
+    def _emit_signal_sync(self, coro) -> None:
+        """Emit a token usage signal from synchronous context."""
+        try:
+            # Try to get running loop
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're in an async context, create a task
+                asyncio.ensure_future(coro)
+            except RuntimeError:
+                # No running loop, create one
+                asyncio.run(coro)
+        except Exception as e:
+            self.console.print(f"  [dim]Token signal error: {e}[/dim]")
+
+    def _estimate_tokens_for_building(self, total_steps: int, plan_content: str) -> tuple[int, int]:
+        """
+        Estimate tokens for building based on step count and plan size.
+
+        Returns:
+            Tuple of (estimated_input_tokens, estimated_output_tokens)
+        """
+        # Base tokens per step (context + prompt)
+        base_per_step = 2000
+        # Tokens for plan content context
+        plan_tokens = int(len(plan_content.split()) * 1.3)
+        # Tokens for goal context and verification
+        verification_tokens = 1500
+
+        # Estimated input: base per step + plan context (shared) + verification
+        estimated_input = (base_per_step * total_steps) + plan_tokens + verification_tokens
+
+        # Output estimation: builder typically produces substantial code per step
+        # Plus goal verification output
+        estimated_output = int(total_steps * 1500) + 2000
+
+        return estimated_input, estimated_output
+
+    def _calculate_cost_estimate(self, input_tokens: int, output_tokens: int) -> float:
+        """
+        Calculate estimated cost based on token counts.
+
+        Uses Claude Sonnet pricing as default:
+        - Input: $3 per 1M tokens
+        - Output: $15 per 1M tokens
+        """
+        input_cost_per_million = 3.0
+        output_cost_per_million = 15.0
+
+        input_cost = (input_tokens / 1_000_000) * input_cost_per_million
+        output_cost = (output_tokens / 1_000_000) * output_cost_per_million
+
+        return round(input_cost + output_cost, 6)
+
+    def _record_agent_token_usage(self, result, step_id: str = "") -> None:
+        """Record token usage from an agent result."""
+        # Extract token counts from agent result
+        tokens_used = getattr(result, 'tokens_used', 0) or 0
+
+        # Estimate input/output split if only total is available
+        # Typically input is larger than output for building tasks
+        if tokens_used > 0:
+            input_estimate = int(tokens_used * 0.6)
+            output_estimate = tokens_used - input_estimate
+            self._total_input_tokens += input_estimate
+            self._total_output_tokens += output_estimate
+
+        # Record to service for persistence
+        if self._current_plan_id and self._job_id:
+            try:
+                self._token_usage_service.record_execution(
+                    plan_id=self._current_plan_id,
+                    run_id=f"{self._job_id}-{step_id}" if step_id else self._job_id,
+                    workflow="building",
+                    input_tokens=input_estimate if tokens_used > 0 else 0,
+                    output_tokens=output_estimate if tokens_used > 0 else 0,
+                    metadata={
+                        "step_id": step_id,
+                        "tokens_total": tokens_used,
+                    }
+                )
+            except Exception as e:
+                self.console.print(f"  [dim]Token recording error: {e}[/dim]")
 
     def _verify_goal_achieved(self, goal_context: GoalContext) -> tuple[bool, list[str]]:
         """
@@ -398,6 +494,9 @@ NOTES: [Brief explanation]
             context=f"Build completed {len(self.build_state.completed_steps)} steps",
             show_progress=False
         )
+
+        # Record token usage from goal-verifier
+        self._record_agent_token_usage(result, step_id="goal-verification")
 
         if not result.success:
             self.console.print(f"  [yellow]{WARNING}[/yellow] Could not verify goal (agent failed)")
@@ -908,7 +1007,7 @@ STEPS:
             self.console.print(f"\n[dim]Updating knowledge for {len(modified_paths)} modified files...[/dim]")
 
             scout_workflow = UnifiedScoutWorkflow(self.project_root)
-            result = scout_workflow.run(
+            result = scout_workflow.execute(
                 target_paths=modified_paths,
                 trigger="post_build"
             )
@@ -1141,6 +1240,9 @@ IMPORTANT:
             context=full_context,
             show_progress=False
         )
+
+        # Record token usage from agent result
+        self._record_agent_token_usage(result, step_id=step.id)
 
         # Validate builder response (check for success AND placeholder detection)
         valid, error = self._validate_agent_response("Builder", result)
@@ -2152,6 +2254,9 @@ Check that the implementation is working correctly.""",
             show_progress=False
         )
 
+        # Record token usage from tester
+        self._record_agent_token_usage(result, step_id=f"validation-phase-{phase_idx + 1}")
+
         return result.success
 
     def _run_integration(self, plan: ParsedPlan) -> bool:
@@ -2171,6 +2276,9 @@ Ensure all features work together correctly.""",
             context=f"Files created: {', '.join(self.build_state.files_created[:20])}",
             show_progress=True
         )
+
+        # Record token usage from integrator
+        self._record_agent_token_usage(result, step_id="integration")
 
         return result.success
 
@@ -2196,6 +2304,11 @@ Ensure all features work together correctly.""",
         """
         # Store current plan ID for state management
         self._current_plan_id = plan_id
+
+        # Generate job ID for token usage tracking
+        self._job_id = f"building-{uuid.uuid4().hex[:8]}"
+        self._total_input_tokens = 0
+        self._total_output_tokens = 0
 
         # Check if plan exists in database
         plan_data = self._plan_repo.get_by_id(plan_id)
@@ -2306,6 +2419,28 @@ Ensure all features work together correctly.""",
         self.build_state.total_steps = total_steps
         self._save_state()
 
+        # Estimate tokens and emit execution_started signal
+        self._estimated_input_tokens, self._estimated_output_tokens = self._estimate_tokens_for_building(
+            total_steps, plan_content
+        )
+        self._emit_signal_sync(
+            self._token_signal.emit_execution_started(
+                job_id=self._job_id,
+                plan_id=plan_id,
+                estimated_input_tokens=self._estimated_input_tokens,
+                estimated_output_tokens=self._estimated_output_tokens,
+                model="claude-sonnet-4-20250514",
+                cost_estimate=self._calculate_cost_estimate(
+                    self._estimated_input_tokens, self._estimated_output_tokens
+                ),
+                metadata={
+                    "workflow": "building",
+                    "total_steps": total_steps,
+                    "plan_type": plan.plan_type,
+                }
+            )
+        )
+
         # CRITICAL: Fail if no steps were extracted from the plan
         if total_steps == 0:
             self.build_state.status = "failed"
@@ -2344,6 +2479,9 @@ Ensure all features work together correctly.""",
                 context=json.dumps(parsed_data, indent=2)[:5000]
             )
 
+            # Record token usage from coordinator
+            self._record_agent_token_usage(coord_result, step_id="coordination")
+
             if coord_result.success:
                 coordination = self._parse_json_from_response(coord_result.content)
                 result = self._run_complex_build(plan, plan_id, coordination)
@@ -2372,6 +2510,35 @@ Ensure all features work together correctly.""",
 
             # Post-build scout hook: Update knowledge for modified files
             self._run_post_build_scout()
+
+            # Emit execution completed signal for success
+            actual_cost = self._calculate_cost_estimate(
+                self._total_input_tokens, self._total_output_tokens
+            )
+            self._emit_signal_sync(
+                self._token_signal.emit_execution_completed(
+                    job_id=self._job_id,
+                    plan_id=plan_id,
+                    input_tokens=self._total_input_tokens,
+                    output_tokens=self._total_output_tokens,
+                    estimated_input_tokens=self._estimated_input_tokens,
+                    estimated_output_tokens=self._estimated_output_tokens,
+                    model="claude-sonnet-4-20250514",
+                    actual_cost=actual_cost,
+                    cost_estimate=self._calculate_cost_estimate(
+                        self._estimated_input_tokens, self._estimated_output_tokens
+                    ),
+                    metadata={
+                        "workflow": "building",
+                        "plan_id": plan_id,
+                        "success": True,
+                        "steps_completed": completed,
+                        "total_steps": total,
+                        "files_created": len(self.build_state.files_created),
+                        "files_modified": len(self.build_state.files_modified),
+                    }
+                )
+            )
         else:
             # Check if this is a pausable failure (can resume) or permanent failure
             is_paused = result.data and result.data.get("can_resume", False)
@@ -2391,6 +2558,36 @@ Ensure all features work together correctly.""",
                 self._archive_plan(plan_id, "failed")
                 self.console.print(f"\n[red]Build failed permanently[/red]")
                 self.console.print(f"  Plan status: failed")
+
+            # Emit execution completed signal for failure/pause
+            actual_cost = self._calculate_cost_estimate(
+                self._total_input_tokens, self._total_output_tokens
+            )
+            completed, total = self.build_state.get_progress()
+            self._emit_signal_sync(
+                self._token_signal.emit_execution_completed(
+                    job_id=self._job_id,
+                    plan_id=plan_id,
+                    input_tokens=self._total_input_tokens,
+                    output_tokens=self._total_output_tokens,
+                    estimated_input_tokens=self._estimated_input_tokens,
+                    estimated_output_tokens=self._estimated_output_tokens,
+                    model="claude-sonnet-4-20250514",
+                    actual_cost=actual_cost,
+                    cost_estimate=self._calculate_cost_estimate(
+                        self._estimated_input_tokens, self._estimated_output_tokens
+                    ),
+                    metadata={
+                        "workflow": "building",
+                        "plan_id": plan_id,
+                        "success": False,
+                        "is_paused": is_paused,
+                        "steps_completed": completed,
+                        "total_steps": total,
+                        "error": result.error if result.error else None,
+                    }
+                )
+            )
 
         return result
 

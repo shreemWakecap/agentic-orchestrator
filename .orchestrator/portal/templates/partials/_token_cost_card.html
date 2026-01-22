@@ -1,0 +1,61 @@
+{# Token Cost Card Component
+
+   A reusable partial that displays two cost metrics:
+   - Estimated Implementation Cost: projected token cost for implementing the plan
+   - Planning Cost Consumed: actual token cost used during the planning process
+
+   Parameters (via plan object):
+     plan.estimated_implementation_cost: float - Estimated cost in USD for implementation
+     plan.actual_planning_cost: float - Actual cost consumed during planning
+
+   Usage:
+     {% include 'partials/_token_cost_card.html' %}
+#}
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <!-- Estimated Implementation Cost -->
+    <div class="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-5 border border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center space-x-3 mb-3">
+            <div class="p-2 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <span class="text-sm font-semibold text-blue-700 uppercase tracking-wide">Estimated Implementation Cost</span>
+        </div>
+        <div class="flex items-baseline space-x-1">
+            <span class="text-3xl font-bold text-blue-800">
+                {% if plan.estimated_implementation_cost is not none %}
+                ${{ "%.4f" | format(plan.estimated_implementation_cost) }}
+                {% else %}
+                --
+                {% endif %}
+            </span>
+            <span class="text-sm text-blue-600">USD</span>
+        </div>
+        <p class="text-xs text-blue-500 mt-2">Projected cost to implement this plan</p>
+    </div>
+
+    <!-- Planning Cost Consumed -->
+    <div class="bg-gradient-to-br from-purple-50 to-violet-100 rounded-2xl p-5 border border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300">
+        <div class="flex items-center space-x-3 mb-3">
+            <div class="p-2 bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl shadow-md">
+                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <span class="text-sm font-semibold text-purple-700 uppercase tracking-wide">Planning Cost Consumed</span>
+        </div>
+        <div class="flex items-baseline space-x-1">
+            <span class="text-3xl font-bold text-purple-800">
+                {% if plan.actual_planning_cost is not none %}
+                ${{ "%.4f" | format(plan.actual_planning_cost) }}
+                {% else %}
+                --
+                {% endif %}
+            </span>
+            <span class="text-sm text-purple-600">USD</span>
+        </div>
+        <p class="text-xs text-purple-500 mt-2">Actual cost used during planning</p>
+    </div>
+</div>

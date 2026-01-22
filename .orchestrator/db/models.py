@@ -219,6 +219,38 @@ class CostHistory(Base):
 
 
 # =============================================================================
+# TOKEN USAGE TRACKING
+# =============================================================================
+
+class TokenUsageRecord(Base):
+    """Token usage record model - tracks individual token usage events."""
+    __tablename__ = "token_usage_records"
+
+    id = Column(Integer, primary_key=True)
+    run_id = Column(String(255), ForeignKey("active_runs.run_id", ondelete="SET NULL"), index=True)
+    plan_id = Column(String(255), ForeignKey("plans.plan_id", ondelete="SET NULL"), index=True)
+    workflow_type = Column(String(100), nullable=False, index=True)  # scout, build, plan, etc.
+    event_type = Column(String(50), nullable=False, index=True)  # execution, estimation
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    model = Column(String(255), index=True)
+    cost_usd = Column(Float, default=0.0)
+    estimated_tokens = Column(Integer)  # For estimation events - predicted token count
+    estimated_cost_usd = Column(Float)  # For estimation events - predicted cost
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    metadata_json = Column(Text, default="{}")
+
+    __table_args__ = (
+        Index('ix_token_usage_workflow_timestamp', 'workflow_type', 'timestamp'),
+        Index('ix_token_usage_event_timestamp', 'event_type', 'timestamp'),
+    )
+
+    # Relationships
+    run = relationship("ActiveRun", backref="token_usage_records")
+    plan = relationship("Plan", backref="token_usage_records")
+
+
+# =============================================================================
 # CODEBASE KNOWLEDGE
 # =============================================================================
 

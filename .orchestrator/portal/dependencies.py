@@ -17,16 +17,19 @@ from db import (
     get_cost_repository,
     get_knowledge_repository,
     get_file_knowledge_repository,
+    get_token_usage_repository,
     PlanRepository,
     BuildStateRepository,
     RunRepository,
     CostRepository,
     KnowledgeRepository,
     FileKnowledgeRepository,
+    TokenUsageRepository,
 )
 from portal.services.task_manager import TaskManager, get_task_manager as _get_task_manager
 from portal.services.recovery_service import RecoveryService, get_recovery_service as _get_recovery_service
 from portal.services.plan_status_service import PlanStatusService
+from portal.services.token_usage_service import TokenUsageService
 
 # Project paths
 PORTAL_DIR = Path(__file__).parent
@@ -97,3 +100,18 @@ def get_plan_status_service() -> PlanStatusService:
     )
 
 
+def get_token_usage_repo() -> TokenUsageRepository:
+    """Get token usage repository instance for dependency injection."""
+    return get_token_usage_repository()
+
+
+def get_token_usage_service() -> TokenUsageService:
+    """Get TokenUsageService instance for dependency injection.
+
+    This service tracks and analyzes token usage across workflow executions,
+    providing analytics, comparison metrics, and error rate calculations.
+    """
+    return TokenUsageService(
+        token_usage_repo=get_token_usage_repository(),
+        cost_repo=get_cost_repository(),
+    )

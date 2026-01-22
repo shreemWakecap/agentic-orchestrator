@@ -45,6 +45,10 @@ const PlanDetail = (function() {
         elements.pauseBuildBtn = document.getElementById('pause-build-btn');
     }
 
+    // Status polling for stuck detection
+    let statusPollInterval = null;
+    const STATUS_POLL_INTERVAL_MS = 10000; // Poll every 10 seconds
+
     /**
      * Initialize the module
      */
@@ -52,8 +56,54 @@ const PlanDetail = (function() {
         cacheElements();
 
         // Check if there's an active build for this plan
-        if (window.PLAN_DATA && window.PLAN_DATA.state === 'in-progress') {
+        const buildingStates = ['in-progress', 'building', 'in_progress'];
+        if (window.PLAN_DATA && buildingStates.includes(window.PLAN_DATA.state)) {
             checkForActiveRun();
+            // Start polling for status updates
+            startStatusPolling();
+        }
+    }
+
+    /**
+     * Start polling for status updates when plan is building
+     * This ensures the UI updates when a build completes
+     */
+    function startStatusPolling() {
+        // Clear any existing interval
+        stopStatusPolling();
+
+        statusPollInterval = setInterval(async function() {
+            try {
+                const planId = window.PLAN_DATA.id || window.PLAN_DATA.folder;
+                if (!planId) return;
+
+                const response = await fetch('/api/plans/' + encodeURIComponent(planId));
+                if (!response.ok) return;
+
+                const data = await response.json();
+
+                // Check if status changed to completed
+                if (data.state === 'completed' || data.state === 'failed') {
+                    stopStatusPolling();
+                    // Refresh the page to show updated status
+                    Toast.success('Build ' + data.state + '! Refreshing...');
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error('Status poll error:', error);
+            }
+        }, STATUS_POLL_INTERVAL_MS);
+    }
+
+    /**
+     * Stop status polling
+     */
+    function stopStatusPolling() {
+        if (statusPollInterval) {
+            clearInterval(statusPollInterval);
+            statusPollInterval = null;
         }
     }
 
@@ -665,6 +715,7 @@ const PlanDetail = (function() {
      */
     function handleBuildComplete(status) {
         stopEventStream();
+        stopStatusPolling();
 
         const duration = buildStartTime ? formatDuration(new Date() - buildStartTime) : '';
 

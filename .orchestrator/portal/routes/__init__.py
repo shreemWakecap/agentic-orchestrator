@@ -15,6 +15,7 @@ from .websocket import router as websocket_router
 from .file_knowledge import router as file_knowledge_router
 from .tasks import router as tasks_router
 from .chat import router as chat_router
+from .token_analytics import router as token_analytics_router
 
 __all__ = [
     "plans_router",
@@ -29,4 +30,5 @@ __all__ = [
     "file_knowledge_router",
     "tasks_router",
     "chat_router",
+    "token_analytics_router",
 ]

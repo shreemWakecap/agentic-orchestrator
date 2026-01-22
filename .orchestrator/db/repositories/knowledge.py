@@ -1,17 +1,25 @@
 """
-Knowledge Repository.
+Knowledge Repository - ORM-based implementation.
 
-Handles codebase knowledge, expert index, and scan metadata operations.
+Handles codebase knowledge, expert index, and scan metadata operations
+using SQLAlchemy ORM for clean, type-safe database access.
 """
+import json
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..connection import Database
 
+from ..models import (
+    CodebaseKnowledge, Technology, ArchitectureInfo, ArchitectureModule,
+    Domain, Pattern, ExpertIndex, ExpertEntry, ScanMetadata,
+    ExtendedScanMetadata, CodingRule
+)
+
 
 class KnowledgeRepository:
-    """Repository for knowledge store operations."""
+    """Repository for knowledge store operations using ORM."""
 
     def __init__(self, db: "Database"):
         self.db = db
@@ -22,244 +30,210 @@ class KnowledgeRepository:
                        domains: list[dict], naming: dict, structure: dict, conventions: list[str],
                        statistics: dict, version: str = "1.0") -> int:
         """Save codebase knowledge, replacing any existing."""
-        now = datetime.now().isoformat()
-
-        with self.db.transaction() as conn:
+        with self.db.session() as session:
             # Clear existing knowledge
-            conn.execute("DELETE FROM codebase_knowledge")
+            session.query(CodebaseKnowledge).delete()
 
-            # Insert main knowledge record
-            cursor = conn.execute("""
-                INSERT INTO codebase_knowledge (version, last_updated, project_name,
-                                               project_type, primary_language, statistics_json)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (version, now, project_name, project_type, primary_language,
-                  self.db.to_json(statistics)))
-            knowledge_id = cursor.lastrowid
+            # Create main knowledge record
+            knowledge = CodebaseKnowledge(
+                version=version,
+                last_updated=datetime.now(),
+                project_name=project_name,
+                project_type=project_type,
+                primary_language=primary_language,
+                statistics_json=json.dumps(statistics)
+            )
+            session.add(knowledge)
+            session.flush()  # Get the ID
 
-            # Insert technologies
+            # Add technologies
             for tech in languages:
-                conn.execute("""
-                    INSERT INTO technologies (knowledge_id, tech_type, name, confidence, version)
-                    VALUES (?, 'language', ?, ?, ?)
-                """, (knowledge_id, tech.get('name'), tech.get('confidence', 0.0),
-                      tech.get('version')))
+                session.add(Technology(
+                    knowledge_id=knowledge.id,
+                    tech_type='language',
+                    name=tech.get('name'),
+                    confidence=tech.get('confidence', 0.0),
+                    version=tech.get('version')
+                ))
 
             for tech in frameworks:
-                conn.execute("""
-                    INSERT INTO technologies (knowledge_id, tech_type, name, confidence,
-                                             entry_point, config_file)
-                    VALUES (?, 'framework', ?, ?, ?, ?)
-                """, (knowledge_id, tech.get('name'), tech.get('confidence', 0.0),
-                      tech.get('entry_point'), tech.get('config_file')))
+                session.add(Technology(
+                    knowledge_id=knowledge.id,
+                    tech_type='framework',
+                    name=tech.get('name'),
+                    confidence=tech.get('confidence', 0.0),
+                    entry_point=tech.get('entry_point'),
+                    config_file=tech.get('config_file')
+                ))
 
             for tech in tools:
-                conn.execute("""
-                    INSERT INTO technologies (knowledge_id, tech_type, name, confidence, config_file)
-                    VALUES (?, 'tool', ?, ?, ?)
-                """, (knowledge_id, tech.get('name'), tech.get('confidence', 0.0),
-                      tech.get('config_file')))
+                session.add(Technology(
+                    knowledge_id=knowledge.id,
+                    tech_type='tool',
+                    name=tech.get('name'),
+                    confidence=tech.get('confidence', 0.0),
+                    config_file=tech.get('config_file')
+                ))
 
-            # Insert architecture info
-            conn.execute("""
-                INSERT INTO architecture_info (knowledge_id, pattern, entry_points_json)
-                VALUES (?, ?, ?)
-            """, (knowledge_id, architecture_pattern, self.db.to_json(entry_points)))
+            # Add architecture info
+            session.add(ArchitectureInfo(
+                knowledge_id=knowledge.id,
+                pattern=architecture_pattern,
+                entry_points_json=json.dumps(entry_points)
+            ))
 
-            # Insert modules
+            # Add modules
             for module in modules:
-                conn.execute("""
-                    INSERT INTO architecture_modules (knowledge_id, name, path, purpose, depends_on_json)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (knowledge_id, module.get('name'), module.get('path'),
-                      module.get('purpose'), self.db.to_json(module.get('depends_on', []))))
+                session.add(ArchitectureModule(
+                    knowledge_id=knowledge.id,
+                    name=module.get('name'),
+                    path=module.get('path'),
+                    purpose=module.get('purpose'),
+                    depends_on_json=json.dumps(module.get('depends_on', []))
+                ))
 
-            # Insert domains
+            # Add domains
             for domain in domains:
-                conn.execute("""
-                    INSERT INTO domains (knowledge_id, name, keywords_json, files_json,
-                                        models_json, routes_json)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (knowledge_id, domain.get('name'),
-                      self.db.to_json(domain.get('keywords', [])),
-                      self.db.to_json(domain.get('files', [])),
-                      self.db.to_json(domain.get('models', [])),
-                      self.db.to_json(domain.get('routes', []))))
+                session.add(Domain(
+                    knowledge_id=knowledge.id,
+                    name=domain.get('name'),
+                    keywords_json=json.dumps(domain.get('keywords', [])),
+                    files_json=json.dumps(domain.get('files', [])),
+                    models_json=json.dumps(domain.get('models', [])),
+                    routes_json=json.dumps(domain.get('routes', []))
+                ))
 
-            # Insert patterns
-            conn.execute("""
-                INSERT INTO patterns (knowledge_id, naming_json, structure_json, conventions_json)
-                VALUES (?, ?, ?, ?)
-            """, (knowledge_id, self.db.to_json(naming), self.db.to_json(structure),
-                  self.db.to_json(conventions)))
+            # Add patterns
+            session.add(Pattern(
+                knowledge_id=knowledge.id,
+                naming_json=json.dumps(naming),
+                structure_json=json.dumps(structure),
+                conventions_json=json.dumps(conventions)
+            ))
 
-            return knowledge_id
+            return knowledge.id
 
     def load_knowledge(self) -> Optional[dict]:
         """Load codebase knowledge from database."""
-        row = self.db.fetchone("SELECT * FROM codebase_knowledge LIMIT 1")
-        if not row:
-            return None
+        with self.db.session() as session:
+            knowledge = session.query(CodebaseKnowledge).first()
+            if not knowledge:
+                return None
 
-        knowledge_id = row['id']
+            # Load related data
+            technologies = session.query(Technology).filter_by(knowledge_id=knowledge.id).all()
+            arch = session.query(ArchitectureInfo).filter_by(knowledge_id=knowledge.id).first()
+            modules = session.query(ArchitectureModule).filter_by(knowledge_id=knowledge.id).all()
+            domains = session.query(Domain).filter_by(knowledge_id=knowledge.id).all()
+            patterns = session.query(Pattern).filter_by(knowledge_id=knowledge.id).first()
 
-        # Load technologies
-        tech_rows = self.db.fetchall(
-            "SELECT * FROM technologies WHERE knowledge_id = ?", (knowledge_id,)
-        )
+            languages = [t for t in technologies if t.tech_type == 'language']
+            frameworks = [t for t in technologies if t.tech_type == 'framework']
+            tools = [t for t in technologies if t.tech_type == 'tool']
 
-        languages = [r for r in tech_rows if r['tech_type'] == 'language']
-        frameworks = [r for r in tech_rows if r['tech_type'] == 'framework']
-        tools = [r for r in tech_rows if r['tech_type'] == 'tool']
-
-        # Load architecture
-        arch_row = self.db.fetchone(
-            "SELECT * FROM architecture_info WHERE knowledge_id = ?", (knowledge_id,)
-        )
-        module_rows = self.db.fetchall(
-            "SELECT * FROM architecture_modules WHERE knowledge_id = ?", (knowledge_id,)
-        )
-
-        # Load domains
-        domain_rows = self.db.fetchall(
-            "SELECT * FROM domains WHERE knowledge_id = ?", (knowledge_id,)
-        )
-
-        # Load patterns
-        pattern_row = self.db.fetchone(
-            "SELECT * FROM patterns WHERE knowledge_id = ?", (knowledge_id,)
-        )
-
-        return {
-            'version': row['version'],
-            'last_updated': row['last_updated'],
-            'project': {
-                'name': row['project_name'],
-                'type': row['project_type'],
-                'primary_language': row['primary_language'],
-            },
-            'technologies': {
-                'languages': [{
-                    'name': t['name'],
-                    'confidence': t['confidence'],
-                    'version': t['version'],
-                } for t in languages],
-                'frameworks': [{
-                    'name': t['name'],
-                    'confidence': t['confidence'],
-                    'entry_point': t['entry_point'],
-                    'config_file': t['config_file'],
-                } for t in frameworks],
-                'tools': [{
-                    'name': t['name'],
-                    'confidence': t['confidence'],
-                    'config_file': t['config_file'],
-                } for t in tools],
-            },
-            'architecture': {
-                'pattern': arch_row['pattern'] if arch_row else 'unknown',
-                'entry_points': self.db.from_json(arch_row['entry_points_json'], []) if arch_row else [],
-                'modules': [{
-                    'name': m['name'],
-                    'path': m['path'],
-                    'purpose': m['purpose'],
-                    'depends_on': self.db.from_json(m['depends_on_json'], []),
-                } for m in module_rows],
-            },
-            'domains': [{
-                'name': d['name'],
-                'keywords': self.db.from_json(d['keywords_json'], []),
-                'files': self.db.from_json(d['files_json'], []),
-                'models': self.db.from_json(d['models_json'], []),
-                'routes': self.db.from_json(d['routes_json'], []),
-            } for d in domain_rows],
-            'patterns': {
-                'naming': self.db.from_json(pattern_row['naming_json'], {}) if pattern_row else {},
-                'structure': self.db.from_json(pattern_row['structure_json'], {}) if pattern_row else {},
-                'conventions': self.db.from_json(pattern_row['conventions_json'], []) if pattern_row else [],
-            },
-            'statistics': self.db.from_json(row['statistics_json'], {}),
-        }
+            return {
+                'version': knowledge.version,
+                'last_updated': knowledge.last_updated.isoformat() if knowledge.last_updated else None,
+                'project': {
+                    'name': knowledge.project_name,
+                    'type': knowledge.project_type,
+                    'primary_language': knowledge.primary_language,
+                },
+                'technologies': {
+                    'languages': [{'name': t.name, 'confidence': t.confidence, 'version': t.version} for t in languages],
+                    'frameworks': [{'name': t.name, 'confidence': t.confidence, 'entry_point': t.entry_point, 'config_file': t.config_file} for t in frameworks],
+                    'tools': [{'name': t.name, 'confidence': t.confidence, 'config_file': t.config_file} for t in tools],
+                },
+                'architecture': {
+                    'pattern': arch.pattern if arch else 'unknown',
+                    'entry_points': json.loads(arch.entry_points_json) if arch and arch.entry_points_json else [],
+                    'modules': [{'name': m.name, 'path': m.path, 'purpose': m.purpose, 'depends_on': json.loads(m.depends_on_json or '[]')} for m in modules],
+                },
+                'domains': [{'name': d.name, 'keywords': json.loads(d.keywords_json or '[]'), 'files': json.loads(d.files_json or '[]'), 'models': json.loads(d.models_json or '[]'), 'routes': json.loads(d.routes_json or '[]')} for d in domains],
+                'patterns': {
+                    'naming': json.loads(patterns.naming_json) if patterns and patterns.naming_json else {},
+                    'structure': json.loads(patterns.structure_json) if patterns and patterns.structure_json else {},
+                    'conventions': json.loads(patterns.conventions_json) if patterns and patterns.conventions_json else [],
+                },
+                'statistics': json.loads(knowledge.statistics_json) if knowledge.statistics_json else {},
+            }
 
     def exists(self) -> bool:
         """Check if knowledge exists."""
-        row = self.db.fetchone("SELECT COUNT(*) as count FROM codebase_knowledge")
-        return row and row['count'] > 0
+        with self.db.session() as session:
+            return session.query(CodebaseKnowledge).count() > 0
 
     def clear(self):
         """Clear all knowledge data."""
-        with self.db.transaction() as conn:
-            conn.execute("DELETE FROM codebase_knowledge")
+        with self.db.session() as session:
+            session.query(CodebaseKnowledge).delete()
 
     # --- Expert Index ---
 
     def save_expert_index(self, experts: list[dict], keyword_map: dict,
                           path_map: dict, version: str = "1.0") -> int:
         """Save expert index, replacing any existing."""
-        now = datetime.now().isoformat()
-
-        with self.db.transaction() as conn:
+        with self.db.session() as session:
             # Clear existing index
-            conn.execute("DELETE FROM expert_index")
+            session.query(ExpertIndex).delete()
 
-            # Insert index record
-            cursor = conn.execute("""
-                INSERT INTO expert_index (version, last_updated, keyword_map_json, path_map_json)
-                VALUES (?, ?, ?, ?)
-            """, (version, now, self.db.to_json(keyword_map), self.db.to_json(path_map)))
-            index_id = cursor.lastrowid
+            # Create index record
+            index = ExpertIndex(
+                version=version,
+                last_updated=datetime.now(),
+                keyword_map_json=json.dumps(keyword_map),
+                path_map_json=json.dumps(path_map)
+            )
+            session.add(index)
+            session.flush()
 
-            # Insert expert entries
+            # Add expert entries
             for expert in experts:
                 triggers = expert.get('triggers', {})
-                conn.execute("""
-                    INSERT INTO expert_entries (index_id, name, expert_type, file_path, weight,
-                                               triggers_keywords_json, triggers_paths_json,
-                                               triggers_topics_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    index_id, expert.get('name'), expert.get('type'), expert.get('file'),
-                    expert.get('weight', 1.0),
-                    self.db.to_json(triggers.get('keywords', [])),
-                    self.db.to_json(triggers.get('paths', [])),
-                    self.db.to_json(triggers.get('topics', []))
+                session.add(ExpertEntry(
+                    index_id=index.id,
+                    name=expert.get('name'),
+                    expert_type=expert.get('type'),
+                    file_path=expert.get('file'),
+                    weight=expert.get('weight', 1.0),
+                    triggers_keywords_json=json.dumps(triggers.get('keywords', [])),
+                    triggers_paths_json=json.dumps(triggers.get('paths', [])),
+                    triggers_topics_json=json.dumps(triggers.get('topics', []))
                 ))
 
-            return index_id
+            return index.id
 
     def load_expert_index(self) -> Optional[dict]:
         """Load expert index from database."""
-        row = self.db.fetchone("SELECT * FROM expert_index LIMIT 1")
-        if not row:
-            return None
+        with self.db.session() as session:
+            index = session.query(ExpertIndex).first()
+            if not index:
+                return None
 
-        index_id = row['id']
-        expert_rows = self.db.fetchall(
-            "SELECT * FROM expert_entries WHERE index_id = ?", (index_id,)
-        )
+            entries = session.query(ExpertEntry).filter_by(index_id=index.id).all()
 
-        return {
-            'version': row['version'],
-            'last_updated': row['last_updated'],
-            'experts': [{
-                'name': e['name'],
-                'type': e['expert_type'],
-                'file': e['file_path'],
-                'weight': e['weight'],
-                'triggers': {
-                    'keywords': self.db.from_json(e['triggers_keywords_json'], []),
-                    'paths': self.db.from_json(e['triggers_paths_json'], []),
-                    'topics': self.db.from_json(e['triggers_topics_json'], []),
-                }
-            } for e in expert_rows],
-            'keyword_map': self.db.from_json(row['keyword_map_json'], {}),
-            'path_map': self.db.from_json(row['path_map_json'], {}),
-        }
+            return {
+                'version': index.version,
+                'last_updated': index.last_updated.isoformat() if index.last_updated else None,
+                'experts': [{
+                    'name': e.name,
+                    'type': e.expert_type,
+                    'file': e.file_path,
+                    'weight': e.weight,
+                    'triggers': {
+                        'keywords': json.loads(e.triggers_keywords_json or '[]'),
+                        'paths': json.loads(e.triggers_paths_json or '[]'),
+                        'topics': json.loads(e.triggers_topics_json or '[]'),
+                    }
+                } for e in entries],
+                'keyword_map': json.loads(index.keyword_map_json or '{}'),
+                'path_map': json.loads(index.path_map_json or '{}'),
+            }
 
     def has_expert_index(self) -> bool:
         """Check if expert index exists."""
-        row = self.db.fetchone("SELECT COUNT(*) as count FROM expert_index")
-        return row and row['count'] > 0
+        with self.db.session() as session:
+            return session.query(ExpertIndex).count() > 0
 
     # --- Scan Metadata ---
 
@@ -268,360 +242,261 @@ class KnowledgeRepository:
                        scan_type: str = "full", trigger: str = "manual",
                        experts_generated: list[str] = None) -> int:
         """Save scan metadata."""
-        with self.db.transaction() as conn:
-            cursor = conn.execute("""
-                INSERT INTO scan_metadata (scan_id, started_at, completed_at, duration_seconds,
-                                          files_scanned, scan_type, trigger_type, experts_generated_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(scan_id) DO UPDATE SET
-                    completed_at = excluded.completed_at,
-                    duration_seconds = excluded.duration_seconds,
-                    files_scanned = excluded.files_scanned,
-                    experts_generated_json = excluded.experts_generated_json
-            """, (scan_id, started_at, completed_at, duration_seconds, files_scanned,
-                  scan_type, trigger, self.db.to_json(experts_generated or [])))
-            return cursor.lastrowid
+        with self.db.session() as session:
+            # Check for existing scan
+            existing = session.query(ScanMetadata).filter_by(scan_id=scan_id).first()
+
+            if existing:
+                existing.completed_at = datetime.fromisoformat(completed_at) if completed_at else None
+                existing.duration_seconds = duration_seconds
+                existing.files_scanned = files_scanned
+                existing.experts_generated_json = json.dumps(experts_generated or [])
+                return existing.id
+            else:
+                scan = ScanMetadata(
+                    scan_id=scan_id,
+                    started_at=datetime.fromisoformat(started_at) if started_at else datetime.now(),
+                    completed_at=datetime.fromisoformat(completed_at) if completed_at else None,
+                    duration_seconds=duration_seconds,
+                    files_scanned=files_scanned,
+                    scan_type=scan_type,
+                    trigger_type=trigger,
+                    experts_generated_json=json.dumps(experts_generated or [])
+                )
+                session.add(scan)
+                session.flush()
+                return scan.id
 
     def load_scan_meta(self) -> Optional[dict]:
         """Load most recent scan metadata."""
-        row = self.db.fetchone(
-            "SELECT * FROM scan_metadata ORDER BY started_at DESC LIMIT 1"
-        )
-        if row:
-            row['experts_generated'] = self.db.from_json(row.get('experts_generated_json'), [])
-        return row
+        with self.db.session() as session:
+            scan = session.query(ScanMetadata).order_by(ScanMetadata.started_at.desc()).first()
+            if not scan:
+                return None
+
+            return {
+                'id': scan.id,
+                'scan_id': scan.scan_id,
+                'started_at': scan.started_at.isoformat() if scan.started_at else None,
+                'completed_at': scan.completed_at.isoformat() if scan.completed_at else None,
+                'duration_seconds': scan.duration_seconds,
+                'files_scanned': scan.files_scanned,
+                'scan_type': scan.scan_type,
+                'trigger_type': scan.trigger_type,
+                'experts_generated': json.loads(scan.experts_generated_json or '[]'),
+            }
 
     # --- Search Methods for Codebase Explorer ---
 
     def search_domains_by_keyword(self, keywords: list[str]) -> list[dict]:
-        """Search domains that match any of the given keywords.
-
-        Args:
-            keywords: List of keywords to search for in domain keywords.
-
-        Returns:
-            List of matching domains with their details.
-        """
+        """Search domains that match any of the given keywords."""
         if not keywords:
             return []
 
-        # Get knowledge ID first
-        knowledge_row = self.db.fetchone("SELECT id FROM codebase_knowledge LIMIT 1")
-        if not knowledge_row:
-            return []
+        with self.db.session() as session:
+            knowledge = session.query(CodebaseKnowledge).first()
+            if not knowledge:
+                return []
 
-        knowledge_id = knowledge_row['id']
+            domains = session.query(Domain).filter_by(knowledge_id=knowledge.id).all()
+            results = []
+            keywords_lower = [kw.lower() for kw in keywords]
 
-        # Fetch all domains and filter by keywords
-        domain_rows = self.db.fetchall(
-            "SELECT * FROM domains WHERE knowledge_id = ?", (knowledge_id,)
-        )
+            for d in domains:
+                domain_keywords = json.loads(d.keywords_json or '[]')
+                domain_keywords_lower = [dk.lower() for dk in domain_keywords]
 
-        results = []
-        keywords_lower = [kw.lower() for kw in keywords]
+                matching_keywords = [
+                    kw for kw in keywords_lower
+                    if any(kw in dk or dk in kw for dk in domain_keywords_lower)
+                ]
 
-        for d in domain_rows:
-            domain_keywords = self.db.from_json(d['keywords_json'], [])
-            domain_keywords_lower = [dk.lower() for dk in domain_keywords]
+                if matching_keywords:
+                    results.append({
+                        'name': d.name,
+                        'keywords': domain_keywords,
+                        'files': json.loads(d.files_json or '[]'),
+                        'models': json.loads(d.models_json or '[]'),
+                        'routes': json.loads(d.routes_json or '[]'),
+                        'matched_keywords': matching_keywords,
+                    })
 
-            # Check if any search keyword matches domain keywords
-            matching_keywords = [
-                kw for kw in keywords_lower
-                if any(kw in dk or dk in kw for dk in domain_keywords_lower)
-            ]
-
-            if matching_keywords:
-                results.append({
-                    'name': d['name'],
-                    'keywords': domain_keywords,
-                    'files': self.db.from_json(d['files_json'], []),
-                    'models': self.db.from_json(d['models_json'], []),
-                    'routes': self.db.from_json(d['routes_json'], []),
-                    'matched_keywords': matching_keywords,
-                })
-
-        return results
+            return results
 
     def search_modules_by_path(self, path_pattern: str) -> list[dict]:
-        """Search modules whose path matches the given pattern.
-
-        Args:
-            path_pattern: Pattern to match against module paths (case-insensitive substring match).
-
-        Returns:
-            List of matching modules with their details.
-        """
+        """Search modules whose path matches the given pattern."""
         if not path_pattern:
             return []
 
-        # Get knowledge ID first
-        knowledge_row = self.db.fetchone("SELECT id FROM codebase_knowledge LIMIT 1")
-        if not knowledge_row:
-            return []
+        with self.db.session() as session:
+            knowledge = session.query(CodebaseKnowledge).first()
+            if not knowledge:
+                return []
 
-        knowledge_id = knowledge_row['id']
+            modules = session.query(ArchitectureModule).filter_by(knowledge_id=knowledge.id).all()
+            results = []
+            pattern_lower = path_pattern.lower()
 
-        # Fetch all modules and filter by path pattern
-        module_rows = self.db.fetchall(
-            "SELECT * FROM architecture_modules WHERE knowledge_id = ?", (knowledge_id,)
-        )
+            for m in modules:
+                module_path = m.path or ''
+                module_name = m.name or ''
 
-        results = []
-        pattern_lower = path_pattern.lower()
+                if pattern_lower in module_path.lower() or pattern_lower in module_name.lower():
+                    results.append({
+                        'name': m.name,
+                        'path': m.path,
+                        'purpose': m.purpose,
+                        'depends_on': json.loads(m.depends_on_json or '[]'),
+                    })
 
-        for m in module_rows:
-            module_path = m['path'] or ''
-            module_name = m['name'] or ''
-
-            # Check if pattern matches path or name
-            if pattern_lower in module_path.lower() or pattern_lower in module_name.lower():
-                results.append({
-                    'name': m['name'],
-                    'path': m['path'],
-                    'purpose': m['purpose'],
-                    'depends_on': self.db.from_json(m['depends_on_json'], []),
-                })
-
-        return results
+            return results
 
     def get_technologies(self) -> dict:
-        """Get all technologies (languages, frameworks, tools) from knowledge store.
+        """Get all technologies from knowledge store."""
+        with self.db.session() as session:
+            knowledge = session.query(CodebaseKnowledge).first()
+            if not knowledge:
+                return {'languages': [], 'frameworks': [], 'tools': []}
 
-        Returns:
-            Dictionary with 'languages', 'frameworks', and 'tools' lists.
-        """
-        # Get knowledge ID first
-        knowledge_row = self.db.fetchone("SELECT id FROM codebase_knowledge LIMIT 1")
-        if not knowledge_row:
-            return {'languages': [], 'frameworks': [], 'tools': []}
+            technologies = session.query(Technology).filter_by(knowledge_id=knowledge.id).all()
 
-        knowledge_id = knowledge_row['id']
-
-        # Fetch all technologies
-        tech_rows = self.db.fetchall(
-            "SELECT * FROM technologies WHERE knowledge_id = ?", (knowledge_id,)
-        )
-
-        languages = []
-        frameworks = []
-        tools = []
-
-        for t in tech_rows:
-            tech_data = {
-                'name': t['name'],
-                'confidence': t['confidence'],
+            return {
+                'languages': [{'name': t.name, 'confidence': t.confidence, 'version': t.version} for t in technologies if t.tech_type == 'language'],
+                'frameworks': [{'name': t.name, 'confidence': t.confidence, 'entry_point': t.entry_point, 'config_file': t.config_file} for t in technologies if t.tech_type == 'framework'],
+                'tools': [{'name': t.name, 'confidence': t.confidence, 'config_file': t.config_file} for t in technologies if t.tech_type == 'tool'],
             }
 
-            if t['tech_type'] == 'language':
-                tech_data['version'] = t['version']
-                languages.append(tech_data)
-            elif t['tech_type'] == 'framework':
-                tech_data['entry_point'] = t['entry_point']
-                tech_data['config_file'] = t['config_file']
-                frameworks.append(tech_data)
-            elif t['tech_type'] == 'tool':
-                tech_data['config_file'] = t['config_file']
-                tools.append(tech_data)
-
-        return {
-            'languages': languages,
-            'frameworks': frameworks,
-            'tools': tools,
-        }
-
     def get_conventions(self) -> dict:
-        """Get coding conventions and patterns from knowledge store.
+        """Get coding conventions and patterns from knowledge store."""
+        with self.db.session() as session:
+            knowledge = session.query(CodebaseKnowledge).first()
+            if not knowledge:
+                return {'naming': {}, 'structure': {}, 'conventions': []}
 
-        Returns:
-            Dictionary with 'naming', 'structure', and 'conventions' data.
-        """
-        # Get knowledge ID first
-        knowledge_row = self.db.fetchone("SELECT id FROM codebase_knowledge LIMIT 1")
-        if not knowledge_row:
-            return {'naming': {}, 'structure': {}, 'conventions': []}
+            patterns = session.query(Pattern).filter_by(knowledge_id=knowledge.id).first()
+            if not patterns:
+                return {'naming': {}, 'structure': {}, 'conventions': []}
 
-        knowledge_id = knowledge_row['id']
-
-        # Fetch patterns
-        pattern_row = self.db.fetchone(
-            "SELECT * FROM patterns WHERE knowledge_id = ?", (knowledge_id,)
-        )
-
-        if not pattern_row:
-            return {'naming': {}, 'structure': {}, 'conventions': []}
-
-        return {
-            'naming': self.db.from_json(pattern_row['naming_json'], {}),
-            'structure': self.db.from_json(pattern_row['structure_json'], {}),
-            'conventions': self.db.from_json(pattern_row['conventions_json'], []),
-        }
+            return {
+                'naming': json.loads(patterns.naming_json or '{}'),
+                'structure': json.loads(patterns.structure_json or '{}'),
+                'conventions': json.loads(patterns.conventions_json or '[]'),
+            }
 
     # --- Coding Rules ---
 
     def save_coding_rule(self, rule) -> int:
-        """Save a coding rule to the database.
-
-        Args:
-            rule: CodingRule object with id, category, rule, severity, examples, source_files, confidence
-
-        Returns:
-            Row ID of the inserted/updated rule.
-        """
-        with self.db.transaction() as conn:
+        """Save a coding rule to the database."""
+        with self.db.session() as session:
             # Get knowledge ID
-            knowledge_row = conn.execute("SELECT id FROM codebase_knowledge LIMIT 1").fetchone()
-            knowledge_id = knowledge_row['id'] if knowledge_row else None
+            knowledge = session.query(CodebaseKnowledge).first()
+            knowledge_id = knowledge.id if knowledge else None
 
-            cursor = conn.execute("""
-                INSERT INTO coding_rules (knowledge_id, rule_id, category, rule_text, severity,
-                                         examples_json, source_files_json, confidence)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(rule_id) DO UPDATE SET
-                    category = excluded.category,
-                    rule_text = excluded.rule_text,
-                    severity = excluded.severity,
-                    examples_json = excluded.examples_json,
-                    source_files_json = excluded.source_files_json,
-                    confidence = MAX(coding_rules.confidence, excluded.confidence),
-                    updated_at = CURRENT_TIMESTAMP
-            """, (
-                knowledge_id,
-                rule.id,
-                rule.category,
-                rule.rule,
-                rule.severity,
-                self.db.to_json(rule.examples),
-                self.db.to_json(rule.source_files),
-                rule.confidence
-            ))
-            return cursor.lastrowid
+            # Check for existing rule
+            existing = session.query(CodingRule).filter_by(rule_id=rule.id).first()
+
+            if existing:
+                existing.category = rule.category
+                existing.rule_text = rule.rule
+                existing.severity = rule.severity
+                existing.examples_json = json.dumps(rule.examples)
+                existing.source_files_json = json.dumps(rule.source_files)
+                existing.confidence = max(existing.confidence, rule.confidence)
+                existing.updated_at = datetime.now()
+                return existing.id
+            else:
+                coding_rule = CodingRule(
+                    knowledge_id=knowledge_id,
+                    rule_id=rule.id,
+                    category=rule.category,
+                    rule_text=rule.rule,
+                    severity=rule.severity,
+                    examples_json=json.dumps(rule.examples),
+                    source_files_json=json.dumps(rule.source_files),
+                    confidence=rule.confidence
+                )
+                session.add(coding_rule)
+                session.flush()
+                return coding_rule.id
 
     def get_coding_rules(self, category: str = None, min_confidence: float = 0.0) -> list[dict]:
-        """Get coding rules from the database.
+        """Get coding rules from the database."""
+        with self.db.session() as session:
+            query = session.query(CodingRule).filter(CodingRule.confidence >= min_confidence)
 
-        Args:
-            category: Optional category filter (naming, structure, patterns, etc.)
-            min_confidence: Minimum confidence threshold (0.0 - 1.0)
+            if category:
+                query = query.filter_by(category=category)
 
-        Returns:
-            List of coding rule dictionaries.
-        """
-        query = "SELECT * FROM coding_rules WHERE confidence >= ?"
-        params = [min_confidence]
+            rules = query.order_by(CodingRule.severity.desc(), CodingRule.confidence.desc()).all()
 
-        if category:
-            query += " AND category = ?"
-            params.append(category)
-
-        query += " ORDER BY severity DESC, confidence DESC"
-
-        rows = self.db.fetchall(query, tuple(params))
-
-        return [{
-            'id': r['rule_id'],
-            'category': r['category'],
-            'rule': r['rule_text'],
-            'severity': r['severity'],
-            'examples': self.db.from_json(r['examples_json'], []),
-            'source_files': self.db.from_json(r['source_files_json'], []),
-            'confidence': r['confidence'],
-        } for r in rows]
+            return [{
+                'id': r.rule_id,
+                'category': r.category,
+                'rule': r.rule_text,
+                'severity': r.severity,
+                'examples': json.loads(r.examples_json or '[]'),
+                'source_files': json.loads(r.source_files_json or '[]'),
+                'confidence': r.confidence,
+            } for r in rules]
 
     def delete_coding_rule(self, rule_id: str) -> bool:
-        """Delete a coding rule by its ID.
-
-        Args:
-            rule_id: The rule ID to delete.
-
-        Returns:
-            True if a rule was deleted, False otherwise.
-        """
-        with self.db.transaction() as conn:
-            cursor = conn.execute("DELETE FROM coding_rules WHERE rule_id = ?", (rule_id,))
-            return cursor.rowcount > 0
+        """Delete a coding rule by its ID."""
+        with self.db.session() as session:
+            deleted = session.query(CodingRule).filter_by(rule_id=rule_id).delete()
+            return deleted > 0
 
     def clear_coding_rules(self):
         """Clear all coding rules."""
-        with self.db.transaction() as conn:
-            conn.execute("DELETE FROM coding_rules")
+        with self.db.session() as session:
+            session.query(CodingRule).delete()
 
     # --- Extended Scan Metadata (with Git State) ---
 
     def save_scan_metadata(self, metadata: dict) -> int:
-        """Save extended scan metadata including git state.
-
-        Args:
-            metadata: Dictionary with keys:
-                - git_commit_hash: Current HEAD commit hash
-                - git_branch: Current branch name
-                - scanned_paths: List of paths that were scanned
-                - trigger: What triggered the scan (manual, auto, post_build)
-                - scan_time: ISO timestamp of the scan
-                - mode: full or incremental
-
-        Returns:
-            Row ID of the inserted record.
-        """
-        with self.db.transaction() as conn:
-            cursor = conn.execute("""
-                INSERT INTO extended_scan_metadata
-                    (git_commit_hash, git_branch, scanned_paths_json, trigger_type,
-                     scan_time, scan_mode)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                metadata.get('git_commit_hash'),
-                metadata.get('git_branch'),
-                self.db.to_json(metadata.get('scanned_paths', [])),
-                metadata.get('trigger', 'manual'),
-                metadata.get('scan_time', datetime.now().isoformat()),
-                metadata.get('mode', 'full')
-            ))
-            return cursor.lastrowid
+        """Save extended scan metadata including git state."""
+        with self.db.session() as session:
+            scan = ExtendedScanMetadata(
+                git_commit_hash=metadata.get('git_commit_hash'),
+                git_branch=metadata.get('git_branch'),
+                scanned_paths_json=json.dumps(metadata.get('scanned_paths', [])),
+                trigger_type=metadata.get('trigger', 'manual'),
+                scan_time=datetime.fromisoformat(metadata['scan_time']) if metadata.get('scan_time') else datetime.now(),
+                scan_mode=metadata.get('mode', 'full')
+            )
+            session.add(scan)
+            session.flush()
+            return scan.id
 
     def get_scan_metadata(self) -> Optional[dict]:
-        """Get the most recent extended scan metadata.
+        """Get the most recent extended scan metadata."""
+        with self.db.session() as session:
+            scan = session.query(ExtendedScanMetadata).order_by(ExtendedScanMetadata.scan_time.desc()).first()
+            if not scan:
+                return None
 
-        Returns:
-            Dictionary with git_commit_hash, git_branch, scanned_paths, etc.
-        """
-        row = self.db.fetchone("""
-            SELECT * FROM extended_scan_metadata
-            ORDER BY scan_time DESC LIMIT 1
-        """)
-
-        if not row:
-            return None
-
-        return {
-            'id': row['id'],
-            'git_commit_hash': row['git_commit_hash'],
-            'git_branch': row['git_branch'],
-            'scanned_paths': self.db.from_json(row['scanned_paths_json'], []),
-            'trigger': row['trigger_type'],
-            'scan_time': row['scan_time'],
-            'mode': row['scan_mode'],
-        }
+            return {
+                'id': scan.id,
+                'git_commit_hash': scan.git_commit_hash,
+                'git_branch': scan.git_branch,
+                'scanned_paths': json.loads(scan.scanned_paths_json or '[]'),
+                'trigger': scan.trigger_type,
+                'scan_time': scan.scan_time.isoformat() if scan.scan_time else None,
+                'mode': scan.scan_mode,
+            }
 
     def get_scan_history(self, limit: int = 10) -> list[dict]:
-        """Get recent scan history.
+        """Get recent scan history."""
+        with self.db.session() as session:
+            scans = session.query(ExtendedScanMetadata).order_by(
+                ExtendedScanMetadata.scan_time.desc()
+            ).limit(limit).all()
 
-        Args:
-            limit: Maximum number of records to return.
-
-        Returns:
-            List of scan metadata dictionaries.
-        """
-        rows = self.db.fetchall("""
-            SELECT * FROM extended_scan_metadata
-            ORDER BY scan_time DESC LIMIT ?
-        """, (limit,))
-
-        return [{
-            'id': r['id'],
-            'git_commit_hash': r['git_commit_hash'],
-            'git_branch': r['git_branch'],
-            'scanned_paths': self.db.from_json(r['scanned_paths_json'], []),
-            'trigger': r['trigger_type'],
-            'scan_time': r['scan_time'],
-            'mode': r['scan_mode'],
-        } for r in rows]
+            return [{
+                'id': s.id,
+                'git_commit_hash': s.git_commit_hash,
+                'git_branch': s.git_branch,
+                'scanned_paths': json.loads(s.scanned_paths_json or '[]'),
+                'trigger': s.trigger_type,
+                'scan_time': s.scan_time.isoformat() if s.scan_time else None,
+                'mode': s.scan_mode,
+            } for s in scans]

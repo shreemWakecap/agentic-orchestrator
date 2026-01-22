@@ -1,17 +1,20 @@
 """
-Plan Repository.
+Plan Repository - ORM-based implementation.
 
-Handles all plan-related database operations.
+Handles all plan-related database operations using SQLAlchemy ORM.
 """
+import json
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..connection import Database
 
+from ..models import Plan, PlanPhase, PlanStep
+
 
 class PlanRepository:
-    """Repository for plan operations."""
+    """Repository for plan operations using ORM."""
 
     def __init__(self, db: "Database"):
         self.db = db
@@ -19,128 +22,154 @@ class PlanRepository:
     def create(self, plan_id: str, goal: str, request: str, raw_content: str,
                context: list[str] = None, verify: list[str] = None) -> int:
         """Create a new plan. Returns the row ID."""
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            cursor = conn.execute("""
-                INSERT INTO plans (plan_id, goal, request, raw_content, context_json,
-                                   verify_json, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                plan_id, goal, request, raw_content,
-                self.db.to_json(context or []),
-                self.db.to_json(verify or []),
-                now, now
-            ))
-            return cursor.lastrowid
+        with self.db.session() as session:
+            plan = Plan(
+                plan_id=plan_id,
+                goal=goal,
+                request=request,
+                raw_content=raw_content,
+                context_json=json.dumps(context or []),
+                verify_json=json.dumps(verify or []),
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            session.add(plan)
+            session.flush()
+            return plan.id
 
     def get_by_id(self, plan_id: str) -> Optional[dict]:
         """Get plan by plan_id."""
-        row = self.db.fetchone("SELECT * FROM plans WHERE plan_id = ?", (plan_id,))
-        if row:
-            row['context'] = self.db.from_json(row.get('context_json'), [])
-            row['verify'] = self.db.from_json(row.get('verify_json'), [])
-        return row
+        with self.db.session() as session:
+            plan = session.query(Plan).filter_by(plan_id=plan_id).first()
+            if not plan:
+                return None
 
-    def list_by_status(self, status: str) -> list[dict]:
+            return self._plan_to_dict(plan)
+
+    def list_by_status(self, status: str) -> List[dict]:
         """List plans by status."""
-        rows = self.db.fetchall(
-            "SELECT * FROM plans WHERE status = ? ORDER BY created_at DESC",
-            (status,)
-        )
-        for row in rows:
-            row['context'] = self.db.from_json(row.get('context_json'), [])
-            row['verify'] = self.db.from_json(row.get('verify_json'), [])
-        return rows
+        with self.db.session() as session:
+            plans = session.query(Plan).filter_by(status=status).order_by(Plan.created_at.desc()).all()
+            return [self._plan_to_dict(p) for p in plans]
 
-    def list_all(self) -> list[dict]:
+    def list_all(self) -> List[dict]:
         """List all plans ordered by creation."""
-        rows = self.db.fetchall("SELECT * FROM plans ORDER BY created_at DESC")
-        for row in rows:
-            row['context'] = self.db.from_json(row.get('context_json'), [])
-            row['verify'] = self.db.from_json(row.get('verify_json'), [])
-        return rows
+        with self.db.session() as session:
+            plans = session.query(Plan).order_by(Plan.created_at.desc()).all()
+            return [self._plan_to_dict(p) for p in plans]
 
     def update_status(self, plan_id: str, status: str):
         """Update plan status."""
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            if status == 'completed':
-                conn.execute("""
-                    UPDATE plans SET status = ?, updated_at = ?, completed_at = ?
-                    WHERE plan_id = ?
-                """, (status, now, now, plan_id))
-            else:
-                conn.execute("""
-                    UPDATE plans SET status = ?, updated_at = ? WHERE plan_id = ?
-                """, (status, now, plan_id))
+        with self.db.session() as session:
+            plan = session.query(Plan).filter_by(plan_id=plan_id).first()
+            if plan:
+                plan.status = status
+                plan.updated_at = datetime.now()
+                if status == 'completed':
+                    plan.completed_at = datetime.now()
 
     def update_content(self, plan_id: str, goal: str, request: str, raw_content: str):
         """Update plan content (goal, request, raw_content)."""
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            conn.execute("""
-                UPDATE plans SET goal = ?, request = ?, raw_content = ?, updated_at = ?
-                WHERE plan_id = ?
-            """, (goal, request, raw_content, now, plan_id))
+        with self.db.session() as session:
+            plan = session.query(Plan).filter_by(plan_id=plan_id).first()
+            if plan:
+                plan.goal = goal
+                plan.request = request
+                plan.raw_content = raw_content
+                plan.updated_at = datetime.now()
 
     def delete(self, plan_id: str):
         """Delete a plan (cascades to steps, phases, build state)."""
-        with self.db.transaction() as conn:
-            conn.execute("DELETE FROM plans WHERE plan_id = ?", (plan_id,))
+        with self.db.session() as session:
+            session.query(Plan).filter_by(plan_id=plan_id).delete()
 
     def add_phase(self, plan_id: str, phase_id: str, name: str,
                   phase_number: int, can_parallelize: bool = False):
         """Add a phase to a plan."""
-        with self.db.transaction() as conn:
-            conn.execute("""
-                INSERT INTO plan_phases (plan_id, phase_id, name, phase_number, can_parallelize)
-                VALUES (?, ?, ?, ?, ?)
-            """, (plan_id, phase_id, name, phase_number, int(can_parallelize)))
+        with self.db.session() as session:
+            phase = PlanPhase(
+                plan_id=plan_id,
+                phase_id=phase_id,
+                name=name,
+                phase_number=phase_number,
+                can_parallelize=can_parallelize
+            )
+            session.add(phase)
 
     def add_step(self, plan_id: str, phase_id: str, step_id: str, action: str,
                  description: str, step_order: int, target: str = None,
                  done: str = None, inputs: list[str] = None, needs: list[str] = None):
         """Add a step to a plan."""
-        with self.db.transaction() as conn:
-            conn.execute("""
-                INSERT INTO plan_steps (plan_id, phase_id, step_id, action, target,
-                                       description, done, inputs_json, needs_json, step_order)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                plan_id, phase_id, step_id, action, target, description, done,
-                self.db.to_json(inputs or []),
-                self.db.to_json(needs or []),
-                step_order
-            ))
+        with self.db.session() as session:
+            step = PlanStep(
+                plan_id=plan_id,
+                phase_id=phase_id,
+                step_id=step_id,
+                action=action,
+                target=target,
+                description=description,
+                done=done,
+                inputs_json=json.dumps(inputs or []),
+                needs_json=json.dumps(needs or []),
+                step_order=step_order
+            )
+            session.add(step)
 
-    def get_steps(self, plan_id: str) -> list[dict]:
+    def get_steps(self, plan_id: str) -> List[dict]:
         """Get all steps for a plan."""
-        rows = self.db.fetchall(
-            "SELECT * FROM plan_steps WHERE plan_id = ? ORDER BY step_order",
-            (plan_id,)
-        )
-        for row in rows:
-            row['inputs'] = self.db.from_json(row.get('inputs_json'), [])
-            row['needs'] = self.db.from_json(row.get('needs_json'), [])
-        return rows
+        with self.db.session() as session:
+            steps = session.query(PlanStep).filter_by(plan_id=plan_id).order_by(PlanStep.step_order).all()
+            return [{
+                'id': s.id,
+                'plan_id': s.plan_id,
+                'phase_id': s.phase_id,
+                'step_id': s.step_id,
+                'action': s.action,
+                'target': s.target,
+                'description': s.description,
+                'done': s.done,
+                'inputs': json.loads(s.inputs_json or '[]'),
+                'needs': json.loads(s.needs_json or '[]'),
+                'step_order': s.step_order,
+            } for s in steps]
 
-    def get_phases(self, plan_id: str) -> list[dict]:
+    def get_phases(self, plan_id: str) -> List[dict]:
         """Get all phases for a plan."""
-        return self.db.fetchall(
-            "SELECT * FROM plan_phases WHERE plan_id = ? ORDER BY phase_number",
-            (plan_id,)
-        )
+        with self.db.session() as session:
+            phases = session.query(PlanPhase).filter_by(plan_id=plan_id).order_by(PlanPhase.phase_number).all()
+            return [{
+                'id': p.id,
+                'plan_id': p.plan_id,
+                'phase_id': p.phase_id,
+                'name': p.name,
+                'phase_number': p.phase_number,
+                'can_parallelize': p.can_parallelize,
+            } for p in phases]
 
     def get_next_plan_number(self) -> int:
         """Get the next plan number for ID generation."""
-        row = self.db.fetchone("SELECT MAX(id) as max_id FROM plans")
-        if row and row['max_id']:
-            return row['max_id'] + 1
-        return 1
+        with self.db.session() as session:
+            from sqlalchemy import func
+            result = session.query(func.max(Plan.id)).scalar()
+            return (result or 0) + 1
 
     def exists(self, plan_id: str) -> bool:
         """Check if a plan exists."""
-        row = self.db.fetchone(
-            "SELECT 1 FROM plans WHERE plan_id = ?", (plan_id,)
-        )
-        return row is not None
+        with self.db.session() as session:
+            return session.query(Plan).filter_by(plan_id=plan_id).count() > 0
+
+    def _plan_to_dict(self, plan: Plan) -> dict:
+        """Convert Plan model to dictionary."""
+        return {
+            'id': plan.id,
+            'plan_id': plan.plan_id,
+            'goal': plan.goal,
+            'request': plan.request,
+            'raw_content': plan.raw_content,
+            'context': json.loads(plan.context_json or '[]'),
+            'verify': json.loads(plan.verify_json or '[]'),
+            'status': plan.status,
+            'created_at': plan.created_at.isoformat() if plan.created_at else None,
+            'updated_at': plan.updated_at.isoformat() if plan.updated_at else None,
+            'completed_at': plan.completed_at.isoformat() if plan.completed_at else None,
+        }

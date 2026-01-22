@@ -1,182 +1,159 @@
 """
-Build State Repository.
+Build State Repository - ORM-based implementation.
 
-Handles build state and step state database operations.
+Handles build state and step state database operations using SQLAlchemy ORM.
 """
+import json
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..connection import Database
 
+from ..models import BuildState, StepState, GoalVerificationState
+
 
 class BuildStateRepository:
-    """Repository for build state operations."""
+    """Repository for build state operations using ORM."""
 
     def __init__(self, db: "Database"):
         self.db = db
 
     def create(self, plan_id: str, total_steps: int = 0) -> int:
         """Create build state for a plan."""
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            cursor = conn.execute("""
-                INSERT INTO build_states (plan_id, status, started_at, updated_at, total_steps,
-                                         completed_steps_json, failed_steps_json, skipped_steps_json,
-                                         files_created_json, files_modified_json)
-                VALUES (?, 'pending', ?, ?, ?, '[]', '[]', '[]', '[]', '[]')
-            """, (plan_id, now, now, total_steps))
-            return cursor.lastrowid
+        with self.db.session() as session:
+            build_state = BuildState(
+                plan_id=plan_id,
+                status='pending',
+                total_steps=total_steps,
+                started_at=datetime.now(),
+                updated_at=datetime.now(),
+                completed_steps_json='[]',
+                failed_steps_json='[]',
+                skipped_steps_json='[]',
+                files_created_json='[]',
+                files_modified_json='[]'
+            )
+            session.add(build_state)
+            session.flush()
+            return build_state.id
 
     def get(self, plan_id: str) -> Optional[dict]:
         """Get build state for a plan."""
-        row = self.db.fetchone(
-            "SELECT * FROM build_states WHERE plan_id = ?", (plan_id,)
-        )
-        if row:
-            row['completed_steps'] = self.db.from_json(row.get('completed_steps_json'), [])
-            row['failed_steps'] = self.db.from_json(row.get('failed_steps_json'), [])
-            row['skipped_steps'] = self.db.from_json(row.get('skipped_steps_json'), [])
-            row['files_created'] = self.db.from_json(row.get('files_created_json'), [])
-            row['files_modified'] = self.db.from_json(row.get('files_modified_json'), [])
-        return row
+        with self.db.session() as session:
+            bs = session.query(BuildState).filter_by(plan_id=plan_id).first()
+            if not bs:
+                return None
+
+            return self._build_state_to_dict(bs)
 
     def update(self, plan_id: str, **kwargs):
         """Update build state fields."""
         if not kwargs:
             return
 
-        kwargs['updated_at'] = datetime.now().isoformat()
+        with self.db.session() as session:
+            bs = session.query(BuildState).filter_by(plan_id=plan_id).first()
+            if not bs:
+                return
 
-        # Convert list fields to JSON
-        for field in ['completed_steps', 'failed_steps', 'skipped_steps',
-                      'files_created', 'files_modified']:
-            if field in kwargs:
-                kwargs[f"{field}_json"] = self.db.to_json(kwargs.pop(field))
+            bs.updated_at = datetime.now()
 
-        set_clause = ", ".join(f"{k} = ?" for k in kwargs.keys())
-        values = list(kwargs.values()) + [plan_id]
+            # Handle JSON fields
+            json_field_mapping = {
+                'completed_steps': 'completed_steps_json',
+                'failed_steps': 'failed_steps_json',
+                'skipped_steps': 'skipped_steps_json',
+                'files_created': 'files_created_json',
+                'files_modified': 'files_modified_json',
+            }
 
-        with self.db.transaction() as conn:
-            conn.execute(
-                f"UPDATE build_states SET {set_clause} WHERE plan_id = ?",
-                values
-            )
+            for key, value in kwargs.items():
+                if key in json_field_mapping:
+                    setattr(bs, json_field_mapping[key], json.dumps(value))
+                elif hasattr(bs, key):
+                    setattr(bs, key, value)
 
     def set_step_state(self, plan_id: str, step_id: str, status: str,
                        started_at: str = None, completed_at: str = None,
                        retry_count: int = 0, error: str = None,
                        files_affected: list[str] = None, summary: str = None):
         """Create or update step state."""
-        with self.db.transaction() as conn:
-            conn.execute("""
-                INSERT INTO step_states (plan_id, step_id, status, started_at, completed_at,
-                                        retry_count, error, files_affected_json, summary)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(plan_id, step_id) DO UPDATE SET
-                    status = excluded.status,
-                    started_at = COALESCE(excluded.started_at, step_states.started_at),
-                    completed_at = excluded.completed_at,
-                    retry_count = excluded.retry_count,
-                    error = excluded.error,
-                    files_affected_json = excluded.files_affected_json,
-                    summary = excluded.summary
-            """, (
-                plan_id, step_id, status, started_at, completed_at,
-                retry_count, error,
-                self.db.to_json(files_affected or []),
-                summary
-            ))
+        with self.db.session() as session:
+            existing = session.query(StepState).filter_by(plan_id=plan_id, step_id=step_id).first()
 
-    def get_step_states(self, plan_id: str) -> list[dict]:
+            if existing:
+                existing.status = status
+                if started_at:
+                    existing.started_at = datetime.fromisoformat(started_at) if isinstance(started_at, str) else started_at
+                if completed_at:
+                    existing.completed_at = datetime.fromisoformat(completed_at) if isinstance(completed_at, str) else completed_at
+                existing.retry_count = retry_count
+                existing.error = error
+                existing.files_affected_json = json.dumps(files_affected or [])
+                existing.summary = summary
+            else:
+                step_state = StepState(
+                    plan_id=plan_id,
+                    step_id=step_id,
+                    status=status,
+                    started_at=datetime.fromisoformat(started_at) if started_at else None,
+                    completed_at=datetime.fromisoformat(completed_at) if completed_at else None,
+                    retry_count=retry_count,
+                    error=error,
+                    files_affected_json=json.dumps(files_affected or []),
+                    summary=summary
+                )
+                session.add(step_state)
+
+    def get_step_states(self, plan_id: str) -> List[dict]:
         """Get all step states for a plan."""
-        rows = self.db.fetchall(
-            "SELECT * FROM step_states WHERE plan_id = ?", (plan_id,)
-        )
-        for row in rows:
-            row['files_affected'] = self.db.from_json(row.get('files_affected_json'), [])
-        return rows
+        with self.db.session() as session:
+            states = session.query(StepState).filter_by(plan_id=plan_id).all()
+            return [self._step_state_to_dict(s) for s in states]
 
     def get_step_state(self, plan_id: str, step_id: str) -> Optional[dict]:
         """Get step state for a specific step."""
-        row = self.db.fetchone(
-            "SELECT * FROM step_states WHERE plan_id = ? AND step_id = ?",
-            (plan_id, step_id)
-        )
-        if row:
-            row['files_affected'] = self.db.from_json(row.get('files_affected_json'), [])
-        return row
+        with self.db.session() as session:
+            state = session.query(StepState).filter_by(plan_id=plan_id, step_id=step_id).first()
+            if not state:
+                return None
+            return self._step_state_to_dict(state)
 
     def exists(self, plan_id: str) -> bool:
         """Check if build state exists for a plan."""
-        row = self.db.fetchone(
-            "SELECT 1 FROM build_states WHERE plan_id = ?", (plan_id,)
-        )
-        return row is not None
+        with self.db.session() as session:
+            return session.query(BuildState).filter_by(plan_id=plan_id).count() > 0
 
     def clear(self, plan_id: str) -> bool:
-        """Clear all build state and step states for a plan.
-
-        This removes:
-        - The build state record
-        - All associated step state records
-
-        Returns True if any records were deleted.
-        """
-        with self.db.transaction() as conn:
-            # Delete step states first (child records)
-            conn.execute(
-                "DELETE FROM step_states WHERE plan_id = ?", (plan_id,)
-            )
-            # Delete build state
-            cursor = conn.execute(
-                "DELETE FROM build_states WHERE plan_id = ?", (plan_id,)
-            )
-            return cursor.rowcount > 0
+        """Clear all build state and step states for a plan."""
+        with self.db.session() as session:
+            session.query(StepState).filter_by(plan_id=plan_id).delete()
+            deleted = session.query(BuildState).filter_by(plan_id=plan_id).delete()
+            return deleted > 0
 
     def cancel(self, plan_id: str) -> bool:
-        """Cancel a build by setting status to 'cancelled'.
-
-        Allows graceful stopping of stuck or unwanted builds.
-
-        Returns True if the build was cancelled, False if not found.
-        """
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            cursor = conn.execute(
-                "UPDATE build_states SET status = 'cancelled', updated_at = ? WHERE plan_id = ?",
-                (now, plan_id)
-            )
-            return cursor.rowcount > 0
+        """Cancel a build by setting status to 'cancelled'."""
+        with self.db.session() as session:
+            bs = session.query(BuildState).filter_by(plan_id=plan_id).first()
+            if not bs:
+                return False
+            bs.status = 'cancelled'
+            bs.updated_at = datetime.now()
+            return True
 
     def pause(self, plan_id: str) -> bool:
-        """Pause a build by setting status to 'paused'.
-
-        Allows graceful pausing of builds that can be resumed later.
-
-        Returns True if the build was paused, False if not found.
-        """
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            cursor = conn.execute(
-                "UPDATE build_states SET status = 'paused', updated_at = ? WHERE plan_id = ?",
-                (now, plan_id)
-            )
-            return cursor.rowcount > 0
+        """Pause a build by setting status to 'paused'."""
+        with self.db.session() as session:
+            bs = session.query(BuildState).filter_by(plan_id=plan_id).first()
+            if not bs:
+                return False
+            bs.status = 'paused'
+            bs.updated_at = datetime.now()
+            return True
 
     def update_status(self, plan_id: str, status: str) -> bool:
-        """Update build state status.
-
-        This method is called by PlanStatusService to cascade status changes
-        from the Plan (aggregate root) to build_states.
-
-        Args:
-            plan_id: The plan identifier
-            status: New status value
-
-        Returns:
-            True if update succeeded, False if build state not found
-        """
+        """Update build state status."""
         self.update(plan_id, status=status)
         return True
 
@@ -185,227 +162,190 @@ class BuildStateRepository:
     # =====================================================
 
     def save_goal_context(self, plan_id: str, goal_context: dict) -> None:
-        """Save or update goal verification state.
+        """Save or update goal verification state."""
+        with self.db.session() as session:
+            existing = session.query(GoalVerificationState).filter_by(plan_id=plan_id).first()
 
-        Args:
-            plan_id: The plan identifier
-            goal_context: Dictionary with goal, original_request, verification_attempts,
-                         missing_items, completion_percentage, goal_achieved,
-                         context_notes, verify_commands
-        """
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            conn.execute("""
-                INSERT INTO goal_verification_state
-                (plan_id, goal, original_request, verification_attempt,
-                 missing_items_json, completion_percentage, goal_achieved,
-                 context_notes_json, verify_commands_json, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(plan_id) DO UPDATE SET
-                    goal = excluded.goal,
-                    original_request = excluded.original_request,
-                    verification_attempt = excluded.verification_attempt,
-                    missing_items_json = excluded.missing_items_json,
-                    completion_percentage = excluded.completion_percentage,
-                    goal_achieved = excluded.goal_achieved,
-                    context_notes_json = excluded.context_notes_json,
-                    verify_commands_json = excluded.verify_commands_json,
-                    updated_at = excluded.updated_at
-            """, (
-                plan_id,
-                goal_context.get('goal', ''),
-                goal_context.get('original_request', ''),
-                goal_context.get('verification_attempts', 0),
-                self.db.to_json(goal_context.get('missing_items', [])),
-                goal_context.get('completion_percentage', 0),
-                1 if goal_context.get('goal_achieved', False) else 0,
-                self.db.to_json(goal_context.get('context_notes', [])),
-                self.db.to_json(goal_context.get('verify_commands', [])),
-                now, now
-            ))
+            if existing:
+                existing.goal = goal_context.get('goal', '')
+                existing.original_request = goal_context.get('original_request', '')
+                existing.verification_attempt = goal_context.get('verification_attempts', 0)
+                existing.missing_items_json = json.dumps(goal_context.get('missing_items', []))
+                existing.completion_percentage = goal_context.get('completion_percentage', 0)
+                existing.goal_achieved = goal_context.get('goal_achieved', False)
+                existing.context_notes_json = json.dumps(goal_context.get('context_notes', []))
+                existing.verify_commands_json = json.dumps(goal_context.get('verify_commands', []))
+                existing.updated_at = datetime.now()
+            else:
+                state = GoalVerificationState(
+                    plan_id=plan_id,
+                    goal=goal_context.get('goal', ''),
+                    original_request=goal_context.get('original_request', ''),
+                    verification_attempt=goal_context.get('verification_attempts', 0),
+                    missing_items_json=json.dumps(goal_context.get('missing_items', [])),
+                    completion_percentage=goal_context.get('completion_percentage', 0),
+                    goal_achieved=goal_context.get('goal_achieved', False),
+                    context_notes_json=json.dumps(goal_context.get('context_notes', [])),
+                    verify_commands_json=json.dumps(goal_context.get('verify_commands', [])),
+                    created_at=datetime.now(),
+                    updated_at=datetime.now()
+                )
+                session.add(state)
 
     def get_goal_context(self, plan_id: str) -> Optional[dict]:
-        """Load goal verification state.
+        """Load goal verification state."""
+        with self.db.session() as session:
+            state = session.query(GoalVerificationState).filter_by(plan_id=plan_id).first()
+            if not state:
+                return None
 
-        Args:
-            plan_id: The plan identifier
-
-        Returns:
-            Dictionary with goal context or None if not found
-        """
-        row = self.db.fetchone(
-            "SELECT * FROM goal_verification_state WHERE plan_id = ?", (plan_id,)
-        )
-        if row:
             return {
-                'goal': row.get('goal', ''),
-                'original_request': row.get('original_request', ''),
-                'verification_attempts': row.get('verification_attempt', 0),
-                'missing_items': self.db.from_json(row.get('missing_items_json'), []),
-                'completion_percentage': row.get('completion_percentage', 0),
-                'goal_achieved': bool(row.get('goal_achieved', 0)),
-                'context_notes': self.db.from_json(row.get('context_notes_json'), []),
-                'verify_commands': self.db.from_json(row.get('verify_commands_json'), []),
+                'goal': state.goal or '',
+                'original_request': state.original_request or '',
+                'verification_attempts': state.verification_attempt or 0,
+                'missing_items': json.loads(state.missing_items_json or '[]'),
+                'completion_percentage': state.completion_percentage or 0,
+                'goal_achieved': bool(state.goal_achieved),
+                'context_notes': json.loads(state.context_notes_json or '[]'),
+                'verify_commands': json.loads(state.verify_commands_json or '[]'),
             }
-        return None
 
     def clear_goal_context(self, plan_id: str) -> bool:
-        """Clear goal verification state for a plan.
-
-        Args:
-            plan_id: The plan identifier
-
-        Returns:
-            True if deleted, False if not found
-        """
-        with self.db.transaction() as conn:
-            cursor = conn.execute(
-                "DELETE FROM goal_verification_state WHERE plan_id = ?", (plan_id,)
-            )
-            return cursor.rowcount > 0
+        """Clear goal verification state for a plan."""
+        with self.db.session() as session:
+            deleted = session.query(GoalVerificationState).filter_by(plan_id=plan_id).delete()
+            return deleted > 0
 
     # =====================================================
     # RETRY HISTORY TRACKING
     # =====================================================
 
-    def add_step_retry_history(
-        self, plan_id: str, step_id: str, error: str, duration_ms: int
-    ) -> None:
-        """Append to step retry history.
+    def add_step_retry_history(self, plan_id: str, step_id: str, error: str, duration_ms: int) -> None:
+        """Append to step retry history."""
+        with self.db.session() as session:
+            state = session.query(StepState).filter_by(plan_id=plan_id, step_id=step_id).first()
+            if not state:
+                return
 
-        Args:
-            plan_id: The plan identifier
-            step_id: The step identifier
-            error: Error message from the failed attempt
-            duration_ms: Duration of the failed attempt in milliseconds
-        """
-        now = datetime.now().isoformat()
+            history = json.loads(state.retry_history_json or '[]')
+            history.append({
+                'timestamp': datetime.now().isoformat(),
+                'error': error,
+                'duration_ms': duration_ms
+            })
+            state.retry_history_json = json.dumps(history)
 
-        # Get existing history
-        step_state = self.get_step_state(plan_id, step_id)
-        history = []
-        if step_state:
-            history = self.db.from_json(step_state.get('retry_history_json'), [])
-
-        # Append new entry
-        history.append({
-            'timestamp': now,
-            'error': error,
-            'duration_ms': duration_ms
-        })
-
-        with self.db.transaction() as conn:
-            conn.execute("""
-                UPDATE step_states
-                SET retry_history_json = ?
-                WHERE plan_id = ? AND step_id = ?
-            """, (self.db.to_json(history), plan_id, step_id))
-
-    def get_step_retry_history(self, plan_id: str, step_id: str) -> list[dict]:
-        """Get retry history for a step.
-
-        Args:
-            plan_id: The plan identifier
-            step_id: The step identifier
-
-        Returns:
-            List of retry history entries
-        """
-        step_state = self.get_step_state(plan_id, step_id)
-        if step_state:
-            return self.db.from_json(step_state.get('retry_history_json'), [])
-        return []
+    def get_step_retry_history(self, plan_id: str, step_id: str) -> List[dict]:
+        """Get retry history for a step."""
+        with self.db.session() as session:
+            state = session.query(StepState).filter_by(plan_id=plan_id, step_id=step_id).first()
+            if not state:
+                return []
+            return json.loads(state.retry_history_json or '[]')
 
     # =====================================================
     # FULL OUTPUT STORAGE
     # =====================================================
 
     def save_step_full_output(self, plan_id: str, step_id: str, output: str) -> None:
-        """Save full step output (up to 5000 chars).
-
-        Args:
-            plan_id: The plan identifier
-            step_id: The step identifier
-            output: Full output to save (will be truncated to 5000 chars)
-        """
-        truncated = output[:5000] if len(output) > 5000 else output
-        with self.db.transaction() as conn:
-            conn.execute("""
-                UPDATE step_states
-                SET full_output = ?
-                WHERE plan_id = ? AND step_id = ?
-            """, (truncated, plan_id, step_id))
+        """Save full step output (up to 5000 chars)."""
+        with self.db.session() as session:
+            state = session.query(StepState).filter_by(plan_id=plan_id, step_id=step_id).first()
+            if state:
+                state.full_output = output[:5000] if len(output) > 5000 else output
 
     def get_step_full_output(self, plan_id: str, step_id: str) -> Optional[str]:
-        """Get full step output.
-
-        Args:
-            plan_id: The plan identifier
-            step_id: The step identifier
-
-        Returns:
-            Full output or None if not found
-        """
-        row = self.db.fetchone(
-            "SELECT full_output FROM step_states WHERE plan_id = ? AND step_id = ?",
-            (plan_id, step_id)
-        )
-        return row.get('full_output') if row else None
+        """Get full step output."""
+        with self.db.session() as session:
+            state = session.query(StepState).filter_by(plan_id=plan_id, step_id=step_id).first()
+            return state.full_output if state else None
 
     # =====================================================
     # BATCH OPERATIONS
     # =====================================================
 
-    def batch_update_step_states(self, plan_id: str, step_updates: list[dict]) -> None:
-        """Atomically update multiple step states in one transaction.
-
-        Args:
-            plan_id: The plan identifier
-            step_updates: List of dicts with step_id and fields to update
-                         Each dict should have at least 'step_id' and 'status'
-        """
-        with self.db.transaction() as conn:
+    def batch_update_step_states(self, plan_id: str, step_updates: List[dict]) -> None:
+        """Atomically update multiple step states in one transaction."""
+        with self.db.session() as session:
             for update in step_updates:
-                step_id = update.pop('step_id')
-                status = update.get('status', 'pending')
-                started_at = update.get('started_at')
-                completed_at = update.get('completed_at')
-                retry_count = update.get('retry_count', 0)
-                error = update.get('error')
-                files_affected = update.get('files_affected', [])
-                summary = update.get('summary')
+                step_id = update.get('step_id')
+                if not step_id:
+                    continue
 
-                conn.execute("""
-                    INSERT INTO step_states (plan_id, step_id, status, started_at, completed_at,
-                                            retry_count, error, files_affected_json, summary)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(plan_id, step_id) DO UPDATE SET
-                        status = excluded.status,
-                        started_at = COALESCE(excluded.started_at, step_states.started_at),
-                        completed_at = excluded.completed_at,
-                        retry_count = excluded.retry_count,
-                        error = excluded.error,
-                        files_affected_json = excluded.files_affected_json,
-                        summary = excluded.summary
-                """, (
-                    plan_id, step_id, status, started_at, completed_at,
-                    retry_count, error,
-                    self.db.to_json(files_affected),
-                    summary
-                ))
+                existing = session.query(StepState).filter_by(plan_id=plan_id, step_id=step_id).first()
+
+                if existing:
+                    existing.status = update.get('status', existing.status)
+                    if update.get('started_at'):
+                        existing.started_at = datetime.fromisoformat(update['started_at']) if isinstance(update['started_at'], str) else update['started_at']
+                    if update.get('completed_at'):
+                        existing.completed_at = datetime.fromisoformat(update['completed_at']) if isinstance(update['completed_at'], str) else update['completed_at']
+                    existing.retry_count = update.get('retry_count', existing.retry_count)
+                    existing.error = update.get('error', existing.error)
+                    if 'files_affected' in update:
+                        existing.files_affected_json = json.dumps(update['files_affected'])
+                    existing.summary = update.get('summary', existing.summary)
+                else:
+                    state = StepState(
+                        plan_id=plan_id,
+                        step_id=step_id,
+                        status=update.get('status', 'pending'),
+                        started_at=datetime.fromisoformat(update['started_at']) if update.get('started_at') else None,
+                        completed_at=datetime.fromisoformat(update['completed_at']) if update.get('completed_at') else None,
+                        retry_count=update.get('retry_count', 0),
+                        error=update.get('error'),
+                        files_affected_json=json.dumps(update.get('files_affected', [])),
+                        summary=update.get('summary')
+                    )
+                    session.add(state)
 
     # =====================================================
     # EXECUTION MODE TRACKING
     # =====================================================
 
-    def update_execution_mode(
-        self, plan_id: str, mode: str, wave_index: int = 0
-    ) -> None:
-        """Update execution mode and wave index.
-
-        Args:
-            plan_id: The plan identifier
-            mode: 'sequential', 'parallel', or 'coordinated'
-            wave_index: Current wave index for parallel execution
-        """
+    def update_execution_mode(self, plan_id: str, mode: str, wave_index: int = 0) -> None:
+        """Update execution mode and wave index."""
         self.update(plan_id, execution_mode=mode, current_wave_index=wave_index)
+
+    # =====================================================
+    # HELPER METHODS
+    # =====================================================
+
+    def _build_state_to_dict(self, bs: BuildState) -> dict:
+        """Convert BuildState model to dictionary."""
+        return {
+            'id': bs.id,
+            'plan_id': bs.plan_id,
+            'status': bs.status,
+            'current_step': bs.current_step,
+            'current_phase': bs.current_phase,
+            'total_steps': bs.total_steps,
+            'last_error': bs.last_error,
+            'execution_mode': bs.execution_mode,
+            'current_wave_index': bs.current_wave_index,
+            'completed_steps': json.loads(bs.completed_steps_json or '[]'),
+            'failed_steps': json.loads(bs.failed_steps_json or '[]'),
+            'skipped_steps': json.loads(bs.skipped_steps_json or '[]'),
+            'files_created': json.loads(bs.files_created_json or '[]'),
+            'files_modified': json.loads(bs.files_modified_json or '[]'),
+            'started_at': bs.started_at.isoformat() if bs.started_at else None,
+            'updated_at': bs.updated_at.isoformat() if bs.updated_at else None,
+            'completed_at': bs.completed_at.isoformat() if bs.completed_at else None,
+        }
+
+    def _step_state_to_dict(self, ss: StepState) -> dict:
+        """Convert StepState model to dictionary."""
+        return {
+            'id': ss.id,
+            'plan_id': ss.plan_id,
+            'step_id': ss.step_id,
+            'status': ss.status,
+            'started_at': ss.started_at.isoformat() if ss.started_at else None,
+            'completed_at': ss.completed_at.isoformat() if ss.completed_at else None,
+            'retry_count': ss.retry_count,
+            'error': ss.error,
+            'files_affected': json.loads(ss.files_affected_json or '[]'),
+            'summary': ss.summary,
+            'full_output': ss.full_output,
+            'retry_history_json': ss.retry_history_json,
+        }

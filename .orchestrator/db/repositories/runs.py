@@ -1,17 +1,20 @@
 """
-Run Repository.
+Run Repository - ORM-based implementation.
 
-Handles active run tracking and events.
+Handles active run tracking and events using SQLAlchemy ORM.
 """
+import json
 from datetime import datetime
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..connection import Database
 
+from ..models import ActiveRun, RunEvent
+
 
 class RunRepository:
-    """Repository for active run tracking."""
+    """Repository for active run tracking using ORM."""
 
     def __init__(self, db: "Database"):
         self.db = db
@@ -19,73 +22,99 @@ class RunRepository:
     def create(self, run_id: str, workflow: str, description: str = None,
                plan_id: str = None, plan_path: str = None) -> int:
         """Create a new run."""
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            cursor = conn.execute("""
-                INSERT INTO active_runs (run_id, workflow, status, started_at, plan_id,
-                                        plan_path, description, progress)
-                VALUES (?, ?, 'pending', ?, ?, ?, ?, 0)
-            """, (run_id, workflow, now, plan_id, plan_path, description))
-            return cursor.lastrowid
+        with self.db.session() as session:
+            run = ActiveRun(
+                run_id=run_id,
+                workflow=workflow,
+                status='pending',
+                started_at=datetime.now(),
+                plan_id=plan_id,
+                plan_path=plan_path,
+                description=description,
+                progress=0,
+                data_json='{}'
+            )
+            session.add(run)
+            session.flush()
+            return run.id
 
     def get(self, run_id: str) -> Optional[dict]:
         """Get run by ID."""
-        row = self.db.fetchone(
-            "SELECT * FROM active_runs WHERE run_id = ?", (run_id,)
-        )
-        if row:
-            row['data'] = self.db.from_json(row.get('data_json'), {})
-        return row
+        with self.db.session() as session:
+            run = session.query(ActiveRun).filter_by(run_id=run_id).first()
+            if not run:
+                return None
+            return self._run_to_dict(run)
 
     def update(self, run_id: str, **kwargs):
         """Update run fields."""
-        if 'data' in kwargs:
-            kwargs['data_json'] = self.db.to_json(kwargs.pop('data'))
+        with self.db.session() as session:
+            run = session.query(ActiveRun).filter_by(run_id=run_id).first()
+            if not run:
+                return
 
-        set_clause = ", ".join(f"{k} = ?" for k in kwargs.keys())
-        values = list(kwargs.values()) + [run_id]
+            # Handle 'data' field specially
+            if 'data' in kwargs:
+                kwargs['data_json'] = json.dumps(kwargs.pop('data'))
 
-        with self.db.transaction() as conn:
-            conn.execute(
-                f"UPDATE active_runs SET {set_clause} WHERE run_id = ?",
-                values
-            )
+            for key, value in kwargs.items():
+                if hasattr(run, key):
+                    setattr(run, key, value)
 
     def add_event(self, run_id: str, event_type: str, data: dict = None):
         """Add event to run."""
-        now = datetime.now().isoformat()
-        with self.db.transaction() as conn:
-            conn.execute("""
-                INSERT INTO run_events (run_id, event_type, timestamp, data_json)
-                VALUES (?, ?, ?, ?)
-            """, (run_id, event_type, now, self.db.to_json(data)))
+        with self.db.session() as session:
+            event = RunEvent(
+                run_id=run_id,
+                event_type=event_type,
+                timestamp=datetime.now(),
+                data_json=json.dumps(data or {})
+            )
+            session.add(event)
 
-    def get_events(self, run_id: str, since_id: int = 0) -> list[dict]:
+    def get_events(self, run_id: str, since_id: int = 0) -> List[dict]:
         """Get events for a run since a given ID."""
-        rows = self.db.fetchall("""
-            SELECT * FROM run_events WHERE run_id = ? AND id > ?
-            ORDER BY timestamp
-        """, (run_id, since_id))
-        for row in rows:
-            row['data'] = self.db.from_json(row.get('data_json'), {})
-        return rows
+        with self.db.session() as session:
+            events = session.query(RunEvent).filter(
+                RunEvent.run_id == run_id,
+                RunEvent.id > since_id
+            ).order_by(RunEvent.timestamp).all()
 
-    def list_active(self, status: str = None) -> list[dict]:
+            return [{
+                'id': e.id,
+                'run_id': e.run_id,
+                'event_type': e.event_type,
+                'timestamp': e.timestamp.isoformat() if e.timestamp else None,
+                'data': json.loads(e.data_json or '{}'),
+            } for e in events]
+
+    def list_active(self, status: str = None) -> List[dict]:
         """List active runs with optional status filter."""
-        if status:
-            rows = self.db.fetchall(
-                "SELECT * FROM active_runs WHERE status = ? ORDER BY started_at DESC",
-                (status,)
-            )
-        else:
-            rows = self.db.fetchall(
-                "SELECT * FROM active_runs ORDER BY started_at DESC"
-            )
-        for row in rows:
-            row['data'] = self.db.from_json(row.get('data_json'), {})
-        return rows
+        with self.db.session() as session:
+            query = session.query(ActiveRun)
+            if status:
+                query = query.filter_by(status=status)
+            runs = query.order_by(ActiveRun.started_at.desc()).all()
+            return [self._run_to_dict(r) for r in runs]
 
     def delete(self, run_id: str):
         """Delete a run and its events."""
-        with self.db.transaction() as conn:
-            conn.execute("DELETE FROM active_runs WHERE run_id = ?", (run_id,))
+        with self.db.session() as session:
+            session.query(ActiveRun).filter_by(run_id=run_id).delete()
+
+    def _run_to_dict(self, run: ActiveRun) -> dict:
+        """Convert ActiveRun model to dictionary."""
+        return {
+            'id': run.id,
+            'run_id': run.run_id,
+            'workflow': run.workflow,
+            'status': run.status,
+            'started_at': run.started_at.isoformat() if run.started_at else None,
+            'completed_at': run.completed_at.isoformat() if run.completed_at else None,
+            'plan_id': run.plan_id,
+            'plan_path': run.plan_path,
+            'description': run.description,
+            'progress': run.progress,
+            'error': run.error,
+            'data': json.loads(run.data_json or '{}'),
+        }

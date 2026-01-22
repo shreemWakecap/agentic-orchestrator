@@ -115,6 +115,86 @@ const PlanList = (function() {
         expandedPlans.clear();
     }
 
+    // Status polling for building plans
+    let statusPollInterval = null;
+    const STATUS_POLL_INTERVAL_MS = 15000; // Poll every 15 seconds
+
+    /**
+     * Start polling for status updates when there are building plans
+     * This ensures the UI updates when builds complete
+     */
+    function startStatusPolling() {
+        // Check if there are any building plans on the page
+        const buildingPlans = document.querySelectorAll('[data-plan-state="building"], [data-plan-state="in-progress"]');
+        if (buildingPlans.length === 0) {
+            return; // No building plans, no need to poll
+        }
+
+        // Clear any existing interval
+        stopStatusPolling();
+
+        statusPollInterval = setInterval(async function() {
+            try {
+                const response = await fetch('/api/plans');
+                if (!response.ok) return;
+
+                const data = await response.json();
+
+                // Check if any building plan completed
+                let shouldRefresh = false;
+                document.querySelectorAll('.plan-item[data-plan-id]').forEach(function(item) {
+                    const planId = item.dataset.planId;
+                    const currentState = item.dataset.planState;
+
+                    if (currentState === 'building' || currentState === 'in-progress') {
+                        // Find this plan in the response
+                        const planData = data.plans ? data.plans.find(function(p) { return p.id === planId; }) : null;
+                        if (planData && (planData.state === 'completed' || planData.state === 'failed')) {
+                            shouldRefresh = true;
+                        }
+                    }
+                });
+
+                if (shouldRefresh) {
+                    stopStatusPolling();
+                    if (typeof Toast !== 'undefined') {
+                        Toast.success('Build status updated! Refreshing...');
+                    }
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                }
+            } catch (error) {
+                console.error('Status poll error:', error);
+            }
+        }, STATUS_POLL_INTERVAL_MS);
+    }
+
+    /**
+     * Stop status polling
+     */
+    function stopStatusPolling() {
+        if (statusPollInterval) {
+            clearInterval(statusPollInterval);
+            statusPollInterval = null;
+        }
+    }
+
+    /**
+     * Initialize the module (call on page load)
+     */
+    function init() {
+        // Start polling if there are building plans
+        startStatusPolling();
+    }
+
+    // Auto-initialize on DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
     // Public API
     return {
         togglePlan: togglePlan,
@@ -123,7 +203,9 @@ const PlanList = (function() {
         collapseAll: collapseAll,
         isExpanded: isExpanded,
         getExpandedPlans: getExpandedPlans,
-        reset: reset
+        reset: reset,
+        startStatusPolling: startStatusPolling,
+        stopStatusPolling: stopStatusPolling
     };
 })();
 

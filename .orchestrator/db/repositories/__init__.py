@@ -19,6 +19,7 @@ from .knowledge import KnowledgeRepository
 from .cost import CostRepository
 from .runs import RunRepository
 from .file_knowledge import FileKnowledgeRepository
+from .token_usage import TokenUsageRepository
 
 __all__ = [
     # Base and interfaces
@@ -36,4 +37,5 @@ __all__ = [
     "CostRepository",
     "RunRepository",
     "FileKnowledgeRepository",
+    "TokenUsageRepository",
 ]

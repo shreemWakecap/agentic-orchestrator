@@ -40,6 +40,7 @@ from portal.routes import (
     file_knowledge_router,
     tasks_router,
     chat_router,
+    token_analytics_router,
 )
 from portal.routes.health import set_version
 from portal.exception_handlers import register_exception_handlers
@@ -168,6 +169,7 @@ app.include_router(websocket_router)
 app.include_router(file_knowledge_router)
 app.include_router(tasks_router)
 app.include_router(chat_router)
+app.include_router(token_analytics_router)
 
 
 def run_portal(host: str = "127.0.0.1", port: int = 8000):

@@ -20,10 +20,25 @@ class PlanResponse(BaseModel):
         from_attributes = True
 
 
+class PlanCostEstimate(BaseModel):
+    """Cost estimation for a plan."""
+    estimated_tokens: int = Field(0, description="Estimated total tokens for implementation")
+    estimated_cost_usd: float = Field(0.0, description="Estimated cost in USD")
+    planning_tokens: Optional[int] = Field(None, description="Actual tokens used during planning")
+    planning_cost_usd: Optional[float] = Field(None, description="Actual planning cost in USD")
+    implementation_tokens: Optional[int] = Field(None, description="Actual tokens used during implementation")
+    implementation_cost_usd: Optional[float] = Field(None, description="Actual implementation cost in USD")
+    confidence: str = Field("medium", description="Estimate confidence: high, medium, low")
+    breakdown: Optional[Dict[str, Any]] = Field(None, description="Cost breakdown by agent/phase")
+
+
 class PlanDetailResponse(PlanResponse):
     """Detailed plan information including content."""
     content: Optional[str] = None
     complexity: Optional[str] = None
+    cost_estimate: Optional[PlanCostEstimate] = Field(None, description="Token cost estimate for this plan")
+    estimated_implementation_cost: Optional[float] = Field(None, description="Estimated token cost in USD for implementing this plan")
+    actual_planning_cost: Optional[float] = Field(None, description="Actual token cost in USD consumed during the planning process")
 
 
 class PlanListResponse(BaseModel):
@@ -294,3 +309,91 @@ class UpdatePlanResponse(BaseModel):
     plan_id: str
     updated_fields: List[str] = Field(default_factory=list, description="List of fields that were updated")
     message: str = "Plan updated successfully"
+
+
+# Token Usage Analytics Models
+
+class TokenUsageRecord(BaseModel):
+    """Individual token usage record for a run or plan."""
+    id: str = Field(..., description="Unique identifier for this usage record")
+    plan_id: Optional[str] = Field(None, description="Associated plan ID if applicable")
+    run_id: Optional[str] = Field(None, description="Associated run ID if applicable")
+    event_type: str = Field(..., description="Type of event: plan_estimate, run_execution, etc.")
+    timestamp: str = Field(..., description="ISO timestamp when usage was recorded")
+    input_tokens: int = Field(0, description="Number of input tokens consumed")
+    output_tokens: int = Field(0, description="Number of output tokens consumed")
+    total_tokens: int = Field(0, description="Total tokens (input + output)")
+    cost_usd: float = Field(0.0, description="Cost in USD for this usage")
+    model: Optional[str] = Field(None, description="Model used for this operation")
+    agent_type: Optional[str] = Field(None, description="Agent type: planner, builder, scout, etc.")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
+
+    class Config:
+        from_attributes = True
+
+
+class TokenUsageSummary(BaseModel):
+    """Aggregated token usage summary for a time period."""
+    period_start: str = Field(..., description="ISO timestamp for period start")
+    period_end: str = Field(..., description="ISO timestamp for period end")
+    total_input_tokens: int = Field(0, description="Total input tokens in period")
+    total_output_tokens: int = Field(0, description="Total output tokens in period")
+    total_tokens: int = Field(0, description="Total tokens in period")
+    total_cost_usd: float = Field(0.0, description="Total cost in USD for period")
+    run_count: int = Field(0, description="Number of runs in period")
+    plan_count: int = Field(0, description="Number of plans estimated in period")
+    average_tokens_per_run: float = Field(0.0, description="Average tokens per run")
+    average_cost_per_run: float = Field(0.0, description="Average cost per run in USD")
+    by_agent_type: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Usage breakdown by agent type")
+    by_model: Dict[str, Dict[str, Any]] = Field(default_factory=dict, description="Usage breakdown by model")
+
+
+class TokenComparison(BaseModel):
+    """Comparison between estimated and actual token usage."""
+    plan_id: str = Field(..., description="Plan ID for comparison")
+    plan_name: Optional[str] = Field(None, description="Plan name for display")
+    estimated_tokens: int = Field(0, description="Estimated tokens during planning")
+    estimated_cost_usd: float = Field(0.0, description="Estimated cost in USD")
+    actual_tokens: int = Field(0, description="Actual tokens consumed")
+    actual_cost_usd: float = Field(0.0, description="Actual cost in USD")
+    token_variance: int = Field(0, description="Difference: actual - estimated")
+    cost_variance: float = Field(0.0, description="Cost difference in USD")
+    variance_percentage: float = Field(0.0, description="Variance as percentage of estimate")
+    accuracy_rating: str = Field("unknown", description="Accuracy: accurate, over_estimated, under_estimated")
+    completed_at: Optional[str] = Field(None, description="When the plan was completed")
+
+
+class ErrorRateMetrics(BaseModel):
+    """Error rate calculations for token usage tracking."""
+    period_start: str = Field(..., description="ISO timestamp for period start")
+    period_end: str = Field(..., description="ISO timestamp for period end")
+    total_runs: int = Field(0, description="Total number of runs")
+    successful_runs: int = Field(0, description="Number of successful runs")
+    failed_runs: int = Field(0, description="Number of failed runs")
+    error_rate: float = Field(0.0, description="Error rate as decimal (0.0 to 1.0)")
+    error_rate_percentage: float = Field(0.0, description="Error rate as percentage")
+    tokens_wasted_on_failures: int = Field(0, description="Tokens consumed by failed runs")
+    cost_wasted_on_failures: float = Field(0.0, description="Cost in USD wasted on failures")
+    errors_by_type: Dict[str, int] = Field(default_factory=dict, description="Error count by error type")
+    errors_by_agent: Dict[str, int] = Field(default_factory=dict, description="Error count by agent type")
+
+
+class TokenTrendData(BaseModel):
+    """Time-series trend data for token usage charts."""
+    timestamp: str = Field(..., description="ISO timestamp for this data point")
+    period_label: str = Field(..., description="Human-readable period label (e.g., 'Jan 15', 'Week 3')")
+    total_tokens: int = Field(0, description="Total tokens for this period")
+    total_cost_usd: float = Field(0.0, description="Total cost for this period")
+    run_count: int = Field(0, description="Number of runs in this period")
+    error_count: int = Field(0, description="Number of errors in this period")
+    average_tokens_per_run: float = Field(0.0, description="Average tokens per run")
+
+
+class TokenAnalyticsResponse(BaseModel):
+    """Comprehensive token analytics response for dashboard."""
+    summary: TokenUsageSummary = Field(..., description="Aggregated usage summary")
+    trends: List[TokenTrendData] = Field(default_factory=list, description="Time-series trend data")
+    comparisons: List[TokenComparison] = Field(default_factory=list, description="Estimated vs actual comparisons")
+    error_metrics: ErrorRateMetrics = Field(..., description="Error rate metrics")
+    recent_records: List[TokenUsageRecord] = Field(default_factory=list, description="Recent usage records")
+    date_range: Dict[str, str] = Field(default_factory=dict, description="Applied date range filter")

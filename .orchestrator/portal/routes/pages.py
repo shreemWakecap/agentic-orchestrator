@@ -11,9 +11,11 @@ from portal.dependencies import (
     get_run_repo,
     get_knowledge_repo,
     get_build_state_repo,
+    get_token_usage_service,
 )
 from portal.services.plan_service import PlanService
 from portal.services.knowledge_service import KnowledgeService
+from portal.services.token_usage_service import TokenUsageService
 
 # Setup templates
 PORTAL_DIR = Path(__file__).parent.parent
@@ -230,3 +232,39 @@ async def knowledge_page(
 async def settings_page(request: Request):
     """Render settings page for database configuration and system settings."""
     return templates.TemplateResponse(request, "settings.html", {})
+
+
+@router.get("/token-analytics", response_class=HTMLResponse)
+async def token_analytics_page(
+    request: Request,
+    token_usage_service: TokenUsageService = Depends(get_token_usage_service),
+):
+    """Render token analytics dashboard page."""
+    # Get analytics data for default period (last 30 days)
+    analytics = token_usage_service.get_analytics()
+
+    # Get comparison metrics for estimated vs actual
+    comparison = token_usage_service.get_comparison_metrics()
+
+    # Get error rates
+    error_rates = token_usage_service.calculate_error_rates()
+
+    # Get usage trends
+    trends = token_usage_service.get_usage_trends()
+
+    # Get recent usage records for display
+    from db.repositories.token_usage import get_token_usage_repository
+    token_repo = get_token_usage_repository()
+    recent_records = token_repo.get_usage_records(limit=20)
+
+    return templates.TemplateResponse(
+        request,
+        "token_analytics.html",
+        {
+            "analytics": analytics,
+            "comparison": comparison,
+            "error_rates": error_rates,
+            "trends": trends,
+            "recent_records": recent_records,
+        },
+    )

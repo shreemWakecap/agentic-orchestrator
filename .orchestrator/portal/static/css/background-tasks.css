@@ -361,18 +361,10 @@
     border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
-.dark .task-status-badge.pending {
-    color: #fcd34d;
-}
-
 .task-status-badge.running {
     background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.15) 100%);
     color: var(--color-success-700);
     border: 1px solid rgba(16, 185, 129, 0.3);
-}
-
-.dark .task-status-badge.running {
-    color: var(--color-success-300);
 }
 
 .task-status-badge.completed {
@@ -381,18 +373,10 @@
     border: 1px solid rgba(16, 185, 129, 0.3);
 }
 
-.dark .task-status-badge.completed {
-    color: #6ee7b7;
-}
-
 .task-status-badge.failed {
     background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.15) 100%);
     color: #b91c1c;
     border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.dark .task-status-badge.failed {
-    color: #fca5a5;
 }
 
 /* Badge dot indicator */

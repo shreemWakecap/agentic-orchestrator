@@ -476,167 +476,6 @@
 }
 
 /* ============================================
-   DARK MODE VARIABLES
-   Rich, sophisticated dark theme with indigo accents
-   ============================================ */
-.dark,
-[data-theme="dark"] {
-    /* ============================================
-       SURFACE COLORS - Dark Mode
-       ============================================ */
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-tertiary: #334155;
-    --bg-elevated: #1e293b;
-    --bg-overlay: rgba(0, 0, 0, 0.75);
-
-    /* Surface aliases */
-    --surface-primary: #0f172a;
-    --surface-secondary: #1e293b;
-    --surface-tertiary: #334155;
-    --surface-elevated: #1e293b;
-    --surface-overlay: rgba(0, 0, 0, 0.75);
-    --surface-inverse: #ffffff;
-
-    /* Interactive surface states - Dark Mode */
-    --surface-hover: #334155;
-    --surface-active: #475569;
-    --surface-selected: #1e1b4b;
-    --surface-selected-hover: #312e81;
-    --surface-disabled: #1e293b;
-
-    /* Brand surface tints - Dark Mode (Indigo) */
-    --surface-primary-subtle: rgba(99, 102, 241, 0.1);
-    --surface-primary-muted: rgba(99, 102, 241, 0.15);
-    --surface-accent-subtle: rgba(6, 182, 212, 0.1);
-    --surface-accent-muted: rgba(6, 182, 212, 0.15);
-
-    /* Status surface tints - Dark Mode */
-    --surface-building-subtle: rgba(168, 85, 247, 0.1);
-    --surface-building-muted: rgba(168, 85, 247, 0.15);
-    --surface-stuck-subtle: rgba(249, 115, 22, 0.1);
-    --surface-stuck-muted: rgba(249, 115, 22, 0.15);
-
-    /* ============================================
-       TEXT COLORS - Dark Mode
-       ============================================ */
-    --text-primary: #f9fafb;
-    --text-secondary: #d1d5db;
-    --text-tertiary: #9ca3af;
-    --text-muted: #6b7280;
-    --text-disabled: #4b5563;
-    --text-inverse: #111827;
-    --text-on-primary: #ffffff;
-    --text-on-dark: #f3f4f6;
-
-    /* Semantic text colors - Dark Mode */
-    --text-success: #34d399;
-    --text-warning: #fde047;
-    --text-error: #fb7185;
-    --text-info: #38bdf8;
-    --text-building: #c084fc;
-    --text-stuck: #fb923c;
-    --text-link: #818cf8;
-    --text-link-hover: #a5b4fc;
-
-    /* ============================================
-       BORDER COLORS - Dark Mode
-       ============================================ */
-    --border-light: #374151;
-    --border-default: #4b5563;
-    --border-dark: #6b7280;
-
-    /* Border aliases */
-    --border-subtle: #374151;
-    --border-strong: #6b7280;
-    --border-focus: #818cf8;
-    --border-error: #fb7185;
-    --border-success: #34d399;
-    --border-warning: #fde047;
-    --border-info: #38bdf8;
-    --border-building: #c084fc;
-    --border-stuck: #fb923c;
-
-    /* ============================================
-       GLASS EFFECT - Dark with Indigo Tint
-       ============================================ */
-    --glass-bg: rgba(30, 41, 59, 0.85);
-    --glass-bg-strong: rgba(30, 41, 59, 0.95);
-    --glass-border: rgba(129, 140, 248, 0.2);
-    --glass-tint: rgba(129, 140, 248, 0.08);
-
-    /* ============================================
-       SHADOWS - Dark Mode
-       ============================================ */
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.4);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
-    --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
-    --shadow-soft: 0 2px 15px -3px rgba(0, 0, 0, 0.4), 0 10px 20px -2px rgba(0, 0, 0, 0.3);
-
-    /* Shadow glows - Dark Mode (brighter) */
-    --shadow-glow-primary: 0 0 30px rgba(99, 102, 241, 0.4);
-    --shadow-glow-accent: 0 0 30px rgba(34, 211, 238, 0.4);
-    --shadow-glow-success: 0 0 30px rgba(52, 211, 153, 0.4);
-    --shadow-glow-error: 0 0 30px rgba(251, 113, 133, 0.4);
-    --shadow-glow-building: 0 0 30px rgba(192, 132, 252, 0.4);
-    --shadow-glow-stuck: 0 0 30px rgba(251, 146, 60, 0.4);
-
-    /* ============================================
-       GRADIENTS - Dark Mode
-       ============================================ */
-    --gradient-primary: linear-gradient(135deg, #818cf8 0%, #6366f1 100%);
-    --gradient-primary-hover: linear-gradient(135deg, #a5b4fc 0%, #818cf8 100%);
-    --gradient-primary-subtle: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(99, 102, 241, 0.1) 100%);
-    --gradient-success: linear-gradient(135deg, #6ee7b7 0%, #34d399 100%);
-    --gradient-warning: linear-gradient(135deg, #fef08a 0%, #fde047 100%);
-    --gradient-danger: linear-gradient(135deg, #fda4af 0%, #fb7185 100%);
-    --gradient-error: linear-gradient(135deg, #fda4af 0%, #fb7185 100%);
-    --gradient-info: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 100%);
-    --gradient-accent: linear-gradient(135deg, #67e8f9 0%, #22d3ee 100%);
-    --gradient-building: linear-gradient(135deg, #d8b4fe 0%, #c084fc 100%);
-    --gradient-stuck: linear-gradient(135deg, #fdba74 0%, #fb923c 100%);
-    --gradient-subtle: linear-gradient(180deg, rgba(30, 41, 59, 0) 0%, rgba(15, 23, 42, 1) 100%);
-    --gradient-hero: linear-gradient(135deg, #818cf8 0%, #22d3ee 100%);
-
-    /* Mesh gradients - Dark mode */
-    --gradient-mesh: radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.2) 0px, transparent 50%),
-                     radial-gradient(at 80% 0%, rgba(34, 211, 238, 0.15) 0px, transparent 50%),
-                     radial-gradient(at 0% 50%, rgba(192, 132, 252, 0.12) 0px, transparent 50%);
-    --gradient-surface-brand: linear-gradient(180deg, rgba(99, 102, 241, 0.1) 0%, #0f172a 100%);
-    --gradient-surface-subtle: linear-gradient(180deg, rgba(30, 41, 59, 0) 0%, #0f172a 100%);
-    --gradient-mesh-brand:
-        radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.2) 0px, transparent 50%),
-        radial-gradient(at 80% 0%, rgba(34, 211, 238, 0.15) 0px, transparent 50%),
-        radial-gradient(at 0% 50%, rgba(192, 132, 252, 0.12) 0px, transparent 50%);
-
-    /* ============================================
-       INTERACTIVE STATES - Dark Mode
-       ============================================ */
-    --interactive-primary: #6366f1;
-    --interactive-primary-hover: #818cf8;
-    --interactive-primary-active: #4f46e5;
-    --interactive-primary-disabled: #3730a3;
-
-    --interactive-secondary: #374151;
-    --interactive-secondary-hover: #4b5563;
-    --interactive-secondary-active: #6b7280;
-    --interactive-secondary-disabled: #1f2937;
-
-    --interactive-outline-border: #4b5563;
-    --interactive-outline-hover-bg: rgba(99, 102, 241, 0.1);
-    --interactive-outline-hover-border: #818cf8;
-    --interactive-outline-active-bg: rgba(99, 102, 241, 0.2);
-
-    /* ============================================
-       FOCUS RING - Dark Mode
-       ============================================ */
-    --focus-ring-color: rgba(129, 140, 248, 0.5);
-}
-
-/* ============================================
    GLASSMORPHISM UTILITY CLASSES
    ============================================ */
 .glass {
@@ -1023,37 +862,6 @@
 .border-dark { border-color: var(--border-dark); }
 
 /* ============================================
-   DARK MODE TOGGLE ANIMATION
-   ============================================ */
-.dark-mode-toggle {
-    position: relative;
-    width: 3rem;
-    height: 1.5rem;
-    border-radius: var(--radius-full);
-    background: var(--bg-tertiary);
-    cursor: pointer;
-    transition: background var(--transition-base);
-}
-
-.dark-mode-toggle::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: calc(1.5rem - 4px);
-    height: calc(1.5rem - 4px);
-    border-radius: var(--radius-full);
-    background: var(--bg-primary);
-    box-shadow: var(--shadow-sm);
-    transition: transform var(--transition-bounce);
-}
-
-.dark .dark-mode-toggle::after,
-[data-theme="dark"] .dark-mode-toggle::after {
-    transform: translateX(1.5rem);
-}
-
-/* ============================================
    ENHANCED TEXTAREA COMPONENT
    ============================================ */
 .textarea-enhanced {
@@ -1256,27 +1064,6 @@
 }
 
 /* ============================================
-   DARK MODE ADJUSTMENTS FOR TEXTAREA
-   ============================================ */
-.dark .textarea-enhanced,
-[data-theme="dark"] .textarea-enhanced {
-    background: var(--bg-secondary);
-}
-
-.dark .textarea-enhanced:focus,
-[data-theme="dark"] .textarea-enhanced:focus {
-    background: var(--bg-primary);
-    box-shadow:
-        0 0 0 3px rgba(16, 185, 129, 0.3),
-        var(--shadow-md);
-}
-
-.dark .textarea-char-count,
-[data-theme="dark"] .textarea-char-count {
-    background: var(--bg-secondary);
-}
-
-/* ============================================
    COLLAPSIBLE SYNC SECTION
    ============================================ */
 .sync-section-header {
@@ -1289,11 +1076,6 @@
 
 .sync-section-header:hover {
     background-color: rgba(var(--color-secondary-200), 0.3);
-}
-
-.dark .sync-section-header:hover,
-[data-theme="dark"] .sync-section-header:hover {
-    background-color: rgba(var(--color-secondary-700), 0.3);
 }
 
 .sync-section-content {

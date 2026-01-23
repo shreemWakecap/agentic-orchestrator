@@ -10,7 +10,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
-            darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
@@ -267,13 +266,6 @@
             }
         }
 
-        /* Theme transition for smooth dark/light mode switching */
-        html.theme-transition,
-        html.theme-transition *,
-        html.theme-transition *::before,
-        html.theme-transition *::after {
-            transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, box-shadow 200ms ease !important;
-        }
         /* Button Styles */
         .btn {
             display: inline-flex;
@@ -427,16 +419,6 @@
             box-shadow: 0 0 0 3px rgba(var(--color-primary-500-rgb, 99, 102, 241), 0.15);
         }
         .textarea-modern::placeholder { color: var(--text-muted, #9ca3af); }
-        .dark .textarea-modern {
-            background: var(--bg-secondary, #1f2937);
-            border-color: var(--border-default, #374151);
-            color: var(--text-primary, #e5e7eb);
-        }
-        .dark .textarea-modern:focus {
-            border-color: var(--color-primary-400, #818cf8);
-            box-shadow: 0 0 0 3px rgba(var(--color-primary-400-rgb, 129, 140, 248), 0.2);
-        }
-        .dark .textarea-modern::placeholder { color: var(--text-muted, #6b7280); }
 
         /* Preview Area - Scrollable text preview with proper formatting */
         .preview-area {
@@ -463,17 +445,6 @@
         }
         .preview-area::-webkit-scrollbar-thumb:hover {
             background-color: rgba(var(--color-neutral-400-rgb, 156, 163, 175), 0.7);
-        }
-        .dark .preview-area {
-            background: var(--bg-tertiary, #111827);
-            border-color: var(--border-default, #374151);
-            color: var(--text-primary, #e5e7eb);
-        }
-        .dark .preview-area::-webkit-scrollbar-thumb {
-            background-color: rgba(var(--color-neutral-500-rgb, 100, 116, 139), 0.5);
-        }
-        .dark .preview-area::-webkit-scrollbar-thumb:hover {
-            background-color: rgba(var(--color-neutral-500-rgb, 100, 116, 139), 0.7);
         }
 
         /* Progress Bar */
@@ -521,7 +492,6 @@
             z-index: 40;
         }
         .side-popup-overlay.active { opacity: 1; visibility: visible; }
-        .dark .side-popup-overlay { background-color: var(--surface-overlay, rgba(0, 0, 0, 0.6)); }
 
         .side-popup {
             position: fixed;
@@ -545,11 +515,6 @@
             transform: translateX(0);
             animation: slideInPanel 0.4s cubic-bezier(0.32, 0.72, 0, 1);
         }
-        .dark .side-popup {
-            background: var(--glass-bg-strong, rgba(31, 41, 55, 0.95));
-            border-left: 1px solid var(--glass-border, rgba(255, 255, 255, 0.1));
-            box-shadow: var(--shadow-2xl, -10px 0 40px rgba(0, 0, 0, 0.4), -2px 0 10px rgba(0, 0, 0, 0.2));
-        }
 
         @keyframes slideInPanel {
             0% {
@@ -572,11 +537,6 @@
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
         }
-        .dark .side-popup-header {
-            background: var(--glass-bg, linear-gradient(to right, rgba(31, 41, 55, 0.9), rgba(55, 65, 81, 0.9)));
-            border-bottom: 1px solid var(--border-default, rgba(75, 85, 99, 0.5));
-        }
-        .dark .side-popup-header h2 { color: var(--text-primary, #f3f4f6); }
 
         .side-popup-content {
             flex: 1;
@@ -594,7 +554,6 @@
         .side-popup-content::-webkit-scrollbar-thumb:hover {
             background-color: rgba(var(--color-neutral-400-rgb, 156, 163, 175), 0.7);
         }
-        .dark .side-popup-content { color: var(--text-primary, #e5e7eb); }
 
         .side-popup-close {
             display: flex;
@@ -619,14 +578,6 @@
         .side-popup-close:focus {
             outline: none;
             box-shadow: 0 0 0 2px rgba(var(--color-primary-500-rgb, 99, 102, 241), 0.3);
-        }
-        .dark .side-popup-close {
-            color: var(--text-muted, #9ca3af);
-            background: rgba(255, 255, 255, 0.05);
-        }
-        .dark .side-popup-close:hover {
-            background: rgba(var(--color-error-500-rgb, 244, 63, 94), 0.2);
-            color: var(--color-error-400, #fb7185);
         }
 
         /* Expand/Collapse Animation */
@@ -671,12 +622,6 @@
         .brand-link:hover .brand-text {
             color: var(--color-primary-600, #4f46e5);
         }
-        .dark .brand-text {
-            color: var(--text-primary, #e5e7eb);
-        }
-        .dark .brand-link:hover .brand-text {
-            color: var(--color-primary-400, #818cf8);
-        }
 
         /* Navigation Link Styles - Indigo Accent */
         .nav-link-green {
@@ -720,28 +665,9 @@
             outline: none;
             box-shadow: 0 0 0 2px rgba(var(--color-primary-500-rgb, 99, 102, 241), 0.3);
         }
-        /* Dark mode navigation */
-        .dark .nav-link-green {
-            color: var(--text-secondary);
-        }
-        .dark .nav-link-green:hover {
-            color: var(--color-primary-400, #818cf8);
-            background-color: rgba(var(--color-primary-400-rgb, 129, 140, 248), 0.1);
-        }
-        .dark .nav-link-green:active {
-            color: var(--color-primary-300, #a5b4fc);
-            background-color: rgba(var(--color-primary-400-rgb, 129, 140, 248), 0.15);
-        }
-        .dark .nav-link-green.active {
-            color: var(--color-primary-400, #818cf8);
-            background-color: rgba(var(--color-primary-400-rgb, 129, 140, 248), 0.12);
-        }
-        .dark .nav-link-green::after {
-            background: linear-gradient(90deg, var(--color-primary-400, #818cf8), var(--color-primary-500, #6366f1));
-        }
     </style>
 </head>
-<body class="bg-secondary min-h-screen transition-colors dark:bg-secondary">
+<body class="bg-secondary min-h-screen">
     <!-- Navigation with Glassmorphism -->
     <nav class="glass-nav sticky top-0 z-30 shadow-soft">
         <div class="max-w-7xl mx-auto px-6 sm:px-8 lg:px-10">
@@ -754,42 +680,22 @@
                         </a>
                     </div>
                     <div class="hidden sm:ml-8 sm:flex sm:space-x-2">
-                        <a href="/" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
+                        <a href="/" class="nav-link-green px-4 py-2 rounded-lg text-secondary transition-all text-sm font-medium">
                             Dashboard
                         </a>
-                        <a href="/plans" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
+                        <a href="/plans" class="nav-link-green px-4 py-2 rounded-lg text-secondary transition-all text-sm font-medium">
                             Plans
                         </a>
-                        <a href="/knowledge" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
+                        <a href="/knowledge" class="nav-link-green px-4 py-2 rounded-lg text-secondary transition-all text-sm font-medium">
                             Knowledge
                         </a>
-                        <a href="/chat" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
+                        <a href="/chat" class="nav-link-green px-4 py-2 rounded-lg text-secondary transition-all text-sm font-medium">
                             Chat
                         </a>
-                        <a href="/runs" class="nav-link-green px-4 py-2 rounded-lg text-secondary dark:text-secondary transition-all text-sm font-medium">
+                        <a href="/runs" class="nav-link-green px-4 py-2 rounded-lg text-secondary transition-all text-sm font-medium">
                             Runs
                         </a>
                     </div>
-                </div>
-                <!-- Dark Mode Toggle Button -->
-                <div class="flex items-center space-x-4">
-                    <button
-                        data-theme-toggle
-                        type="button"
-                        class="relative p-2 rounded-lg bg-tertiary dark:bg-tertiary hover:bg-secondary dark:hover:bg-secondary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 dark:focus:ring-offset-secondary-900"
-                        aria-label="Toggle dark mode"
-                        aria-pressed="false"
-                        title="Toggle dark mode"
-                    >
-                        <!-- Sun icon (shown in dark mode) -->
-                        <svg data-theme-icon="sun" class="h-5 w-5 text-warning-500 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                        </svg>
-                        <!-- Moon icon (shown in light mode) -->
-                        <svg data-theme-icon="moon" class="h-5 w-5 text-secondary-600 dark:text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-                        </svg>
-                    </button>
                 </div>
             </div>
         </div>
@@ -803,7 +709,7 @@
     <!-- Footer with Glass Effect -->
     <footer class="glass-nav mt-8 border-t border-light">
         <div class="max-w-7xl mx-auto py-6 px-6 sm:px-8 lg:px-10">
-            <p class="text-center text-sm text-tertiary dark:text-tertiary">
+            <p class="text-center text-sm text-tertiary">
                 SDLC Orchestrator v1.0.0
             </p>
         </div>
@@ -815,7 +721,7 @@
         <div class="side-popup-header">
             <div class="flex items-center gap-3">
                 <div class="w-1 h-6 bg-gradient-to-b from-primary-500 to-primary-600 rounded-full"></div>
-                <h2 id="side-popup-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Title</h2>
+                <h2 id="side-popup-title" class="text-lg font-semibold text-gray-900">Title</h2>
             </div>
             <button onclick="SidePopup.close()" class="side-popup-close" aria-label="Close panel" title="Close (Esc)">
                 <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -857,15 +763,9 @@
     <!-- 4. Feature Modules -->
     <script src="/static/js/plan-recovery.js"></script>
 
-    <!-- Initialize Dark Mode, Scroll Animations, and Background Tasks -->
+    <!-- Initialize Scroll Animations and Background Tasks -->
     <script>
-        // Ensure DarkMode is initialized on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize dark mode (handles stored preference and system preference)
-            if (typeof DarkMode !== 'undefined') {
-                DarkMode.init();
-            }
-
             // Initialize scroll reveal animations for common elements
             if (typeof OrchestratorAnimations !== 'undefined') {
                 // Fade in cards and stat cards on scroll

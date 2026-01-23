@@ -1,41 +1,140 @@
 /* Modern UI CSS - CSS Custom Properties & Utility Classes */
 /* Compatible with Tailwind CSS Play CDN */
+/* Aligned with design-tokens.css for consistency */
 
 /* ============================================
    ROOT VARIABLES - Light Mode (Default)
+   Modern Indigo Brand System
    ============================================ */
 :root {
-    /* Primary Colors - Green Scale
-       WCAG AA Accessibility:
-       - 600+ on white: 4.87:1+ (normal text AA)
-       - 500 on white: 3.75:1 (large text AA)
-       - White on 600+: 4.87:1+ (normal text AA) */
-    --color-primary-50: #f0fdf4;
-    --color-primary-100: #dcfce7;
-    --color-primary-200: #bbf7d0;
-    --color-primary-300: #86efac;
-    --color-primary-400: #4ade80;
-    --color-primary-500: #22c55e;
-    --color-primary-600: #16a34a;
-    --color-primary-700: #15803d;
-    --color-primary-800: #166534;
-    --color-primary-900: #14532d;
-    --color-primary-950: #052e16;
+    /* ============================================
+       PRIMARY COLORS - Indigo Scale
+       Sophisticated, modern brand identity
+       ============================================ */
+    --color-primary-50: #eef2ff;
+    --color-primary-100: #e0e7ff;
+    --color-primary-200: #c7d2fe;
+    --color-primary-300: #a5b4fc;
+    --color-primary-400: #818cf8;
+    --color-primary-500: #6366f1;
+    --color-primary-600: #4f46e5;
+    --color-primary-700: #4338ca;
+    --color-primary-800: #3730a3;
+    --color-primary-900: #312e81;
+    --color-primary-950: #1e1b4b;
 
-    /* Secondary/Neutral Colors */
-    --color-secondary-50: #f8fafc;
-    --color-secondary-100: #f1f5f9;
-    --color-secondary-200: #e2e8f0;
-    --color-secondary-300: #cbd5e1;
-    --color-secondary-400: #94a3b8;
-    --color-secondary-500: #64748b;
-    --color-secondary-600: #475569;
-    --color-secondary-700: #334155;
-    --color-secondary-800: #1e293b;
-    --color-secondary-900: #0f172a;
+    /* RGB values for alpha channel usage */
+    --color-primary-500-rgb: 99, 102, 241;
+    --color-primary-400-rgb: 129, 140, 248;
 
-    /* Success Colors - Emerald (distinct from brand green)
-       Using emerald tones to differentiate from primary green */
+    /* ============================================
+       SECONDARY/NEUTRAL COLORS - Cool Gray Scale
+       For backgrounds, surfaces, borders, and text
+       ============================================ */
+    --color-secondary-50: #f9fafb;
+    --color-secondary-100: #f3f4f6;
+    --color-secondary-200: #e5e7eb;
+    --color-secondary-300: #d1d5db;
+    --color-secondary-400: #9ca3af;
+    --color-secondary-500: #6b7280;
+    --color-secondary-600: #4b5563;
+    --color-secondary-700: #374151;
+    --color-secondary-800: #1f2937;
+    --color-secondary-900: #111827;
+    --color-secondary-950: #030712;
+
+    /* Neutral aliases (matching design-tokens.css) */
+    --color-neutral-50: #f9fafb;
+    --color-neutral-100: #f3f4f6;
+    --color-neutral-200: #e5e7eb;
+    --color-neutral-300: #d1d5db;
+    --color-neutral-400: #9ca3af;
+    --color-neutral-500: #6b7280;
+    --color-neutral-600: #4b5563;
+    --color-neutral-700: #374151;
+    --color-neutral-800: #1f2937;
+    --color-neutral-900: #111827;
+    --color-neutral-950: #030712;
+
+    /* RGB values for alpha channel usage */
+    --color-neutral-500-rgb: 107, 114, 128;
+    --color-neutral-600-rgb: 75, 85, 99;
+
+    /* ============================================
+       ACCENT COLORS - Cyan Scale
+       Electric accent for energy and contrast
+       ============================================ */
+    --color-accent-cyan-50: #ecfeff;
+    --color-accent-cyan-100: #cffafe;
+    --color-accent-cyan-200: #a5f3fc;
+    --color-accent-cyan-300: #67e8f9;
+    --color-accent-cyan-400: #22d3ee;
+    --color-accent-cyan-500: #06b6d4;
+    --color-accent-cyan-600: #0891b2;
+    --color-accent-cyan-700: #0e7490;
+    --color-accent-cyan-800: #155e75;
+    --color-accent-cyan-900: #164e63;
+    --color-accent-cyan-950: #083344;
+
+    /* Teal alias */
+    --color-accent-teal-50: var(--color-accent-cyan-50);
+    --color-accent-teal-500: var(--color-accent-cyan-500);
+
+    /* ============================================
+       ACCENT COLORS - Fuchsia Scale
+       For highlights and special elements
+       ============================================ */
+    --color-accent-fuchsia-50: #fdf4ff;
+    --color-accent-fuchsia-100: #fae8ff;
+    --color-accent-fuchsia-200: #f5d0fe;
+    --color-accent-fuchsia-300: #f0abfc;
+    --color-accent-fuchsia-400: #e879f9;
+    --color-accent-fuchsia-500: #d946ef;
+    --color-accent-fuchsia-600: #c026d3;
+    --color-accent-fuchsia-700: #a21caf;
+    --color-accent-fuchsia-800: #86198f;
+    --color-accent-fuchsia-900: #701a75;
+    --color-accent-fuchsia-950: #4a044e;
+
+    /* ============================================
+       ACCENT COLORS - Violet Scale
+       For building/processing states
+       ============================================ */
+    --color-accent-violet-50: #f5f3ff;
+    --color-accent-violet-100: #ede9fe;
+    --color-accent-violet-200: #ddd6fe;
+    --color-accent-violet-300: #c4b5fd;
+    --color-accent-violet-400: #a78bfa;
+    --color-accent-violet-500: #8b5cf6;
+    --color-accent-violet-600: #7c3aed;
+    --color-accent-violet-700: #6d28d9;
+    --color-accent-violet-800: #5b21b6;
+    --color-accent-violet-900: #4c1d95;
+    --color-accent-violet-950: #2e1065;
+
+    /* ============================================
+       ACCENT COLORS - Amber Scale
+       For attention/stuck states
+       ============================================ */
+    --color-accent-amber-50: #fffbeb;
+    --color-accent-amber-100: #fef3c7;
+    --color-accent-amber-200: #fde68a;
+    --color-accent-amber-300: #fcd34d;
+    --color-accent-amber-400: #fbbf24;
+    --color-accent-amber-500: #f59e0b;
+    --color-accent-amber-600: #d97706;
+    --color-accent-amber-700: #b45309;
+    --color-accent-amber-800: #92400e;
+    --color-accent-amber-900: #78350f;
+    --color-accent-amber-950: #451a03;
+
+    /* Orange alias */
+    --color-accent-orange-50: #fff7ed;
+    --color-accent-orange-500: #f97316;
+
+    /* ============================================
+       SUCCESS COLORS - Emerald
+       ============================================ */
     --color-success-50: #ecfdf5;
     --color-success-100: #d1fae5;
     --color-success-200: #a7f3d0;
@@ -46,69 +145,221 @@
     --color-success-700: #047857;
     --color-success-800: #065f46;
     --color-success-900: #064e3b;
+    --color-success-950: #022c22;
 
-    /* Warning Colors */
-    --color-warning-50: #fffbeb;
-    --color-warning-100: #fef3c7;
-    --color-warning-200: #fde68a;
-    --color-warning-300: #fcd34d;
-    --color-warning-400: #fbbf24;
-    --color-warning-500: #f59e0b;
-    --color-warning-600: #d97706;
-    --color-warning-700: #b45309;
+    /* RGB values for alpha channel usage */
+    --color-success-500-rgb: 16, 185, 129;
 
-    /* Danger Colors */
-    --color-danger-50: #fef2f2;
-    --color-danger-100: #fee2e2;
-    --color-danger-200: #fecaca;
-    --color-danger-300: #fca5a5;
-    --color-danger-400: #f87171;
-    --color-danger-500: #ef4444;
-    --color-danger-600: #dc2626;
-    --color-danger-700: #b91c1c;
-    --color-danger-800: #991b1b;
-    --color-danger-900: #7f1d1d;
+    /* ============================================
+       WARNING COLORS - Yellow
+       ============================================ */
+    --color-warning-50: #fefce8;
+    --color-warning-100: #fef9c3;
+    --color-warning-200: #fef08a;
+    --color-warning-300: #fde047;
+    --color-warning-400: #facc15;
+    --color-warning-500: #eab308;
+    --color-warning-600: #ca8a04;
+    --color-warning-700: #a16207;
+    --color-warning-800: #854d0e;
+    --color-warning-900: #713f12;
+    --color-warning-950: #422006;
 
-    /* Info Colors - Blue */
-    --color-info-50: #eff6ff;
-    --color-info-100: #dbeafe;
-    --color-info-200: #bfdbfe;
-    --color-info-300: #93c5fd;
-    --color-info-400: #60a5fa;
-    --color-info-500: #3b82f6;
-    --color-info-600: #2563eb;
-    --color-info-700: #1d4ed8;
-    --color-info-800: #1e40af;
-    --color-info-900: #1e3a8a;
+    /* RGB values for alpha channel usage */
+    --color-warning-500-rgb: 234, 179, 8;
 
-    /* Background Colors */
+    /* ============================================
+       DANGER/ERROR COLORS - Rose
+       ============================================ */
+    --color-danger-50: #fff1f2;
+    --color-danger-100: #ffe4e6;
+    --color-danger-200: #fecdd3;
+    --color-danger-300: #fda4af;
+    --color-danger-400: #fb7185;
+    --color-danger-500: #f43f5e;
+    --color-danger-600: #e11d48;
+    --color-danger-700: #be123c;
+    --color-danger-800: #9f1239;
+    --color-danger-900: #881337;
+    --color-danger-950: #4c0519;
+
+    /* Error aliases (matching design-tokens.css) */
+    --color-error-50: #fff1f2;
+    --color-error-100: #ffe4e6;
+    --color-error-200: #fecdd3;
+    --color-error-300: #fda4af;
+    --color-error-400: #fb7185;
+    --color-error-500: #f43f5e;
+    --color-error-600: #e11d48;
+    --color-error-700: #be123c;
+    --color-error-800: #9f1239;
+    --color-error-900: #881337;
+    --color-error-950: #4c0519;
+
+    /* RGB values for alpha channel usage */
+    --color-error-500-rgb: 244, 63, 94;
+
+    /* ============================================
+       INFO COLORS - Sky Blue
+       ============================================ */
+    --color-info-50: #f0f9ff;
+    --color-info-100: #e0f2fe;
+    --color-info-200: #bae6fd;
+    --color-info-300: #7dd3fc;
+    --color-info-400: #38bdf8;
+    --color-info-500: #0ea5e9;
+    --color-info-600: #0284c7;
+    --color-info-700: #0369a1;
+    --color-info-800: #075985;
+    --color-info-900: #0c4a6e;
+    --color-info-950: #082f49;
+
+    /* RGB values for alpha channel usage */
+    --color-info-500-rgb: 14, 165, 233;
+
+    /* ============================================
+       BUILDING COLORS - Purple
+       ============================================ */
+    --color-building-50: #faf5ff;
+    --color-building-100: #f3e8ff;
+    --color-building-200: #e9d5ff;
+    --color-building-300: #d8b4fe;
+    --color-building-400: #c084fc;
+    --color-building-500: #a855f7;
+    --color-building-600: #9333ea;
+    --color-building-700: #7e22ce;
+    --color-building-800: #6b21a8;
+    --color-building-900: #581c87;
+    --color-building-950: #3b0764;
+
+    /* RGB values for alpha channel usage */
+    --color-building-500-rgb: 168, 85, 247;
+
+    /* ============================================
+       STUCK COLORS - Orange
+       ============================================ */
+    --color-stuck-50: #fff7ed;
+    --color-stuck-100: #ffedd5;
+    --color-stuck-200: #fed7aa;
+    --color-stuck-300: #fdba74;
+    --color-stuck-400: #fb923c;
+    --color-stuck-500: #f97316;
+    --color-stuck-600: #ea580c;
+    --color-stuck-700: #c2410c;
+    --color-stuck-800: #9a3412;
+    --color-stuck-900: #7c2d12;
+    --color-stuck-950: #431407;
+
+    /* RGB values for alpha channel usage */
+    --color-stuck-500-rgb: 249, 115, 22;
+
+    /* ============================================
+       SURFACE COLORS - Light Mode
+       ============================================ */
     --bg-primary: #ffffff;
-    --bg-secondary: #f8fafc;
-    --bg-tertiary: #f1f5f9;
+    --bg-secondary: #f9fafb;
+    --bg-tertiary: #f3f4f6;
     --bg-elevated: #ffffff;
-    --bg-overlay: rgba(0, 0, 0, 0.5);
+    --bg-overlay: rgba(17, 24, 39, 0.6);
 
-    /* Text Colors */
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-tertiary: #64748b;
-    --text-muted: #94a3b8;
+    /* Surface aliases (matching design-tokens.css) */
+    --surface-primary: #ffffff;
+    --surface-secondary: #f9fafb;
+    --surface-tertiary: #f3f4f6;
+    --surface-elevated: #ffffff;
+    --surface-overlay: rgba(17, 24, 39, 0.6);
+    --surface-inverse: #111827;
+
+    /* Interactive surface states */
+    --surface-hover: #f3f4f6;
+    --surface-active: #e5e7eb;
+    --surface-selected: #eef2ff;
+    --surface-selected-hover: #e0e7ff;
+    --surface-disabled: #f3f4f6;
+
+    /* Brand surface tints - Indigo */
+    --surface-primary-subtle: #eef2ff;
+    --surface-primary-muted: #e0e7ff;
+    --surface-accent-subtle: #ecfeff;
+    --surface-accent-muted: #cffafe;
+
+    /* Status surface tints */
+    --surface-building-subtle: #faf5ff;
+    --surface-building-muted: #f3e8ff;
+    --surface-stuck-subtle: #fff7ed;
+    --surface-stuck-muted: #ffedd5;
+
+    /* ============================================
+       TEXT COLORS - Light Mode
+       ============================================ */
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-tertiary: #6b7280;
+    --text-muted: #9ca3af;
+    --text-disabled: #d1d5db;
     --text-inverse: #ffffff;
+    --text-on-primary: #ffffff;
+    --text-on-dark: #f3f4f6;
 
-    /* Border Colors */
-    --border-light: #e2e8f0;
-    --border-default: #cbd5e1;
-    --border-dark: #94a3b8;
+    /* Semantic text colors */
+    --text-success: #047857;
+    --text-warning: #a16207;
+    --text-error: #be123c;
+    --text-info: #0369a1;
+    --text-building: #7e22ce;
+    --text-stuck: #c2410c;
+    --text-link: #4f46e5;
+    --text-link-hover: #4338ca;
 
-    /* Glass Effect Variables - Subtle Green Tinted */
-    --glass-bg: rgba(240, 253, 244, 0.65);
-    --glass-bg-strong: rgba(240, 253, 244, 0.85);
-    --glass-border: rgba(34, 197, 94, 0.12);
+    /* ============================================
+       BORDER COLORS - Light Mode
+       ============================================ */
+    --border-light: #e5e7eb;
+    --border-default: #d1d5db;
+    --border-dark: #9ca3af;
+
+    /* Border aliases (matching design-tokens.css) */
+    --border-subtle: #e5e7eb;
+    --border-strong: #9ca3af;
+    --border-focus: #6366f1;
+    --border-error: #e11d48;
+    --border-success: #059669;
+    --border-warning: #ca8a04;
+    --border-info: #0284c7;
+    --border-building: #9333ea;
+    --border-stuck: #ea580c;
+
+    /* ============================================
+       INTERACTIVE STATES - Indigo
+       ============================================ */
+    --interactive-primary: #4f46e5;
+    --interactive-primary-hover: #4338ca;
+    --interactive-primary-active: #3730a3;
+    --interactive-primary-disabled: #a5b4fc;
+
+    --interactive-secondary: #f3f4f6;
+    --interactive-secondary-hover: #e5e7eb;
+    --interactive-secondary-active: #d1d5db;
+    --interactive-secondary-disabled: #f9fafb;
+
+    --interactive-outline-border: #d1d5db;
+    --interactive-outline-hover-bg: #eef2ff;
+    --interactive-outline-hover-border: #6366f1;
+    --interactive-outline-active-bg: #e0e7ff;
+
+    /* ============================================
+       GLASS EFFECT VARIABLES - Indigo Tinted
+       ============================================ */
+    --glass-bg: rgba(238, 242, 255, 0.7);
+    --glass-bg-strong: rgba(238, 242, 255, 0.9);
+    --glass-border: rgba(99, 102, 241, 0.15);
     --glass-blur: 12px;
     --glass-blur-strong: 20px;
-    --glass-tint: rgba(34, 197, 94, 0.03);
+    --glass-tint: rgba(99, 102, 241, 0.05);
 
-    /* Shadow Variables */
+    /* ============================================
+       SHADOW VARIABLES
+       ============================================ */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -117,200 +368,111 @@
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
     --shadow-soft: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
-    --shadow-glow-primary: 0 0 20px rgba(34, 197, 94, 0.3);
-    --shadow-glow-success: 0 0 20px rgba(16, 185, 129, 0.3);
-    --shadow-glow-accent: 0 0 20px rgba(20, 184, 166, 0.3);
-    --shadow-glow-error: 0 0 20px rgba(239, 68, 68, 0.3);
 
-    /* Gradient Variables - Green Brand */
-    --gradient-primary: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-    --gradient-primary-hover: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
-    --gradient-primary-subtle: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-    --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    --gradient-warning: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    --gradient-info: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-    --gradient-accent: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
-    --gradient-subtle: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(248,250,252,1) 100%);
-    --gradient-hero: linear-gradient(135deg, #22c55e 0%, #14b8a6 100%);
-    --gradient-mesh: radial-gradient(at 40% 20%, rgba(34, 197, 94, 0.1) 0px, transparent 50%),
-                     radial-gradient(at 80% 0%, rgba(22, 163, 74, 0.08) 0px, transparent 50%),
-                     radial-gradient(at 0% 50%, rgba(21, 128, 61, 0.06) 0px, transparent 50%),
-                     radial-gradient(at 100% 80%, rgba(34, 197, 94, 0.05) 0px, transparent 40%);
-    --gradient-surface-brand: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);
+    /* Brand shadow glows - Indigo */
+    --shadow-glow-primary: 0 0 20px rgba(99, 102, 241, 0.35);
+    --shadow-glow-accent: 0 0 20px rgba(6, 182, 212, 0.35);
+    --shadow-glow-success: 0 0 20px rgba(16, 185, 129, 0.35);
+    --shadow-glow-error: 0 0 20px rgba(244, 63, 94, 0.35);
+    --shadow-glow-building: 0 0 20px rgba(168, 85, 247, 0.35);
+    --shadow-glow-stuck: 0 0 20px rgba(249, 115, 22, 0.35);
 
-    /* Focus Ring */
-    --focus-ring-color: rgba(34, 197, 94, 0.4);
+    /* ============================================
+       GRADIENT VARIABLES - Indigo Brand
+       ============================================ */
+    --gradient-primary: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    --gradient-primary-hover: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    --gradient-primary-subtle: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+    --gradient-success: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+    --gradient-warning: linear-gradient(135deg, #fde047 0%, #eab308 100%);
+    --gradient-danger: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+    --gradient-error: linear-gradient(135deg, #fb7185 0%, #f43f5e 100%);
+    --gradient-info: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+    --gradient-accent: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+    --gradient-building: linear-gradient(135deg, #c084fc 0%, #a855f7 100%);
+    --gradient-stuck: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
+    --gradient-subtle: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(249,250,251,1) 100%);
+    --gradient-hero: linear-gradient(135deg, #6366f1 0%, #06b6d4 100%);
+    --gradient-mesh: radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+                     radial-gradient(at 80% 0%, rgba(6, 182, 212, 0.10) 0px, transparent 50%),
+                     radial-gradient(at 0% 50%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+    --gradient-surface-brand: linear-gradient(180deg, #eef2ff 0%, #ffffff 100%);
+    --gradient-surface-subtle: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, #f9fafb 100%);
+    --gradient-mesh-brand:
+        radial-gradient(at 40% 20%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgba(6, 182, 212, 0.10) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, rgba(168, 85, 247, 0.08) 0px, transparent 50%);
+
+    /* ============================================
+       FOCUS RING
+       ============================================ */
+    --focus-ring-color: rgba(99, 102, 241, 0.4);
     --focus-ring-offset: 2px;
     --focus-ring-width: 3px;
 
-    /* Transition Variables */
+    /* ============================================
+       TRANSITION VARIABLES
+       ============================================ */
     --transition-fast: 150ms ease;
     --transition-base: 200ms ease;
     --transition-slow: 300ms ease;
     --transition-bounce: 300ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
     --transition-smooth: 300ms cubic-bezier(0.4, 0, 0.2, 1);
 
-    /* Spacing Scale */
+    /* ============================================
+       SPACING SCALE
+       ============================================ */
+    --space-0: 0;
+    --space-px: 1px;
+    --space-0-5: 0.125rem;
     --space-1: 0.25rem;
+    --space-1-5: 0.375rem;
     --space-2: 0.5rem;
+    --space-2-5: 0.625rem;
     --space-3: 0.75rem;
+    --space-3-5: 0.875rem;
     --space-4: 1rem;
     --space-5: 1.25rem;
     --space-6: 1.5rem;
+    --space-7: 1.75rem;
     --space-8: 2rem;
+    --space-9: 2.25rem;
     --space-10: 2.5rem;
+    --space-11: 2.75rem;
     --space-12: 3rem;
+    --space-14: 3.5rem;
+    --space-16: 4rem;
+    --space-20: 5rem;
+    --space-24: 6rem;
+    --space-28: 7rem;
+    --space-32: 8rem;
 
-    /* Border Radius */
-    --radius-sm: 0.25rem;
+    /* ============================================
+       BORDER RADIUS
+       ============================================ */
+    --radius-none: 0;
+    --radius-sm: 0.125rem;
+    --radius-default: 0.25rem;
     --radius-md: 0.375rem;
     --radius-lg: 0.5rem;
     --radius-xl: 0.75rem;
     --radius-2xl: 1rem;
+    --radius-3xl: 1.5rem;
     --radius-full: 9999px;
-}
 
-/* ============================================
-   DARK MODE VARIABLES
-   ============================================ */
-.dark,
-[data-theme="dark"] {
-    /* Primary Colors - Green Scale (Dark Mode Optimized)
-       WCAG AA Accessibility for Dark Backgrounds:
-       - 300-400 on dark bg (#0f172a): 7.5:1+ (normal text AAA)
-       - 400 on dark bg: 9.3:1 (normal text AAA)
-       - Dark bg on 300+: excellent contrast */
-    --color-primary-50: #052e16;
-    --color-primary-100: #14532d;
-    --color-primary-200: #166534;
-    --color-primary-300: #15803d;
-    --color-primary-400: #22c55e;
-    --color-primary-500: #4ade80;
-    --color-primary-600: #86efac;
-    --color-primary-700: #bbf7d0;
-    --color-primary-800: #dcfce7;
-    --color-primary-900: #f0fdf4;
-    --color-primary-950: #f7fef9;
-
-    /* Secondary/Neutral Colors - Dark Mode */
-    --color-secondary-50: #0f172a;
-    --color-secondary-100: #1e293b;
-    --color-secondary-200: #334155;
-    --color-secondary-300: #475569;
-    --color-secondary-400: #64748b;
-    --color-secondary-500: #94a3b8;
-    --color-secondary-600: #cbd5e1;
-    --color-secondary-700: #e2e8f0;
-    --color-secondary-800: #f1f5f9;
-    --color-secondary-900: #f8fafc;
-
-    /* Success Colors - Emerald (Dark Mode) */
-    --color-success-50: #064e3b;
-    --color-success-100: #065f46;
-    --color-success-200: #047857;
-    --color-success-300: #059669;
-    --color-success-400: #34d399;
-    --color-success-500: #6ee7b7;
-    --color-success-600: #a7f3d0;
-    --color-success-700: #d1fae5;
-    --color-success-800: #ecfdf5;
-    --color-success-900: #f0fdf8;
-
-    /* Warning Colors - Dark Mode */
-    --color-warning-50: #451a03;
-    --color-warning-100: #78350f;
-    --color-warning-200: #b45309;
-    --color-warning-300: #d97706;
-    --color-warning-400: #fbbf24;
-    --color-warning-500: #fcd34d;
-    --color-warning-600: #fde68a;
-    --color-warning-700: #fef3c7;
-
-    /* Danger Colors - Dark Mode */
-    --color-danger-50: #450a0a;
-    --color-danger-100: #7f1d1d;
-    --color-danger-200: #991b1b;
-    --color-danger-300: #b91c1c;
-    --color-danger-400: #f87171;
-    --color-danger-500: #fca5a5;
-    --color-danger-600: #fecaca;
-    --color-danger-700: #fee2e2;
-    --color-danger-800: #fef2f2;
-    --color-danger-900: #fef7f7;
-
-    /* Info Colors - Blue (Dark Mode) */
-    --color-info-50: #1e3a8a;
-    --color-info-100: #1e40af;
-    --color-info-200: #1d4ed8;
-    --color-info-300: #2563eb;
-    --color-info-400: #60a5fa;
-    --color-info-500: #93c5fd;
-    --color-info-600: #bfdbfe;
-    --color-info-700: #dbeafe;
-    --color-info-800: #eff6ff;
-    --color-info-900: #f5f9ff;
-
-    /* Background Colors - Dark */
-    --bg-primary: #0f172a;
-    --bg-secondary: #1e293b;
-    --bg-tertiary: #334155;
-    --bg-elevated: #1e293b;
-    --bg-overlay: rgba(0, 0, 0, 0.7);
-
-    /* Text Colors - Dark (WCAG AA compliant: 4.5:1+ on #0f172a)
-       - #f1f5f9 on #0f172a: 15.3:1 (AAA)
-       - #cbd5e1 on #0f172a: 10.7:1 (AAA)
-       - #94a3b8 on #0f172a: 6.1:1 (AA)
-       - #64748b on #0f172a: 3.8:1 (AA large text) */
-    --text-primary: #f1f5f9;
-    --text-secondary: #cbd5e1;
-    --text-tertiary: #94a3b8;
-    --text-muted: #64748b;
-    --text-inverse: #0f172a;
-
-    /* Border Colors - Dark */
-    --border-light: #334155;
-    --border-default: #475569;
-    --border-dark: #64748b;
-
-    /* Glass Effect - Dark with Green Tint */
-    --glass-bg: rgba(30, 41, 59, 0.75);
-    --glass-bg-strong: rgba(30, 41, 59, 0.9);
-    --glass-border: rgba(74, 222, 128, 0.2);
-    --glass-tint: rgba(74, 222, 128, 0.08);
-
-    /* Shadows - Dark (more pronounced with green accent) */
-    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
-    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
-    --shadow-soft: 0 2px 15px -3px rgba(0, 0, 0, 0.3), 0 10px 20px -2px rgba(0, 0, 0, 0.2);
-    --shadow-glow-primary: 0 0 25px rgba(74, 222, 128, 0.4);
-    --shadow-glow-success: 0 0 25px rgba(52, 211, 153, 0.4);
-    --shadow-glow-accent: 0 0 25px rgba(45, 212, 191, 0.4);
-    --shadow-glow-error: 0 0 25px rgba(248, 113, 113, 0.4);
-
-    /* Gradients - Dark with Green Branding */
-    --gradient-primary: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
-    --gradient-primary-hover: linear-gradient(135deg, #86efac 0%, #4ade80 100%);
-    --gradient-primary-subtle: linear-gradient(135deg, rgba(22, 101, 52, 0.4) 0%, rgba(5, 46, 22, 0.4) 100%);
-    --gradient-success: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-    --gradient-warning: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
-    --gradient-danger: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
-    --gradient-info: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
-    --gradient-accent: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
-    --gradient-subtle: linear-gradient(180deg, rgba(30,41,59,0) 0%, rgba(15,23,42,1) 100%);
-    --gradient-hero: linear-gradient(135deg, #4ade80 0%, #2dd4bf 100%);
-    --gradient-mesh: radial-gradient(at 40% 20%, rgba(74, 222, 128, 0.2) 0px, transparent 50%),
-                     radial-gradient(at 80% 0%, rgba(34, 197, 94, 0.15) 0px, transparent 50%),
-                     radial-gradient(at 0% 50%, rgba(22, 163, 74, 0.12) 0px, transparent 50%),
-                     radial-gradient(at 100% 80%, rgba(74, 222, 128, 0.1) 0px, transparent 40%);
-    --gradient-surface-brand: linear-gradient(180deg, rgba(5, 46, 22, 0.5) 0%, #0f172a 100%);
-
-    /* Focus Ring - Dark Mode */
-    --focus-ring-color: rgba(74, 222, 128, 0.5);
+    /* ============================================
+       Z-INDEX SCALE
+       ============================================ */
+    --z-behind: -1;
+    --z-base: 0;
+    --z-dropdown: 10;
+    --z-sticky: 20;
+    --z-fixed: 30;
+    --z-overlay: 40;
+    --z-modal: 50;
+    --z-popover: 60;
+    --z-tooltip: 70;
+    --z-toast: 80;
 }
 
 /* ============================================
@@ -368,6 +530,10 @@
 .shadow-soft { box-shadow: var(--shadow-soft); }
 .shadow-glow-primary { box-shadow: var(--shadow-glow-primary); }
 .shadow-glow-success { box-shadow: var(--shadow-glow-success); }
+.shadow-glow-accent { box-shadow: var(--shadow-glow-accent); }
+.shadow-glow-error { box-shadow: var(--shadow-glow-error); }
+.shadow-glow-building { box-shadow: var(--shadow-glow-building); }
+.shadow-glow-stuck { box-shadow: var(--shadow-glow-stuck); }
 
 .shadow-elevation-1 { box-shadow: var(--shadow-sm); }
 .shadow-elevation-2 { box-shadow: var(--shadow-md); }
@@ -391,9 +557,16 @@
 .gradient-success { background: var(--gradient-success); }
 .gradient-warning { background: var(--gradient-warning); }
 .gradient-danger { background: var(--gradient-danger); }
+.gradient-error { background: var(--gradient-error); }
+.gradient-info { background: var(--gradient-info); }
+.gradient-accent { background: var(--gradient-accent); }
+.gradient-building { background: var(--gradient-building); }
+.gradient-stuck { background: var(--gradient-stuck); }
 .gradient-hero { background: var(--gradient-hero); }
 .gradient-subtle { background: var(--gradient-subtle); }
 .gradient-mesh { background: var(--gradient-mesh); }
+.gradient-mesh-brand { background: var(--gradient-mesh-brand); }
+.gradient-surface-brand { background: var(--gradient-surface-brand); }
 
 /* Text gradients */
 .text-gradient-primary {
@@ -689,37 +862,6 @@
 .border-dark { border-color: var(--border-dark); }
 
 /* ============================================
-   DARK MODE TOGGLE ANIMATION
-   ============================================ */
-.dark-mode-toggle {
-    position: relative;
-    width: 3rem;
-    height: 1.5rem;
-    border-radius: var(--radius-full);
-    background: var(--bg-tertiary);
-    cursor: pointer;
-    transition: background var(--transition-base);
-}
-
-.dark-mode-toggle::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: calc(1.5rem - 4px);
-    height: calc(1.5rem - 4px);
-    border-radius: var(--radius-full);
-    background: var(--bg-primary);
-    box-shadow: var(--shadow-sm);
-    transition: transform var(--transition-bounce);
-}
-
-.dark .dark-mode-toggle::after,
-[data-theme="dark"] .dark-mode-toggle::after {
-    transform: translateX(1.5rem);
-}
-
-/* ============================================
    ENHANCED TEXTAREA COMPONENT
    ============================================ */
 .textarea-enhanced {
@@ -922,27 +1064,6 @@
 }
 
 /* ============================================
-   DARK MODE ADJUSTMENTS FOR TEXTAREA
-   ============================================ */
-.dark .textarea-enhanced,
-[data-theme="dark"] .textarea-enhanced {
-    background: var(--bg-secondary);
-}
-
-.dark .textarea-enhanced:focus,
-[data-theme="dark"] .textarea-enhanced:focus {
-    background: var(--bg-primary);
-    box-shadow:
-        0 0 0 3px rgba(16, 185, 129, 0.3),
-        var(--shadow-md);
-}
-
-.dark .textarea-char-count,
-[data-theme="dark"] .textarea-char-count {
-    background: var(--bg-secondary);
-}
-
-/* ============================================
    COLLAPSIBLE SYNC SECTION
    ============================================ */
 .sync-section-header {
@@ -955,11 +1076,6 @@
 
 .sync-section-header:hover {
     background-color: rgba(var(--color-secondary-200), 0.3);
-}
-
-.dark .sync-section-header:hover,
-[data-theme="dark"] .sync-section-header:hover {
-    background-color: rgba(var(--color-secondary-700), 0.3);
 }
 
 .sync-section-content {

@@ -75,7 +75,7 @@
     outline: none;
     border-color: var(--color-primary-500);
     box-shadow:
-        0 0 0 3px rgba(59, 130, 246, 0.2),
+        0 0 0 3px var(--focus-ring-color),
         var(--shadow-sm);
     background: var(--bg-primary);
 }
@@ -84,17 +84,17 @@
 @keyframes plan-textarea-focus-pulse {
     0% {
         box-shadow:
-            0 0 0 3px rgba(59, 130, 246, 0.2),
+            0 0 0 3px var(--focus-ring-color),
             var(--shadow-sm);
     }
     50% {
         box-shadow:
-            0 0 0 4px rgba(59, 130, 246, 0.15),
+            0 0 0 4px var(--focus-ring-color),
             var(--shadow-md);
     }
     100% {
         box-shadow:
-            0 0 0 3px rgba(59, 130, 246, 0.2),
+            0 0 0 3px var(--focus-ring-color),
             var(--shadow-sm);
     }
 }
@@ -150,7 +150,7 @@
 .plan-textarea.plan-textarea-error:focus {
     border-color: var(--color-danger-500);
     box-shadow:
-        0 0 0 3px rgba(239, 68, 68, 0.2),
+        0 0 0 3px var(--shadow-glow-error),
         var(--shadow-sm);
     animation: none;
 }
@@ -178,7 +178,7 @@
 .plan-textarea.plan-textarea-warning:focus {
     border-color: var(--color-warning-500);
     box-shadow:
-        0 0 0 3px rgba(245, 158, 11, 0.2),
+        0 0 0 3px var(--shadow-glow-stuck),
         var(--shadow-sm);
     animation: none;
 }
@@ -206,7 +206,7 @@
 .plan-textarea.plan-textarea-success:focus {
     border-color: var(--color-success-500);
     box-shadow:
-        0 0 0 3px rgba(16, 185, 129, 0.2),
+        0 0 0 3px var(--focus-ring-color),
         var(--shadow-sm);
     animation: none;
 }
@@ -393,84 +393,6 @@
 }
 
 /* ============================================
-   DARK MODE ADJUSTMENTS
-   ============================================ */
-.dark .plan-textarea,
-[data-theme="dark"] .plan-textarea {
-    background: var(--bg-secondary);
-}
-
-.dark .plan-textarea:focus,
-[data-theme="dark"] .plan-textarea:focus {
-    background: var(--bg-primary);
-    box-shadow:
-        0 0 0 3px rgba(59, 130, 246, 0.3),
-        var(--shadow-md);
-}
-
-.dark .plan-textarea-counter,
-[data-theme="dark"] .plan-textarea-counter {
-    background: var(--bg-secondary);
-}
-
-/* Error state dark mode */
-.dark .plan-textarea-wrapper.plan-textarea-error .plan-textarea,
-[data-theme="dark"] .plan-textarea-wrapper.plan-textarea-error .plan-textarea,
-.dark .plan-textarea.plan-textarea-error,
-[data-theme="dark"] .plan-textarea.plan-textarea-error {
-    background: rgba(239, 68, 68, 0.1);
-}
-
-/* Warning state dark mode */
-.dark .plan-textarea-wrapper.plan-textarea-warning .plan-textarea,
-[data-theme="dark"] .plan-textarea-wrapper.plan-textarea-warning .plan-textarea,
-.dark .plan-textarea.plan-textarea-warning,
-[data-theme="dark"] .plan-textarea.plan-textarea-warning {
-    background: rgba(245, 158, 11, 0.1);
-}
-
-/* Success state dark mode */
-.dark .plan-textarea-wrapper.plan-textarea-success .plan-textarea,
-[data-theme="dark"] .plan-textarea-wrapper.plan-textarea-success .plan-textarea,
-.dark .plan-textarea.plan-textarea-success,
-[data-theme="dark"] .plan-textarea.plan-textarea-success {
-    background: rgba(16, 185, 129, 0.1);
-}
-
-/* Counter dark mode states */
-.dark .plan-textarea-counter.plan-textarea-counter-warning,
-[data-theme="dark"] .plan-textarea-counter.plan-textarea-counter-warning {
-    background: rgba(245, 158, 11, 0.15);
-}
-
-.dark .plan-textarea-counter.plan-textarea-counter-danger,
-[data-theme="dark"] .plan-textarea-counter.plan-textarea-counter-danger {
-    background: rgba(239, 68, 68, 0.15);
-}
-
-/* Message dark mode */
-.dark .plan-textarea-message-error,
-[data-theme="dark"] .plan-textarea-message-error {
-    background: rgba(239, 68, 68, 0.1);
-    border-color: rgba(239, 68, 68, 0.3);
-    color: var(--color-danger-400);
-}
-
-.dark .plan-textarea-message-warning,
-[data-theme="dark"] .plan-textarea-message-warning {
-    background: rgba(245, 158, 11, 0.1);
-    border-color: rgba(245, 158, 11, 0.3);
-    color: var(--color-warning-400);
-}
-
-.dark .plan-textarea-message-success,
-[data-theme="dark"] .plan-textarea-message-success {
-    background: rgba(16, 185, 129, 0.1);
-    border-color: rgba(16, 185, 129, 0.3);
-    color: var(--color-success-400);
-}
-
-/* ============================================
    LOADING STATE
    ============================================ */
 .plan-textarea-wrapper.plan-textarea-loading .plan-textarea {
@@ -524,7 +446,7 @@
    ============================================ */
 @media print {
     .plan-textarea {
-        border: 1px solid #ccc;
+        border: 1px solid var(--border-default);
         box-shadow: none;
     }
 

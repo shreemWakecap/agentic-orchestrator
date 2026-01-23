@@ -251,21 +251,6 @@
     }
 }
 
-/* Dark mode high contrast */
-@media (prefers-contrast: more) {
-    .dark,
-    [data-theme="dark"] {
-        --text-primary: #ffffff;
-        --text-secondary: #f0f0f0;
-        --text-tertiary: #d0d0d0;
-        --text-muted: #b0b0b0;
-
-        --border-light: #808080;
-        --border-default: #a0a0a0;
-        --border-dark: #ffffff;
-    }
-}
-
 /* ============================================
    FORCED COLORS MODE (Windows High Contrast)
    ============================================ */

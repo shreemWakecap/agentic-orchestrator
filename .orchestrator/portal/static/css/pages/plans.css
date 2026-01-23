@@ -252,42 +252,6 @@
 }
 
 /* ==========================================================================
-   Dark Mode Support
-   ========================================================================== */
-
-.dark .plan-card {
-    background: var(--surface-secondary);
-    border-color: var(--border-default);
-}
-
-.dark .plan-card:hover {
-    border-color: var(--color-info-500);
-}
-
-.dark .plan-header:hover {
-    background-color: var(--surface-hover);
-}
-
-.dark .expand-content {
-    background: linear-gradient(180deg, var(--surface-primary) 0%, var(--surface-secondary) 100%);
-}
-
-.dark .file-item-modern {
-    background: var(--surface-secondary);
-    border-color: var(--border-default);
-}
-
-.dark .file-item-modern:hover {
-    background: linear-gradient(135deg, var(--color-info-900) 0%, var(--color-info-950) 100%);
-    border-color: var(--color-info-500);
-}
-
-.dark .empty-state {
-    background: linear-gradient(135deg, var(--surface-secondary) 0%, var(--surface-primary) 100%);
-    border-color: var(--border-default);
-}
-
-/* ==========================================================================
    Stuck Plan Indicator Styles
    ========================================================================== */
 
@@ -297,12 +261,4 @@
 
 .plan-card.stuck:hover {
     border-color: var(--color-stuck-500);
-}
-
-.dark .plan-card.stuck {
-    border-color: var(--border-stuck);
-}
-
-.dark .plan-card.stuck:hover {
-    border-color: var(--color-stuck-400);
 }

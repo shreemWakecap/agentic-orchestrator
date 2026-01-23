@@ -465,12 +465,12 @@ class RecoveryService:
             plan_id: The plan identifier
 
         Returns:
-            Plan name if found, None otherwise
+            Plan goal as display name if found, None otherwise
         """
         row = self._db.fetchone(
-            "SELECT name FROM plans WHERE id = ?", (plan_id,)
+            "SELECT goal FROM plans WHERE plan_id = ?", (plan_id,)
         )
-        return row.get('name') if row else None
+        return row.get('goal') if row else None
 
     def cancel_build(self, plan_id: str) -> Dict:
         """Cancel a build that is in progress or stale.

@@ -41,6 +41,12 @@ class ExpertLoader:
     """
     Manages tech-specific, domain, and module expert agents.
 
+    Multi-Project Support:
+        In multi-project mode, experts are loaded in priority order:
+        1. Project-specific experts: $SDLC_ORCHESTRATOR_HOME/projects/{slug}/experts/
+        2. Shared experts: {project_root}/.orchestrator/agents/experts/
+        3. Built-in experts: {orchestrator_dir}/agents/experts/
+
     Usage:
         loader = ExpertLoader(project_root)
 
@@ -58,69 +64,154 @@ class ExpertLoader:
                             domain_keywords=["auth", "login", "jwt"])
     """
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, project_slug: str = None):
         self.project_root = project_root
-        self.experts_dir = project_root / ".orchestrator" / "agents" / "experts"
+        self.project_slug = project_slug
         self.console = Console()
 
-        # Ensure directory exists
+        # Primary experts directory (local to project)
+        self.experts_dir = project_root / ".orchestrator" / "agents" / "experts"
+
+        # Additional experts directories (for multi-project mode)
+        self._project_experts_dir = None
+        self._shared_experts_dir = None
+
+        # Try to get project-specific paths from orchestrator home
+        self._init_multi_project_paths()
+
+        # Ensure primary directory exists
         self.experts_dir.mkdir(parents=True, exist_ok=True)
 
+    def _init_multi_project_paths(self):
+        """Initialize paths for multi-project mode."""
+        try:
+            from config import get_config
+
+            config = get_config()
+            if not config.is_multi_project_mode:
+                return
+
+            # Get project slug from context if not provided
+            slug = self.project_slug
+            if not slug:
+                from db.project_context import get_optional_project_id
+                # We need the slug, not ID, so try to get from registry
+                project_id = get_optional_project_id()
+                if project_id:
+                    try:
+                        from core.project_registry import get_project_registry
+                        registry = get_project_registry()
+                        project = registry.get_project(project_id)
+                        if project:
+                            slug = project.slug
+                    except Exception:
+                        pass
+
+            if slug and config.orchestrator_home.projects_dir:
+                self._project_experts_dir = config.orchestrator_home.projects_dir / slug / "experts"
+                self._project_experts_dir.mkdir(parents=True, exist_ok=True)
+
+            # Shared experts from orchestrator home
+            if config.orchestrator_home.home_path:
+                self._shared_experts_dir = config.orchestrator_home.home_path / "agents" / "experts"
+                if self._shared_experts_dir.exists():
+                    pass  # Use it
+                else:
+                    self._shared_experts_dir = None
+
+        except Exception:
+            pass  # Fall back to single-project mode
+
+    def _get_all_expert_dirs(self) -> list[Path]:
+        """Get all expert directories in priority order."""
+        dirs = []
+
+        # 1. Project-specific (highest priority)
+        if self._project_experts_dir and self._project_experts_dir.exists():
+            dirs.append(self._project_experts_dir)
+
+        # 2. Local project directory
+        if self.experts_dir.exists():
+            dirs.append(self.experts_dir)
+
+        # 3. Shared experts from orchestrator home
+        if self._shared_experts_dir and self._shared_experts_dir.exists():
+            dirs.append(self._shared_experts_dir)
+
+        return dirs
+
     def discover_experts(self) -> list[ExpertInfo]:
-        """Discover all available expert agents."""
+        """
+        Discover all available expert agents.
+
+        In multi-project mode, searches:
+        1. Project-specific experts (highest priority)
+        2. Local project experts
+        3. Shared experts (lowest priority)
+
+        Experts with the same name are not duplicated (first found wins).
+        """
         experts = []
+        seen_names = set()
 
-        for file_path in self.experts_dir.glob("*.md"):
-            if file_path.name.startswith("_"):
-                continue  # Skip meta files
+        # Search all directories in priority order
+        for experts_dir in self._get_all_expert_dirs():
+            for file_path in experts_dir.glob("*.md"):
+                if file_path.name.startswith("_"):
+                    continue  # Skip meta files
 
-            try:
-                content = file_path.read_text(encoding="utf-8")
+                # Skip if already found with this name
+                if file_path.stem in seen_names:
+                    continue
 
-                # Parse frontmatter
-                name = file_path.stem
-                description = ""
-                expert_type = ExpertType.TECH
-                module_path = None
-                domain_keywords = []
+                try:
+                    content = file_path.read_text(encoding="utf-8")
 
-                if content.startswith("---"):
-                    parts = content.split("---", 2)
-                    if len(parts) >= 3:
-                        frontmatter = parts[1]
-                        for line in frontmatter.split("\n"):
-                            line = line.strip()
-                            if line.startswith("name:"):
-                                name = line.split(":", 1)[1].strip()
-                            elif line.startswith("description:"):
-                                description = line.split(":", 1)[1].strip()
-                            elif line.startswith("expert_type:"):
-                                type_str = line.split(":", 1)[1].strip()
-                                if type_str in [e.value for e in ExpertType]:
-                                    expert_type = ExpertType(type_str)
-                            elif line.startswith("module_path:"):
-                                module_path = line.split(":", 1)[1].strip()
-                            elif line.startswith("domain_keywords:"):
-                                # Parse YAML-style list: [auth, login, jwt]
-                                kw_str = line.split(":", 1)[1].strip()
-                                if kw_str.startswith("[") and kw_str.endswith("]"):
-                                    domain_keywords = [k.strip() for k in kw_str[1:-1].split(",")]
+                    # Parse frontmatter
+                    name = file_path.stem
+                    description = ""
+                    expert_type = ExpertType.TECH
+                    module_path = None
+                    domain_keywords = []
 
-                # Determine category (for TECH type)
-                category = self._categorize_expert(name, content)
+                    if content.startswith("---"):
+                        parts = content.split("---", 2)
+                        if len(parts) >= 3:
+                            frontmatter = parts[1]
+                            for line in frontmatter.split("\n"):
+                                line = line.strip()
+                                if line.startswith("name:"):
+                                    name = line.split(":", 1)[1].strip()
+                                elif line.startswith("description:"):
+                                    description = line.split(":", 1)[1].strip()
+                                elif line.startswith("expert_type:"):
+                                    type_str = line.split(":", 1)[1].strip()
+                                    if type_str in [e.value for e in ExpertType]:
+                                        expert_type = ExpertType(type_str)
+                                elif line.startswith("module_path:"):
+                                    module_path = line.split(":", 1)[1].strip()
+                                elif line.startswith("domain_keywords:"):
+                                    # Parse YAML-style list: [auth, login, jwt]
+                                    kw_str = line.split(":", 1)[1].strip()
+                                    if kw_str.startswith("[") and kw_str.endswith("]"):
+                                        domain_keywords = [k.strip() for k in kw_str[1:-1].split(",")]
 
-                experts.append(ExpertInfo(
-                    name=name,
-                    description=description,
-                    file_path=file_path,
-                    category=category,
-                    expert_type=expert_type,
-                    module_path=module_path,
-                    domain_keywords=domain_keywords
-                ))
+                    # Determine category (for TECH type)
+                    category = self._categorize_expert(name, content)
 
-            except Exception as e:
-                self.console.print(f"[yellow]Warning: Could not load expert {file_path.name}: {e}[/yellow]")
+                    experts.append(ExpertInfo(
+                        name=name,
+                        description=description,
+                        file_path=file_path,
+                        category=category,
+                        expert_type=expert_type,
+                        module_path=module_path,
+                        domain_keywords=domain_keywords
+                    ))
+                    seen_names.add(file_path.stem)
+
+                except Exception as e:
+                    self.console.print(f"[yellow]Warning: Could not load expert {file_path.name}: {e}[/yellow]")
 
         return experts
 

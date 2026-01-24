@@ -966,7 +966,27 @@ def run(args=None) -> int:
     )
 
     parsed = parser.parse_args(args or [])
-    project_root = Path(__file__).parent.parent.parent
+
+    # Determine project root (multi-project mode vs single-project mode)
+    from config import get_config
+    config = get_config()
+
+    project_id = None
+    project_slug = None
+
+    if config.is_multi_project_mode:
+        from core.project_registry import get_project_registry
+        registry = get_project_registry()
+        active = registry.get_active_project()
+        if not active:
+            print("Error: No active project. Use 'orch project switch <name>' first.")
+            return 1
+        project_root = Path(active.path)
+        project_id = active.id
+        project_slug = active.slug
+        print(f"Project: {active.name} ({active.slug})")
+    else:
+        project_root = Path(__file__).parent.parent.parent
 
     criteria = None
     if parsed.non_interactive:
@@ -981,6 +1001,11 @@ def run(args=None) -> int:
         interactive=not parsed.non_interactive,
         criteria=criteria,
     )
+
+    # Set project context for multi-project mode
+    if project_id:
+        workflow._project_id = project_id
+        workflow._project_slug = project_slug
 
     result = workflow.run()
     return 0 if result.success else 1

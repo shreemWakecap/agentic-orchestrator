@@ -9,6 +9,10 @@ Usage:
 
     config = get_config()
     db_config = get_database_config()
+
+Multi-Project Mode:
+    Set SDLC_ORCHESTRATOR_HOME to enable multi-project mode.
+    In this mode, projects are managed centrally and isolated from each other.
 """
 import os
 import logging
@@ -25,6 +29,11 @@ from urllib.parse import quote_plus
 # Determine paths
 ORCHESTRATOR_DIR = Path(__file__).parent
 PROJECT_ROOT = ORCHESTRATOR_DIR.parent
+
+# Orchestrator home (for multi-project mode)
+ORCHESTRATOR_HOME_ENV = "SDLC_ORCHESTRATOR_HOME"
+
+# .env file is always in the .orchestrator directory
 ENV_FILE = ORCHESTRATOR_DIR / ".env"
 
 # Load dotenv ONCE at module import
@@ -176,6 +185,71 @@ class CLIConfig:
 
 
 # =============================================================================
+# ORCHESTRATOR HOME CONFIGURATION (Multi-Project Mode)
+# =============================================================================
+
+@dataclass(frozen=True)
+class OrchestratorHomeConfig:
+    """
+    Orchestrator home configuration for multi-project mode.
+
+    When enabled, projects are managed in a central location and
+    data is isolated per-project.
+    """
+    enabled: bool
+    home_path: Optional[Path]
+    projects_dir: Optional[Path]
+    config_dir: Optional[Path]
+    logs_dir: Optional[Path]
+
+    @property
+    def registry_file(self) -> Optional[Path]:
+        """Path to project registry file."""
+        if self.projects_dir:
+            return self.projects_dir / "registry.json"
+        return None
+
+    def get_project_dir(self, project_slug: str) -> Optional[Path]:
+        """Get data directory for a specific project."""
+        if self.projects_dir:
+            return self.projects_dir / project_slug
+        return None
+
+    @classmethod
+    def from_env(cls) -> "OrchestratorHomeConfig":
+        """Load from environment variables.
+
+        Multi-project mode is ALWAYS enabled. If SDLC_ORCHESTRATOR_HOME is set,
+        use that path. Otherwise, use the .orchestrator directory as home.
+        """
+        home_path_str = os.getenv(ORCHESTRATOR_HOME_ENV)
+
+        if home_path_str:
+            home_path = Path(home_path_str).resolve()
+        else:
+            # Default: use .orchestrator directory as home
+            home_path = ORCHESTRATOR_DIR
+
+        return cls(
+            enabled=True,  # ALWAYS ENABLED
+            home_path=home_path,
+            projects_dir=home_path / "projects",
+            config_dir=home_path / "config",
+            logs_dir=home_path / "logs",
+        )
+
+    def require_enabled(self) -> None:
+        """
+        Verify multi-project mode is enabled.
+
+        This is now a no-op since multi-project mode is always enabled.
+        Kept for backward compatibility.
+        """
+        # Multi-project mode is always enabled now
+        pass
+
+
+# =============================================================================
 # UNIFIED CONFIG
 # =============================================================================
 
@@ -191,10 +265,16 @@ class Config:
     server: ServerConfig
     streaming: StreamingConfig
     cli: CLIConfig
+    orchestrator_home: OrchestratorHomeConfig
 
     # Path constants
     orchestrator_dir: Path = field(default=ORCHESTRATOR_DIR)
     project_root: Path = field(default=PROJECT_ROOT)
+
+    @property
+    def is_multi_project_mode(self) -> bool:
+        """Check if multi-project mode is enabled."""
+        return self.orchestrator_home.enabled
 
     @classmethod
     def from_env(cls) -> "Config":
@@ -205,6 +285,7 @@ class Config:
             server=ServerConfig.from_env(),
             streaming=StreamingConfig.from_env(),
             cli=CLIConfig.from_env(),
+            orchestrator_home=OrchestratorHomeConfig.from_env(),
         )
 
 
@@ -257,3 +338,29 @@ def get_sync_database_url() -> str:
 def get_async_database_url() -> str:
     """Get asynchronous database URL (for portal/ package)."""
     return get_database_config().async_url
+
+
+@lru_cache(maxsize=1)
+def get_orchestrator_home_config() -> OrchestratorHomeConfig:
+    """Get orchestrator home configuration (convenience accessor)."""
+    return get_config().orchestrator_home
+
+
+def is_multi_project_mode() -> bool:
+    """Check if multi-project mode is enabled."""
+    return get_config().is_multi_project_mode
+
+
+def require_multi_project_mode() -> OrchestratorHomeConfig:
+    """
+    Get orchestrator home config, raising if not enabled.
+
+    Returns:
+        OrchestratorHomeConfig: The home configuration.
+
+    Raises:
+        EnvironmentError: If SDLC_ORCHESTRATOR_HOME is not set.
+    """
+    config = get_orchestrator_home_config()
+    config.require_enabled()
+    return config

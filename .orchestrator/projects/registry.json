@@ -1,0 +1,21 @@
+{
+  "version": "1.0",
+  "created_at": "2026-01-24T00:55:26.768541",
+  "active_project": "self",
+  "projects": {
+    "self": {
+      "id": "24798b59-3af3-4068-9e0f-2cbc8fd439eb",
+      "name": "self",
+      "slug": "self",
+      "path": "D:\\agentic-orchestrator",
+      "status": "active",
+      "source_type": "local",
+      "git_url": null,
+      "git_branch": null,
+      "added_at": "2026-01-24T01:00:56.457862",
+      "last_accessed": "2026-01-24T01:11:45.298452",
+      "indexed_at": null,
+      "description": null
+    }
+  }
+}

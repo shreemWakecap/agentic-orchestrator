@@ -268,3 +268,72 @@ async def token_analytics_page(
             "recent_records": recent_records,
         },
     )
+
+
+@router.get("/projects", response_class=HTMLResponse)
+async def projects_page(request: Request):
+    """Render projects management page (multi-project mode only)."""
+    from config import get_config
+
+    config = get_config()
+
+    # Check if multi-project mode is enabled
+    if not config.is_multi_project_mode:
+        return templates.TemplateResponse(
+            request,
+            "projects.html",
+            {
+                "is_multi_project": False,
+                "projects": [],
+                "active_project": None,
+                "error": "Multi-project mode is not enabled. Set SDLC_ORCHESTRATOR_HOME and run 'orch init'.",
+            },
+        )
+
+    # Get projects from service
+    try:
+        from core.project_service import get_project_service
+
+        service = get_project_service()
+        projects = service.list_projects(include_archived=True)
+        active = service.get_active()
+
+        # Convert to dict for template
+        projects_data = []
+        for p in projects:
+            projects_data.append({
+                "id": p.id,
+                "name": p.name,
+                "slug": p.slug,
+                "path": p.path,
+                "status": p.status.value if hasattr(p.status, 'value') else str(p.status),
+                "source_type": p.source_type.value if hasattr(p.source_type, 'value') else str(p.source_type),
+                "git_url": p.git_url,
+                "git_branch": p.git_branch,
+                "description": p.description,
+                "created_at": p.added_at,
+                "last_accessed_at": p.last_accessed,
+                "indexed_at": p.indexed_at,
+            })
+
+        return templates.TemplateResponse(
+            request,
+            "projects.html",
+            {
+                "is_multi_project": True,
+                "projects": projects_data,
+                "active_project": active.slug if active else None,
+                "error": None,
+            },
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            request,
+            "projects.html",
+            {
+                "is_multi_project": True,
+                "projects": [],
+                "active_project": None,
+                "error": str(e),
+            },
+        )

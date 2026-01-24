@@ -679,6 +679,36 @@
                             <span class="brand-text">Orchestrator</span>
                         </a>
                     </div>
+                    <!-- Project Switcher (Multi-Project Mode) -->
+                    <div id="project-switcher" class="hidden sm:ml-4 relative">
+                        <button id="project-switcher-btn" type="button" class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-secondary-700 bg-secondary-100 hover:bg-secondary-200 rounded-lg transition-colors border border-secondary-200" onclick="ProjectSwitcher.toggle()">
+                            <svg class="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                            </svg>
+                            <span id="project-switcher-name" class="max-w-[150px] truncate">No Project</span>
+                            <svg class="w-4 h-4 text-secondary-400 transition-transform" id="project-switcher-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </button>
+                        <!-- Dropdown Menu -->
+                        <div id="project-switcher-dropdown" class="hidden absolute left-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-secondary-200 py-2 z-50">
+                            <div class="px-3 py-2 border-b border-secondary-100">
+                                <p class="text-xs font-semibold text-secondary-500 uppercase tracking-wide">Switch Project</p>
+                            </div>
+                            <div id="project-switcher-list" class="max-h-64 overflow-y-auto py-1">
+                                <!-- Projects loaded dynamically -->
+                            </div>
+                            <div class="border-t border-secondary-100 mt-1 pt-1 px-1">
+                                <a href="/projects" class="flex items-center gap-2 px-3 py-2 text-sm text-secondary-600 hover:bg-secondary-50 rounded-md transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    Manage Projects
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                     <div class="hidden sm:ml-8 sm:flex sm:space-x-2">
                         <a href="/" class="nav-link-green px-4 py-2 rounded-lg text-secondary transition-all text-sm font-medium">
                             Dashboard
@@ -694,6 +724,9 @@
                         </a>
                         <a href="/runs" class="nav-link-green px-4 py-2 rounded-lg text-secondary transition-all text-sm font-medium">
                             Runs
+                        </a>
+                        <a href="/projects" id="nav-projects" class="nav-link-green px-4 py-2 rounded-lg text-secondary transition-all text-sm font-medium hidden">
+                            Projects
                         </a>
                     </div>
                 </div>
@@ -762,6 +795,191 @@
 
     <!-- 4. Feature Modules -->
     <script src="/static/js/plan-recovery.js"></script>
+
+    <!-- 5. Project Switcher (Multi-Project Mode) -->
+    <script>
+        var ProjectSwitcher = (function() {
+            var isOpen = false;
+            var projects = [];
+            var activeProjectSlug = null;
+            var isMultiProjectMode = false;
+
+            // Initialize on page load
+            function init() {
+                // Check if multi-project mode is enabled by fetching projects
+                fetch('/api/projects/')
+                    .then(function(response) {
+                        if (response.status === 400) {
+                            // Multi-project mode not enabled
+                            return null;
+                        }
+                        return response.json();
+                    })
+                    .then(function(data) {
+                        if (data) {
+                            isMultiProjectMode = true;
+                            projects = data.projects || [];
+                            activeProjectSlug = data.active_project;
+                            render();
+                            show();
+                        }
+                    })
+                    .catch(function(err) {
+                        console.log('Project switcher: Not in multi-project mode');
+                    });
+
+                // Close on click outside
+                document.addEventListener('click', function(e) {
+                    var switcher = document.getElementById('project-switcher');
+                    if (switcher && !switcher.contains(e.target) && isOpen) {
+                        close();
+                    }
+                });
+
+                // Close on Escape
+                document.addEventListener('keydown', function(e) {
+                    if (e.key === 'Escape' && isOpen) {
+                        close();
+                    }
+                });
+            }
+
+            function show() {
+                var switcher = document.getElementById('project-switcher');
+                if (switcher) {
+                    switcher.classList.remove('hidden');
+                }
+                // Also show Projects nav link
+                var projectsNav = document.getElementById('nav-projects');
+                if (projectsNav) {
+                    projectsNav.classList.remove('hidden');
+                }
+            }
+
+            function hide() {
+                var switcher = document.getElementById('project-switcher');
+                if (switcher) {
+                    switcher.classList.add('hidden');
+                }
+            }
+
+            function toggle() {
+                var dropdown = document.getElementById('project-switcher-dropdown');
+                var arrow = document.getElementById('project-switcher-arrow');
+                if (dropdown) {
+                    isOpen = !isOpen;
+                    dropdown.classList.toggle('hidden', !isOpen);
+                    if (arrow) {
+                        arrow.style.transform = isOpen ? 'rotate(180deg)' : '';
+                    }
+                }
+            }
+
+            function close() {
+                var dropdown = document.getElementById('project-switcher-dropdown');
+                var arrow = document.getElementById('project-switcher-arrow');
+                if (dropdown) {
+                    isOpen = false;
+                    dropdown.classList.add('hidden');
+                    if (arrow) {
+                        arrow.style.transform = '';
+                    }
+                }
+            }
+
+            function render() {
+                var nameEl = document.getElementById('project-switcher-name');
+                var listEl = document.getElementById('project-switcher-list');
+
+                // Update active project name
+                if (nameEl) {
+                    var activeProject = projects.find(function(p) { return p.slug === activeProjectSlug; });
+                    nameEl.textContent = activeProject ? activeProject.name : 'Select Project';
+                }
+
+                // Render project list
+                if (listEl) {
+                    var html = '';
+                    if (projects.length === 0) {
+                        html = '<div class="px-4 py-3 text-sm text-secondary-500">No projects found</div>';
+                    } else {
+                        projects.forEach(function(project) {
+                            var isActive = project.slug === activeProjectSlug;
+                            var statusColor = project.status === 'ready' ? 'bg-success-500' :
+                                             project.status === 'archived' ? 'bg-secondary-400' : 'bg-warning-500';
+                            html += '<button ' +
+                                'onclick="ProjectSwitcher.switchTo(\'' + project.slug + '\')" ' +
+                                'class="w-full flex items-center gap-3 px-3 py-2 text-sm text-left hover:bg-secondary-50 transition-colors ' +
+                                (isActive ? 'bg-primary-50 border-l-2 border-primary-500' : '') + '">' +
+                                '<span class="w-2 h-2 rounded-full ' + statusColor + ' flex-shrink-0"></span>' +
+                                '<div class="flex-1 min-w-0">' +
+                                '<div class="font-medium text-secondary-900 truncate">' + escapeHtml(project.name) + '</div>' +
+                                '<div class="text-xs text-secondary-500 truncate">' + escapeHtml(project.path) + '</div>' +
+                                '</div>' +
+                                (isActive ? '<svg class="w-4 h-4 text-primary-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>' : '') +
+                                '</button>';
+                        });
+                    }
+                    listEl.innerHTML = html;
+                }
+            }
+
+            function switchTo(slug) {
+                if (slug === activeProjectSlug) {
+                    close();
+                    return;
+                }
+
+                fetch('/api/projects/' + encodeURIComponent(slug) + '/activate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(function(response) {
+                    if (!response.ok) throw new Error('Failed to switch project');
+                    return response.json();
+                })
+                .then(function(data) {
+                    activeProjectSlug = data.slug;
+                    render();
+                    close();
+                    // Show toast and reload page to update data
+                    if (typeof showToast === 'function') {
+                        showToast('Switched to ' + data.name, 'success');
+                    }
+                    setTimeout(function() { window.location.reload(); }, 500);
+                })
+                .catch(function(err) {
+                    if (typeof showToast === 'function') {
+                        showToast('Failed to switch project: ' + err.message, 'error');
+                    }
+                });
+            }
+
+            function escapeHtml(text) {
+                var div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function getActiveProject() {
+                return activeProjectSlug;
+            }
+
+            // Initialize when DOM is ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+            return {
+                toggle: toggle,
+                close: close,
+                switchTo: switchTo,
+                getActiveProject: getActiveProject
+            };
+        })();
+    </script>
 
     <!-- Initialize Scroll Animations and Background Tasks -->
     <script>

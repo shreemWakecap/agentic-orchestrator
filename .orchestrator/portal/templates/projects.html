@@ -1,0 +1,593 @@
+{% extends "base.html" %}
+
+{% block title %}Projects - SDLC Orchestrator{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold text-secondary-900">Projects</h1>
+            <p class="text-secondary-500 mt-1">Manage your SDLC Orchestrator projects</p>
+        </div>
+        {% if is_multi_project %}
+        <div class="flex items-center gap-3">
+            <button onclick="ProjectsPage.showAddLocalDialog()" class="btn btn-secondary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                </svg>
+                Add Local
+            </button>
+            <button onclick="ProjectsPage.showAddGitDialog()" class="btn btn-primary">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Clone Git
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if error %}
+    <!-- Error Message -->
+    <div class="bg-danger-50 border border-danger-200 rounded-lg p-4">
+        <div class="flex items-start gap-3">
+            <svg class="w-5 h-5 text-danger-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div>
+                <p class="font-medium text-danger-800">Configuration Required</p>
+                <p class="text-sm text-danger-600 mt-1">{{ error }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if is_multi_project %}
+    <!-- Projects Grid -->
+    <div id="projects-container">
+        {% if projects|length == 0 %}
+        <div class="card p-12 text-center">
+            <svg class="w-12 h-12 text-secondary-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+            </svg>
+            <h3 class="text-lg font-medium text-secondary-700">No Projects Yet</h3>
+            <p class="text-secondary-500 mt-1">Add your first project to get started</p>
+            <div class="flex items-center justify-center gap-3 mt-6">
+                <button onclick="ProjectsPage.showAddLocalDialog()" class="btn btn-secondary">
+                    Add Local Project
+                </button>
+                <button onclick="ProjectsPage.showAddGitDialog()" class="btn btn-primary">
+                    Clone Git Repository
+                </button>
+            </div>
+        </div>
+        {% else %}
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {% for project in projects %}
+            <div class="card p-4 hover:shadow-lg transition-shadow {% if project.slug == active_project %}ring-2 ring-primary-500{% endif %}" id="project-{{ project.slug }}">
+                <div class="flex items-start justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        <!-- Status indicator -->
+                        <span class="w-2 h-2 rounded-full {% if project.status == 'ready' %}bg-success-500{% elif project.status == 'archived' %}bg-secondary-400{% elif project.status == 'indexing' %}bg-warning-500 animate-pulse{% else %}bg-secondary-300{% endif %}"></span>
+                        <h3 class="font-semibold text-secondary-900">{{ project.name }}</h3>
+                    </div>
+                    {% if project.slug == active_project %}
+                    <span class="px-2 py-0.5 text-xs font-medium bg-primary-100 text-primary-700 rounded-full">Active</span>
+                    {% endif %}
+                </div>
+
+                <div class="space-y-2 text-sm">
+                    <div class="flex items-center gap-2 text-secondary-500">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                        </svg>
+                        <span class="truncate" title="{{ project.path }}">{{ project.path }}</span>
+                    </div>
+
+                    {% if project.source_type == 'git' and project.git_url %}
+                    <div class="flex items-center gap-2 text-secondary-500">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        <span class="truncate" title="{{ project.git_url }}">{{ project.git_branch or 'main' }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if project.description %}
+                    <p class="text-secondary-600 line-clamp-2">{{ project.description }}</p>
+                    {% endif %}
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center gap-2 mt-4 pt-4 border-t border-secondary-100">
+                    {% if project.slug != active_project and project.status != 'archived' %}
+                    <button onclick="ProjectsPage.switchTo('{{ project.slug }}')" class="btn btn-sm btn-primary flex-1">
+                        Switch
+                    </button>
+                    {% elif project.status == 'archived' %}
+                    <button onclick="ProjectsPage.restore('{{ project.slug }}')" class="btn btn-sm btn-secondary flex-1">
+                        Restore
+                    </button>
+                    {% else %}
+                    <span class="btn btn-sm bg-primary-50 text-primary-600 flex-1 cursor-default">
+                        Current
+                    </span>
+                    {% endif %}
+
+                    <div class="relative" x-data="{ open: false }">
+                        <button onclick="ProjectsPage.toggleMenu('{{ project.slug }}')" class="btn btn-sm btn-secondary px-2" id="menu-btn-{{ project.slug }}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                            </svg>
+                        </button>
+                        <div id="menu-{{ project.slug }}" class="hidden absolute right-0 bottom-full mb-1 w-40 bg-white rounded-lg shadow-lg border border-secondary-200 py-1 z-10">
+                            {% if project.source_type == 'git' %}
+                            <button onclick="ProjectsPage.gitFetch('{{ project.slug }}')" class="w-full text-left px-3 py-2 text-sm text-secondary-700 hover:bg-secondary-50">
+                                Git Fetch
+                            </button>
+                            <button onclick="ProjectsPage.gitPull('{{ project.slug }}')" class="w-full text-left px-3 py-2 text-sm text-secondary-700 hover:bg-secondary-50">
+                                Git Pull
+                            </button>
+                            <div class="border-t border-secondary-100 my-1"></div>
+                            {% endif %}
+                            <button onclick="ProjectsPage.showInfo('{{ project.slug }}')" class="w-full text-left px-3 py-2 text-sm text-secondary-700 hover:bg-secondary-50">
+                                View Details
+                            </button>
+                            {% if project.status != 'archived' %}
+                            <button onclick="ProjectsPage.archive('{{ project.slug }}')" class="w-full text-left px-3 py-2 text-sm text-warning-600 hover:bg-warning-50">
+                                Archive
+                            </button>
+                            {% endif %}
+                            <button onclick="ProjectsPage.remove('{{ project.slug }}')" class="w-full text-left px-3 py-2 text-sm text-danger-600 hover:bg-danger-50">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Add Local Project Dialog -->
+<div id="add-local-dialog" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
+        <h2 class="text-lg font-semibold text-secondary-900 mb-4">Add Local Project</h2>
+        <form onsubmit="ProjectsPage.addLocal(event)">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-secondary-700 mb-1">Project Path</label>
+                    <input type="text" name="path" required class="input" placeholder="C:\path\to\project">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-secondary-700 mb-1">Name (optional)</label>
+                    <input type="text" name="name" class="input" placeholder="My Project">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-secondary-700 mb-1">Description (optional)</label>
+                    <textarea name="description" class="input" rows="2" placeholder="Brief description..."></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="ProjectsPage.closeDialog('add-local-dialog')" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Project</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Git Project Dialog -->
+<div id="add-git-dialog" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
+        <h2 class="text-lg font-semibold text-secondary-900 mb-4">Clone Git Repository</h2>
+        <form onsubmit="ProjectsPage.addGit(event)">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-secondary-700 mb-1">Repository URL</label>
+                    <input type="url" name="url" required class="input" placeholder="https://github.com/user/repo">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-secondary-700 mb-1">Destination Path</label>
+                    <input type="text" name="destination" required class="input" placeholder="C:\projects\repo">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-secondary-700 mb-1">Branch (optional)</label>
+                    <input type="text" name="branch" class="input" placeholder="main">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-secondary-700 mb-1">Name (optional)</label>
+                    <input type="text" name="name" class="input" placeholder="Project name">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="ProjectsPage.closeDialog('add-git-dialog')" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Clone</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Project Info Side Panel -->
+<div id="project-info-overlay" class="side-popup-overlay" onclick="ProjectsPage.closeInfo()"></div>
+<div id="project-info-panel" class="side-popup max-w-md">
+    <div class="side-popup-header">
+        <div class="flex items-center gap-3">
+            <div class="w-1 h-6 bg-gradient-to-b from-primary-500 to-primary-600 rounded-full"></div>
+            <h2 id="project-info-title" class="text-lg font-semibold text-gray-900">Project Details</h2>
+        </div>
+        <button onclick="ProjectsPage.closeInfo()" class="side-popup-close">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>
+    <div id="project-info-content" class="side-popup-content">
+        <!-- Content loaded dynamically -->
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var ProjectsPage = (function() {
+    var openMenu = null;
+
+    function showAddLocalDialog() {
+        document.getElementById('add-local-dialog').classList.remove('hidden');
+    }
+
+    function showAddGitDialog() {
+        document.getElementById('add-git-dialog').classList.remove('hidden');
+    }
+
+    function closeDialog(id) {
+        document.getElementById(id).classList.add('hidden');
+    }
+
+    function addLocal(e) {
+        e.preventDefault();
+        var form = e.target;
+        var data = {
+            path: form.path.value,
+            name: form.name.value || null,
+            description: form.description.value || null,
+            auto_index: false
+        };
+
+        fetch('/api/projects/local', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(function(response) {
+            if (!response.ok) return response.json().then(function(d) { throw new Error(d.detail || 'Failed'); });
+            return response.json();
+        })
+        .then(function(project) {
+            showToast('Project added: ' + project.name, 'success');
+            closeDialog('add-local-dialog');
+            window.location.reload();
+        })
+        .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    function addGit(e) {
+        e.preventDefault();
+        var form = e.target;
+        var data = {
+            url: form.url.value,
+            destination: form.destination.value,
+            branch: form.branch.value || null,
+            name: form.name.value || null,
+            auto_index: false
+        };
+
+        showToast('Cloning repository...', 'info');
+
+        fetch('/api/projects/git', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        })
+        .then(function(response) {
+            if (!response.ok) return response.json().then(function(d) { throw new Error(d.detail || 'Failed'); });
+            return response.json();
+        })
+        .then(function(project) {
+            showToast('Repository cloned: ' + project.name, 'success');
+            closeDialog('add-git-dialog');
+            window.location.reload();
+        })
+        .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    function switchTo(slug) {
+        fetch('/api/projects/' + encodeURIComponent(slug) + '/activate', {
+            method: 'POST'
+        })
+        .then(function(response) {
+            if (!response.ok) throw new Error('Failed to switch');
+            return response.json();
+        })
+        .then(function(data) {
+            showToast('Switched to ' + data.name, 'success');
+            window.location.reload();
+        })
+        .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    function archive(slug) {
+        if (!confirm('Archive this project?')) return;
+
+        fetch('/api/projects/' + encodeURIComponent(slug) + '/archive', {
+            method: 'POST'
+        })
+        .then(function(response) {
+            if (!response.ok) throw new Error('Failed');
+            return response.json();
+        })
+        .then(function() {
+            showToast('Project archived', 'success');
+            window.location.reload();
+        })
+        .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    function restore(slug) {
+        fetch('/api/projects/' + encodeURIComponent(slug) + '/restore', {
+            method: 'POST'
+        })
+        .then(function(response) {
+            if (!response.ok) throw new Error('Failed');
+            return response.json();
+        })
+        .then(function() {
+            showToast('Project restored', 'success');
+            window.location.reload();
+        })
+        .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    function remove(slug) {
+        if (!confirm('Remove this project? This only removes the registration, not the files.')) return;
+
+        fetch('/api/projects/' + encodeURIComponent(slug), {
+            method: 'DELETE'
+        })
+        .then(function(response) {
+            if (!response.ok) throw new Error('Failed');
+            return response.json();
+        })
+        .then(function() {
+            showToast('Project removed', 'success');
+            window.location.reload();
+        })
+        .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    function gitFetch(slug) {
+        showToast('Fetching...', 'info');
+        fetch('/api/projects/' + encodeURIComponent(slug) + '/git/fetch', {
+            method: 'POST'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                showToast('Fetch complete', 'success');
+            } else {
+                showToast('Fetch failed: ' + (data.error || 'Unknown'), 'error');
+            }
+            closeMenu();
+        })
+        .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    function gitPull(slug) {
+        showToast('Pulling...', 'info');
+        fetch('/api/projects/' + encodeURIComponent(slug) + '/git/pull', {
+            method: 'POST'
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                var msg = 'Pull complete';
+                if (data.changed_files && data.changed_files.length > 0) {
+                    msg += ' (' + data.changed_files.length + ' files changed)';
+                }
+                showToast(msg, 'success');
+            } else {
+                showToast('Pull failed: ' + (data.error || 'Unknown'), 'error');
+            }
+            closeMenu();
+        })
+        .catch(function(err) {
+            showToast('Error: ' + err.message, 'error');
+        });
+    }
+
+    function toggleMenu(slug) {
+        var menuEl = document.getElementById('menu-' + slug);
+        if (!menuEl) return;
+
+        if (openMenu && openMenu !== slug) {
+            document.getElementById('menu-' + openMenu).classList.add('hidden');
+        }
+
+        menuEl.classList.toggle('hidden');
+        openMenu = menuEl.classList.contains('hidden') ? null : slug;
+    }
+
+    function closeMenu() {
+        if (openMenu) {
+            document.getElementById('menu-' + openMenu).classList.add('hidden');
+            openMenu = null;
+        }
+    }
+
+    function showInfo(slug) {
+        closeMenu();
+        fetch('/api/projects/' + encodeURIComponent(slug))
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                var project = data.project;
+                var content = document.getElementById('project-info-content');
+                var title = document.getElementById('project-info-title');
+
+                title.textContent = project.name;
+
+                var html = '<div class="space-y-4">';
+
+                // Basic info
+                html += '<div class="space-y-2">';
+                html += '<div class="flex justify-between py-2 border-b border-secondary-100">';
+                html += '<span class="text-secondary-500">Slug</span>';
+                html += '<span class="font-mono text-secondary-900">' + escapeHtml(project.slug) + '</span>';
+                html += '</div>';
+                html += '<div class="flex justify-between py-2 border-b border-secondary-100">';
+                html += '<span class="text-secondary-500">Status</span>';
+                html += '<span class="font-medium text-secondary-900">' + escapeHtml(project.status) + '</span>';
+                html += '</div>';
+                html += '<div class="flex justify-between py-2 border-b border-secondary-100">';
+                html += '<span class="text-secondary-500">Source</span>';
+                html += '<span class="font-medium text-secondary-900">' + escapeHtml(project.source_type) + '</span>';
+                html += '</div>';
+                html += '<div class="py-2 border-b border-secondary-100">';
+                html += '<div class="text-secondary-500 mb-1">Path</div>';
+                html += '<div class="font-mono text-sm text-secondary-900 break-all">' + escapeHtml(project.path) + '</div>';
+                html += '</div>';
+
+                if (project.git_url) {
+                    html += '<div class="py-2 border-b border-secondary-100">';
+                    html += '<div class="text-secondary-500 mb-1">Git URL</div>';
+                    html += '<div class="font-mono text-sm text-secondary-900 break-all">' + escapeHtml(project.git_url) + '</div>';
+                    html += '</div>';
+                }
+                if (project.git_branch) {
+                    html += '<div class="flex justify-between py-2 border-b border-secondary-100">';
+                    html += '<span class="text-secondary-500">Branch</span>';
+                    html += '<span class="font-medium text-secondary-900">' + escapeHtml(project.git_branch) + '</span>';
+                    html += '</div>';
+                }
+                html += '</div>';
+
+                // Git status (if available)
+                if (data.git_status && !data.git_status.error) {
+                    var gs = data.git_status;
+                    html += '<div class="bg-secondary-50 rounded-lg p-4">';
+                    html += '<h3 class="font-semibold text-secondary-900 mb-3">Git Status</h3>';
+                    html += '<div class="space-y-2 text-sm">';
+                    html += '<div class="flex justify-between">';
+                    html += '<span class="text-secondary-500">Branch</span>';
+                    html += '<span class="font-mono">' + escapeHtml(gs.branch || '-') + '</span>';
+                    html += '</div>';
+                    html += '<div class="flex justify-between">';
+                    html += '<span class="text-secondary-500">Commit</span>';
+                    html += '<span class="font-mono">' + escapeHtml(gs.commit_hash || '-') + '</span>';
+                    html += '</div>';
+                    html += '<div class="flex justify-between">';
+                    html += '<span class="text-secondary-500">Clean</span>';
+                    html += '<span class="font-medium ' + (gs.is_clean ? 'text-success-600' : 'text-warning-600') + '">' + (gs.is_clean ? 'Yes' : 'No') + '</span>';
+                    html += '</div>';
+                    if (gs.ahead > 0 || gs.behind > 0) {
+                        html += '<div class="flex justify-between">';
+                        html += '<span class="text-secondary-500">Ahead/Behind</span>';
+                        html += '<span>' + gs.ahead + ' / ' + gs.behind + '</span>';
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                    html += '</div>';
+                }
+
+                // Knowledge info
+                html += '<div class="bg-secondary-50 rounded-lg p-4">';
+                html += '<h3 class="font-semibold text-secondary-900 mb-3">Knowledge</h3>';
+                html += '<div class="space-y-2 text-sm">';
+                html += '<div class="flex justify-between">';
+                html += '<span class="text-secondary-500">Indexed</span>';
+                html += '<span class="font-medium ' + (data.knowledge_exists ? 'text-success-600' : 'text-secondary-500') + '">' + (data.knowledge_exists ? 'Yes' : 'No') + '</span>';
+                html += '</div>';
+                html += '<div class="flex justify-between">';
+                html += '<span class="text-secondary-500">Experts</span>';
+                html += '<span>' + (data.expert_count || 0) + '</span>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+
+                html += '</div>';
+
+                content.innerHTML = html;
+
+                // Show panel
+                document.getElementById('project-info-overlay').classList.add('active');
+                document.getElementById('project-info-panel').classList.add('active');
+            })
+            .catch(function(err) {
+                showToast('Error loading details: ' + err.message, 'error');
+            });
+    }
+
+    function closeInfo() {
+        document.getElementById('project-info-overlay').classList.remove('active');
+        document.getElementById('project-info-panel').classList.remove('active');
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Close menus on outside click
+    document.addEventListener('click', function(e) {
+        if (openMenu && !e.target.closest('[id^="menu-"]') && !e.target.closest('[id^="menu-btn-"]')) {
+            closeMenu();
+        }
+    });
+
+    // Close dialogs on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeDialog('add-local-dialog');
+            closeDialog('add-git-dialog');
+            closeInfo();
+        }
+    });
+
+    return {
+        showAddLocalDialog: showAddLocalDialog,
+        showAddGitDialog: showAddGitDialog,
+        closeDialog: closeDialog,
+        addLocal: addLocal,
+        addGit: addGit,
+        switchTo: switchTo,
+        archive: archive,
+        restore: restore,
+        remove: remove,
+        gitFetch: gitFetch,
+        gitPull: gitPull,
+        toggleMenu: toggleMenu,
+        showInfo: showInfo,
+        closeInfo: closeInfo
+    };
+})();
+</script>
+{% endblock %}

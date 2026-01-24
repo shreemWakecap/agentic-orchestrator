@@ -3,6 +3,10 @@ SQLAlchemy ORM Models for PostgreSQL.
 
 This module defines all database tables required by the orchestrator.
 Tables are auto-created on startup via Base.metadata.create_all().
+
+Multi-Project Support:
+    Most tables include a project_id foreign key for multi-project isolation.
+    The Project model is the root entity that owns all project-specific data.
 """
 from datetime import datetime
 from typing import Optional
@@ -18,11 +22,112 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Index,
+    Enum as SQLEnum,
     create_engine,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+import enum
 
 Base = declarative_base()
+
+
+# =============================================================================
+# PROJECT MANAGEMENT (Multi-Project Support)
+# =============================================================================
+
+class ProjectStatus(str, enum.Enum):
+    """Project lifecycle status."""
+    PENDING = "pending"
+    INDEXING = "indexing"
+    READY = "ready"
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+class ProjectSourceType(str, enum.Enum):
+    """Project source type."""
+    LOCAL = "local"
+    GIT = "git"
+
+
+class Project(Base):
+    """
+    Project model - root entity for multi-project support.
+
+    Each project owns its own plans, builds, knowledge, and other data.
+    Projects are isolated from each other in the shared database.
+    """
+    __tablename__ = "projects"
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), unique=True, nullable=False, index=True)  # UUID
+    name = Column(String(255), nullable=False)
+    slug = Column(String(100), unique=True, nullable=False, index=True)
+    path = Column(Text, nullable=False)  # Path to project directory
+    description = Column(Text)
+
+    # Status
+    status = Column(SQLEnum(ProjectStatus), default=ProjectStatus.PENDING, index=True)
+
+    # Source info
+    source_type = Column(SQLEnum(ProjectSourceType), default=ProjectSourceType.LOCAL)
+    git_url = Column(String(500))
+    git_branch = Column(String(255))
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_accessed_at = Column(DateTime)
+    indexed_at = Column(DateTime)
+    archived_at = Column(DateTime)
+
+    # Relationships
+    events = relationship("ProjectEvent", back_populates="project", cascade="all, delete-orphan")
+    plans = relationship("Plan", back_populates="project", cascade="all, delete-orphan")
+    runs = relationship("ActiveRun", back_populates="project", cascade="all, delete-orphan")
+    knowledge = relationship("CodebaseKnowledge", back_populates="project", cascade="all, delete-orphan", uselist=False)
+    cost_history = relationship("CostHistory", back_populates="project", cascade="all, delete-orphan")
+    token_usage = relationship("TokenUsageRecord", back_populates="project", cascade="all, delete-orphan")
+    expert_index = relationship("ExpertIndex", back_populates="project", cascade="all, delete-orphan", uselist=False)
+    scan_metadata = relationship("ScanMetadata", back_populates="project", cascade="all, delete-orphan")
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        return {
+            "id": self.id,
+            "project_id": self.project_id,
+            "name": self.name,
+            "slug": self.slug,
+            "path": self.path,
+            "description": self.description,
+            "status": self.status.value if self.status else None,
+            "source_type": self.source_type.value if self.source_type else None,
+            "git_url": self.git_url,
+            "git_branch": self.git_branch,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "last_accessed_at": self.last_accessed_at.isoformat() if self.last_accessed_at else None,
+            "indexed_at": self.indexed_at.isoformat() if self.indexed_at else None,
+        }
+
+
+class ProjectEvent(Base):
+    """
+    Project event model - audit log for project changes.
+
+    Tracks important events like creation, status changes, indexing, etc.
+    """
+    __tablename__ = "project_events"
+
+    id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type = Column(String(50), nullable=False, index=True)  # created, activated, indexed, archived, etc.
+    event_data_json = Column(Text, default="{}")
+    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    triggered_by = Column(String(100))  # cli, portal, system
+
+    # Relationships
+    project = relationship("Project", back_populates="events")
 
 
 # =============================================================================
@@ -35,6 +140,7 @@ class Plan(Base):
 
     id = Column(Integer, primary_key=True)
     plan_id = Column(String(255), unique=True, nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
     goal = Column(Text)
     request = Column(Text)
     raw_content = Column(Text)
@@ -46,6 +152,7 @@ class Plan(Base):
     completed_at = Column(DateTime)
 
     # Relationships
+    project = relationship("Project", back_populates="plans")
     phases = relationship("PlanPhase", back_populates="plan", cascade="all, delete-orphan")
     steps = relationship("PlanStep", back_populates="plan", cascade="all, delete-orphan")
     build_state = relationship("BuildState", back_populates="plan", cascade="all, delete-orphan", uselist=False)
@@ -170,6 +277,7 @@ class ActiveRun(Base):
 
     id = Column(Integer, primary_key=True)
     run_id = Column(String(255), unique=True, nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
     workflow = Column(String(50), nullable=False)
     status = Column(String(50), default="pending", index=True)
     started_at = Column(DateTime, default=datetime.utcnow)
@@ -183,6 +291,7 @@ class ActiveRun(Base):
     triggered_by = Column(String(50), default="manual")  # manual, system, auto_pre_planning, post_build
 
     # Relationships
+    project = relationship("Project", back_populates="runs")
     events = relationship("RunEvent", back_populates="run", cascade="all, delete-orphan")
 
 
@@ -209,6 +318,7 @@ class CostHistory(Base):
     __tablename__ = "cost_history"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
     workflow = Column(String(50), nullable=False, index=True)
     run_id = Column(String(255), index=True)
     started_at = Column(DateTime)
@@ -217,6 +327,9 @@ class CostHistory(Base):
     estimated_cost = Column(Float, default=0.0)
     actual_cost = Column(Float)
     agents_json = Column(Text, default="{}")
+
+    # Relationships
+    project = relationship("Project", back_populates="cost_history")
 
 
 # =============================================================================
@@ -228,6 +341,7 @@ class TokenUsageRecord(Base):
     __tablename__ = "token_usage_records"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
     run_id = Column(String(255), ForeignKey("active_runs.run_id", ondelete="SET NULL"), index=True)
     plan_id = Column(String(255), ForeignKey("plans.plan_id", ondelete="SET NULL"), index=True)
     workflow_type = Column(String(100), nullable=False, index=True)  # scout, build, plan, etc.
@@ -244,9 +358,11 @@ class TokenUsageRecord(Base):
     __table_args__ = (
         Index('ix_token_usage_workflow_timestamp', 'workflow_type', 'timestamp'),
         Index('ix_token_usage_event_timestamp', 'event_type', 'timestamp'),
+        Index('ix_token_usage_project_timestamp', 'project_id', 'timestamp'),
     )
 
     # Relationships
+    project = relationship("Project", back_populates="token_usage")
     run = relationship("ActiveRun", backref="token_usage_records")
     plan = relationship("Plan", backref="token_usage_records")
 
@@ -260,6 +376,7 @@ class CodebaseKnowledge(Base):
     __tablename__ = "codebase_knowledge"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), unique=True, index=True)  # Multi-project support
     version = Column(String(50), default="1.0")
     last_updated = Column(DateTime, default=datetime.utcnow)
     project_name = Column(String(255))
@@ -268,6 +385,7 @@ class CodebaseKnowledge(Base):
     statistics_json = Column(Text, default="{}")
 
     # Relationships
+    project = relationship("Project", back_populates="knowledge")
     technologies = relationship("Technology", back_populates="knowledge", cascade="all, delete-orphan")
     architecture = relationship("ArchitectureInfo", back_populates="knowledge", cascade="all, delete-orphan", uselist=False)
     modules = relationship("ArchitectureModule", back_populates="knowledge", cascade="all, delete-orphan")
@@ -359,12 +477,14 @@ class ExpertIndex(Base):
     __tablename__ = "expert_index"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), unique=True, index=True)  # Multi-project support
     version = Column(String(50), default="1.0")
     last_updated = Column(DateTime, default=datetime.utcnow)
     keyword_map_json = Column(Text, default="{}")
     path_map_json = Column(Text, default="{}")
 
     # Relationships
+    project = relationship("Project", back_populates="expert_index")
     entries = relationship("ExpertEntry", back_populates="index", cascade="all, delete-orphan")
 
 
@@ -395,6 +515,7 @@ class ScanMetadata(Base):
     __tablename__ = "scan_metadata"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
     scan_id = Column(String(255), unique=True, nullable=False, index=True)
     started_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime)
@@ -404,12 +525,16 @@ class ScanMetadata(Base):
     trigger_type = Column(String(50), default="manual")
     experts_generated_json = Column(Text, default="[]")
 
+    # Relationships
+    project = relationship("Project", back_populates="scan_metadata")
+
 
 class ExtendedScanMetadata(Base):
     """Extended scan metadata with git state tracking for staleness detection."""
     __tablename__ = "extended_scan_metadata"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
     git_commit_hash = Column(String(64), index=True)
     git_branch = Column(String(255))
     scanned_paths_json = Column(Text, default="[]")
@@ -427,8 +552,9 @@ class CodingRule(Base):
     __tablename__ = "coding_rules"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
     knowledge_id = Column(Integer, ForeignKey("codebase_knowledge.id", ondelete="CASCADE"), index=True)
-    rule_id = Column(String(255), unique=True, nullable=False, index=True)
+    rule_id = Column(String(255), nullable=False, index=True)
     category = Column(String(50), nullable=False, index=True)  # naming, structure, patterns, security, testing, documentation
     rule_text = Column(Text, nullable=False)
     severity = Column(String(20), default="info", index=True)  # info, warning, error
@@ -437,6 +563,10 @@ class CodingRule(Base):
     confidence = Column(Float, default=0.5)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('project_id', 'rule_id', name='uq_coding_rules_project_rule'),
+    )
 
 
 # =============================================================================
@@ -448,7 +578,8 @@ class FileKnowledge(Base):
     __tablename__ = "file_knowledge"
 
     id = Column(Integer, primary_key=True)
-    file_path = Column(Text, unique=True, nullable=False, index=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
+    file_path = Column(Text, nullable=False, index=True)
     file_type = Column(String(50))
     language = Column(String(50), index=True)
     size_bytes = Column(Integer, default=0)
@@ -462,12 +593,17 @@ class FileKnowledge(Base):
     summary = Column(Text)
     last_scanned = Column(DateTime, default=datetime.utcnow, index=True)
 
+    __table_args__ = (
+        UniqueConstraint('project_id', 'file_path', name='uq_file_knowledge_project_path'),
+    )
+
 
 class FileScanHistory(Base):
     """File scan history model - tracks individual file scans."""
     __tablename__ = "file_scan_history"
 
     id = Column(Integer, primary_key=True)
+    project_id = Column(String(36), ForeignKey("projects.project_id", ondelete="CASCADE"), index=True)  # Multi-project support
     scan_id = Column(String(255), unique=True, nullable=False, index=True)
     file_path = Column(Text, nullable=False, index=True)
     scan_type = Column(String(50), default="single")

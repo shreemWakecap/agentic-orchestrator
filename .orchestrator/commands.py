@@ -5,9 +5,645 @@ import shutil
 import socket
 import sys
 from pathlib import Path
+from typing import Optional
 
 ORCHESTRATOR_DIR = Path(__file__).parent
 PROJECT_ROOT = ORCHESTRATOR_DIR.parent
+
+
+# =============================================================================
+# INIT COMMAND (Multi-Project Mode)
+# =============================================================================
+
+def run_init(args=None) -> int:
+    """Initialize orchestrator for multi-project mode.
+
+    This command sets up the orchestrator directory structure
+    and prepares the database for multi-project use.
+    """
+    from config import get_config
+
+    config = get_config()
+
+    print("SDLC Orchestrator Initialization")
+    print("=" * 50)
+
+    home_path = config.orchestrator_home.home_path
+    print(f"\nHome directory: {home_path}")
+
+    # Create directory structure
+    from core.home import OrchestratorHome
+
+    home = OrchestratorHome(root=home_path)
+
+    print("\nCreating directory structure...")
+    home.ensure_structure()
+
+    print(f"  [+] {home.config_dir}")
+    print(f"  [+] {home.projects_dir}")
+    print(f"  [+] {home.logs_dir}")
+    print(f"  [+] {home.registry_file}")
+
+    # Check prerequisites
+    print("\nChecking prerequisites...")
+    ok = True
+    for cmd in ['claude', 'git']:
+        if shutil.which(cmd):
+            print(f"  [+] {cmd}")
+        else:
+            print(f"  [!] {cmd} missing")
+            ok = False
+
+    # Check and initialize database
+    print("\nInitializing database...")
+    db_ok = _init_database()
+    if not db_ok:
+        ok = False
+
+    # Summary
+    print("\n" + "=" * 50)
+    if ok:
+        print("Initialization complete!")
+        print("\nNext steps:")
+        print("  1. Add a project: orch project add /path/to/your/project")
+        print("  2. Switch to it:  orch project switch <project-name>")
+        print("  3. Run scout:     orch scout")
+    else:
+        print("Initialization completed with warnings.")
+        print("Please resolve the issues above before proceeding.")
+
+    return 0 if ok else 1
+
+
+def _init_database() -> bool:
+    """Initialize the database for multi-project mode."""
+    try:
+        from db.config import DatabaseConfig
+        config = DatabaseConfig.load()
+
+        # Connect to PostgreSQL and create database if needed
+        import psycopg2
+        from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+
+        try:
+            admin_conn = psycopg2.connect(
+                host=config.host,
+                port=config.port,
+                user=config.user,
+                password=config.password,
+                database="postgres"
+            )
+            admin_conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+            cursor = admin_conn.cursor()
+
+            # Check if database exists
+            cursor.execute("SELECT 1 FROM pg_database WHERE datname = %s", (config.name,))
+            exists = cursor.fetchone()
+
+            if not exists:
+                print(f"  [*] Creating database '{config.name}'...")
+                cursor.execute(f'CREATE DATABASE "{config.name}"')
+                print(f"  [+] Database '{config.name}' created")
+            else:
+                print(f"  [+] Database '{config.name}' exists")
+
+            cursor.close()
+            admin_conn.close()
+
+        except psycopg2.OperationalError as e:
+            if "connection refused" in str(e).lower():
+                print(f"  [!] PostgreSQL server not running at {config.host}:{config.port}")
+            else:
+                print(f"  [!] PostgreSQL error: {e}")
+            return False
+
+        # Connect and run migrations
+        from db import get_database
+        db = get_database()
+        print(f"  [+] Connected: {config.host}:{config.port}/{config.name}")
+
+        # Run Alembic migrations
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["alembic", "-c", "db/alembic.ini", "upgrade", "head"],
+                cwd=ORCHESTRATOR_DIR,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                print("  [+] Database migrations applied")
+            else:
+                stderr = result.stderr.strip()
+                if stderr:
+                    print(f"  [*] Migration note: {stderr[:100]}")
+        except FileNotFoundError:
+            print("  [!] Alembic not found - run: pip install alembic")
+            return False
+
+        return True
+
+    except Exception as e:
+        print(f"  [!] Database error: {e}")
+        return False
+
+
+# =============================================================================
+# PROJECT COMMAND (Multi-Project Mode)
+# =============================================================================
+
+def run_project(args=None) -> int:
+    """Manage projects.
+
+    Subcommands:
+        list [--all]              List projects
+        add <path>                Add local project
+        add --git <url> --dest <path>  Clone git project
+        switch <name|id>          Activate project
+        info [name|id]            Show project details
+        archive <name|id>         Archive project
+        restore <name|id>         Restore archived project
+        remove <name|id>          Remove project
+        fetch [name|id]           Git fetch
+        pull [name|id]            Git pull
+        status [name|id]          Git status
+    """
+    parser = argparse.ArgumentParser(
+        prog="orch project",
+        description="Manage projects"
+    )
+    subparsers = parser.add_subparsers(dest="action", help="Action")
+
+    # list
+    list_parser = subparsers.add_parser("list", help="List projects")
+    list_parser.add_argument("--all", "-a", action="store_true", help="Include archived")
+
+    # add
+    add_parser = subparsers.add_parser("add", help="Add project")
+    add_parser.add_argument("path", nargs="?", help="Local project path")
+    add_parser.add_argument("--git", "-g", help="Git repository URL")
+    add_parser.add_argument("--dest", "-d", help="Clone destination path")
+    add_parser.add_argument("--branch", "-b", help="Git branch")
+    add_parser.add_argument("--name", "-n", help="Project name (optional)")
+
+    # switch
+    switch_parser = subparsers.add_parser("switch", help="Switch active project")
+    switch_parser.add_argument("name", help="Project name or ID")
+
+    # info
+    info_parser = subparsers.add_parser("info", help="Show project info")
+    info_parser.add_argument("name", nargs="?", help="Project name or ID")
+
+    # archive
+    archive_parser = subparsers.add_parser("archive", help="Archive project")
+    archive_parser.add_argument("name", help="Project name or ID")
+
+    # restore
+    restore_parser = subparsers.add_parser("restore", help="Restore archived project")
+    restore_parser.add_argument("name", help="Project name or ID")
+
+    # remove
+    remove_parser = subparsers.add_parser("remove", help="Remove project")
+    remove_parser.add_argument("name", help="Project name or ID")
+    remove_parser.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+    remove_parser.add_argument("--delete-files", action="store_true", help="Delete project files")
+
+    # fetch
+    fetch_parser = subparsers.add_parser("fetch", help="Git fetch")
+    fetch_parser.add_argument("name", nargs="?", help="Project name or ID")
+
+    # pull
+    pull_parser = subparsers.add_parser("pull", help="Git pull")
+    pull_parser.add_argument("name", nargs="?", help="Project name or ID")
+
+    # status
+    status_parser = subparsers.add_parser("status", help="Git status")
+    status_parser.add_argument("name", nargs="?", help="Project name or ID")
+
+    parsed = parser.parse_args(args or [])
+
+    if not parsed.action:
+        parser.print_help()
+        return 0
+
+    # Import project management components
+    from core.project_registry import get_project_registry, ProjectSourceType, ProjectStatus
+
+    registry = get_project_registry()
+
+    if parsed.action == "list":
+        return _project_list(registry, include_archived=parsed.all)
+
+    elif parsed.action == "add":
+        if parsed.git:
+            return _project_add_git(registry, parsed.git, parsed.dest, parsed.branch, parsed.name)
+        elif parsed.path:
+            return _project_add_local(registry, parsed.path, parsed.name)
+        else:
+            print("Error: Provide a path or --git URL")
+            return 1
+
+    elif parsed.action == "switch":
+        return _project_switch(registry, parsed.name)
+
+    elif parsed.action == "info":
+        return _project_info(registry, parsed.name)
+
+    elif parsed.action == "archive":
+        return _project_archive(registry, parsed.name)
+
+    elif parsed.action == "restore":
+        return _project_restore(registry, parsed.name)
+
+    elif parsed.action == "remove":
+        return _project_remove(registry, parsed.name, parsed.force, parsed.delete_files)
+
+    elif parsed.action == "fetch":
+        return _project_git_fetch(registry, parsed.name)
+
+    elif parsed.action == "pull":
+        return _project_git_pull(registry, parsed.name)
+
+    elif parsed.action == "status":
+        return _project_git_status(registry, parsed.name)
+
+    return 0
+
+
+def _project_list(registry, include_archived: bool = False) -> int:
+    """List all projects."""
+    projects = registry.list_projects(include_archived=include_archived)
+
+    if not projects:
+        print("No projects found.")
+        print("\nAdd one with: orch project add /path/to/project")
+        return 0
+
+    print("Projects")
+    print("=" * 60)
+
+    active = registry.get_active_project()
+    active_slug = active.slug if active else None
+
+    for p in projects:
+        marker = "*" if p.slug == active_slug else " "
+        status_indicator = {
+            "pending": "[...]",
+            "indexing": "[IDX]",
+            "ready": "[RDY]",
+            "active": "[ACT]",
+            "archived": "[ARC]",
+        }.get(p.status.value, "[???]")
+
+        print(f"{marker} {status_indicator} {p.name}")
+        print(f"    Slug: {p.slug}")
+        print(f"    Path: {p.path}")
+        if p.git_url:
+            print(f"    Git:  {p.git_url}")
+        print()
+
+    print(f"Total: {len(projects)} project(s)")
+    if active:
+        print(f"Active: {active.name}")
+
+    return 0
+
+
+def _project_add_local(registry, path: str, name: Optional[str] = None) -> int:
+    """Add a local project."""
+    from core.home import get_orchestrator_home
+
+    path = Path(path).resolve()
+
+    if not path.exists():
+        print(f"Error: Path does not exist: {path}")
+        return 1
+
+    if not path.is_dir():
+        print(f"Error: Path is not a directory: {path}")
+        return 1
+
+    # Check if already registered
+    existing = registry.get_project_by_path(str(path))
+    if existing:
+        print(f"Error: Project already registered as '{existing.name}' ({existing.slug})")
+        return 1
+
+    # Determine name
+    if not name:
+        name = path.name
+
+    print(f"Adding local project: {name}")
+    print(f"  Path: {path}")
+
+    # Create project in registry
+    from core.project_registry import ProjectSourceType
+
+    entry = registry.add_project(
+        name=name,
+        path=str(path),
+        source_type=ProjectSourceType.LOCAL,
+    )
+
+    # Create project data directory
+    home = get_orchestrator_home()
+    home.ensure_project_structure(entry.slug)
+
+    # Update status to ready (no cloning needed)
+    registry.set_status(entry.slug, registry.get_project(entry.slug).status.READY)
+
+    print(f"\n[+] Project added: {entry.name} ({entry.slug})")
+    print(f"\nNext steps:")
+    print(f"  orch project switch {entry.slug}")
+    print(f"  orch scout")
+
+    return 0
+
+
+def _project_add_git(registry, git_url: str, dest: Optional[str], branch: Optional[str], name: Optional[str]) -> int:
+    """Add a git project by cloning."""
+    from core.home import get_orchestrator_home
+
+    if not dest:
+        print("Error: --dest is required for git projects")
+        return 1
+
+    dest_path = Path(dest).resolve()
+
+    if dest_path.exists():
+        print(f"Error: Destination already exists: {dest_path}")
+        return 1
+
+    # Determine name from URL if not provided
+    if not name:
+        # Extract name from git URL
+        name = git_url.rstrip('/').split('/')[-1]
+        if name.endswith('.git'):
+            name = name[:-4]
+
+    print(f"Cloning git project: {name}")
+    print(f"  URL:    {git_url}")
+    print(f"  Dest:   {dest_path}")
+    if branch:
+        print(f"  Branch: {branch}")
+
+    # Clone repository
+    import subprocess
+    clone_cmd = ["git", "clone", git_url, str(dest_path)]
+    if branch:
+        clone_cmd.extend(["--branch", branch])
+
+    print("\nCloning...")
+    result = subprocess.run(clone_cmd, capture_output=True, text=True)
+
+    if result.returncode != 0:
+        print(f"Error: Clone failed: {result.stderr}")
+        return 1
+
+    print("  [+] Clone complete")
+
+    # Create project in registry
+    from core.project_registry import ProjectSourceType
+
+    entry = registry.add_project(
+        name=name,
+        path=str(dest_path),
+        source_type=ProjectSourceType.GIT,
+        git_url=git_url,
+        git_branch=branch,
+    )
+
+    # Create project data directory
+    home = get_orchestrator_home()
+    home.ensure_project_structure(entry.slug)
+
+    # Update status to ready
+    registry.set_status(entry.slug, registry.get_project(entry.slug).status.READY)
+
+    print(f"\n[+] Project added: {entry.name} ({entry.slug})")
+    print(f"\nNext steps:")
+    print(f"  orch project switch {entry.slug}")
+    print(f"  orch scout")
+
+    return 0
+
+
+def _project_switch(registry, name: str) -> int:
+    """Switch to a project."""
+    project = registry.get_project(name)
+
+    if not project:
+        print(f"Error: Project not found: {name}")
+        return 1
+
+    if project.status.value == "archived":
+        print(f"Error: Project is archived. Restore it first:")
+        print(f"  orch project restore {name}")
+        return 1
+
+    registry.set_active(project.slug)
+    print(f"Switched to: {project.name}")
+
+    return 0
+
+
+def _project_info(registry, name: Optional[str]) -> int:
+    """Show project info."""
+    if name:
+        project = registry.get_project(name)
+    else:
+        project = registry.get_active_project()
+        if not project:
+            print("No active project. Specify a project name.")
+            return 1
+
+    if not project:
+        print(f"Error: Project not found: {name}")
+        return 1
+
+    print(f"Project: {project.name}")
+    print("=" * 50)
+    print(f"  ID:          {project.id}")
+    print(f"  Slug:        {project.slug}")
+    print(f"  Path:        {project.path}")
+    print(f"  Status:      {project.status.value}")
+    print(f"  Source:      {project.source_type.value}")
+    if project.git_url:
+        print(f"  Git URL:     {project.git_url}")
+    if project.git_branch:
+        print(f"  Git Branch:  {project.git_branch}")
+    print(f"  Added:       {project.added_at}")
+    if project.last_accessed:
+        print(f"  Last Access: {project.last_accessed}")
+    if project.indexed_at:
+        print(f"  Indexed:     {project.indexed_at}")
+
+    return 0
+
+
+def _project_archive(registry, name: str) -> int:
+    """Archive a project."""
+    project = registry.get_project(name)
+
+    if not project:
+        print(f"Error: Project not found: {name}")
+        return 1
+
+    registry.archive_project(project.slug)
+    print(f"Archived: {project.name}")
+
+    return 0
+
+
+def _project_restore(registry, name: str) -> int:
+    """Restore an archived project."""
+    project = registry.get_project(name)
+
+    if not project:
+        print(f"Error: Project not found: {name}")
+        return 1
+
+    registry.restore_project(project.slug)
+    print(f"Restored: {project.name}")
+
+    return 0
+
+
+def _project_remove(registry, name: str, force: bool, delete_files: bool) -> int:
+    """Remove a project."""
+    project = registry.get_project(name)
+
+    if not project:
+        print(f"Error: Project not found: {name}")
+        return 1
+
+    if not force:
+        print(f"Remove project: {project.name}?")
+        print(f"  Path: {project.path}")
+        if delete_files:
+            print("  WARNING: Project files will be deleted!")
+        response = input("\nType 'yes' to confirm: ")
+        if response.lower() != 'yes':
+            print("Cancelled.")
+            return 0
+
+    # Remove project data directory
+    from core.home import get_orchestrator_home
+    home = get_orchestrator_home()
+    project_dir = home.project_dir(project.slug)
+
+    if project_dir.exists():
+        import shutil
+        shutil.rmtree(project_dir)
+        print(f"  [+] Removed project data: {project_dir}")
+
+    # Optionally delete project files
+    if delete_files:
+        project_path = Path(project.path)
+        if project_path.exists():
+            import shutil
+            shutil.rmtree(project_path)
+            print(f"  [+] Removed project files: {project_path}")
+
+    # Remove from registry
+    registry.remove_project(project.slug)
+    print(f"\n[+] Project removed: {project.name}")
+
+    return 0
+
+
+def _project_git_fetch(registry, name: Optional[str]) -> int:
+    """Git fetch for a project."""
+    if name:
+        project = registry.get_project(name)
+    else:
+        project = registry.get_active_project()
+
+    if not project:
+        print("Error: No project specified and no active project")
+        return 1
+
+    import subprocess
+    result = subprocess.run(
+        ["git", "fetch", "--all"],
+        cwd=project.path,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        print(f"Error: {result.stderr}")
+        return 1
+
+    print(f"Fetched: {project.name}")
+    if result.stdout:
+        print(result.stdout)
+
+    return 0
+
+
+def _project_git_pull(registry, name: Optional[str]) -> int:
+    """Git pull for a project."""
+    if name:
+        project = registry.get_project(name)
+    else:
+        project = registry.get_active_project()
+
+    if not project:
+        print("Error: No project specified and no active project")
+        return 1
+
+    import subprocess
+    result = subprocess.run(
+        ["git", "pull"],
+        cwd=project.path,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        print(f"Error: {result.stderr}")
+        return 1
+
+    print(f"Pulled: {project.name}")
+    if result.stdout:
+        print(result.stdout)
+
+    return 0
+
+
+def _project_git_status(registry, name: Optional[str]) -> int:
+    """Git status for a project."""
+    if name:
+        project = registry.get_project(name)
+    else:
+        project = registry.get_active_project()
+
+    if not project:
+        print("Error: No project specified and no active project")
+        return 1
+
+    import subprocess
+    result = subprocess.run(
+        ["git", "status", "--short", "--branch"],
+        cwd=project.path,
+        capture_output=True,
+        text=True
+    )
+
+    if result.returncode != 0:
+        print(f"Error: {result.stderr}")
+        return 1
+
+    print(f"Git status: {project.name}")
+    print(f"Path: {project.path}")
+    print()
+    if result.stdout:
+        print(result.stdout)
+    else:
+        print("(clean)")
+
+    return 0
 
 
 def _find_free_port() -> int:

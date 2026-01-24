@@ -42,7 +42,9 @@ from portal.routes import (
     chat_router,
     token_analytics_router,
     experts_router,
+    projects_router,
 )
+from portal.middleware.project_context import ProjectContextMiddleware
 from portal.routes.health import set_version
 from portal.exception_handlers import register_exception_handlers
 from portal.services.task_manager import (
@@ -152,6 +154,9 @@ set_version(app.version)
 # Register exception handlers
 register_exception_handlers(app)
 
+# Add project context middleware (for multi-project mode)
+app.add_middleware(ProjectContextMiddleware)
+
 # Setup static files
 STATIC_DIR = PORTAL_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
@@ -172,6 +177,7 @@ app.include_router(tasks_router)
 app.include_router(chat_router)
 app.include_router(token_analytics_router)
 app.include_router(experts_router)
+app.include_router(projects_router)
 
 
 def run_portal(host: str = "127.0.0.1", port: int = 8000):

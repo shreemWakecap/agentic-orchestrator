@@ -452,10 +452,24 @@ class FileScanResult:
 
 class KnowledgeStore:
     """
-    Manages persistent codebase knowledge in SQLite database.
+    Manages persistent codebase knowledge in PostgreSQL database.
+
+    Multi-Project Support:
+        In multi-project mode, knowledge is scoped to the current project
+        via the project_context. The store automatically filters by project_id.
 
     Usage:
+        # Single-project mode (legacy)
         store = KnowledgeStore(project_root)
+
+        # Multi-project mode
+        from db.project_context import project_context
+        with project_context.set_project(project_id):
+            store = KnowledgeStore(project_root)
+            knowledge = store.load()
+
+        # Or explicitly pass project_id
+        store = KnowledgeStore(project_root, project_id="uuid-123")
 
         # Check if knowledge exists
         if store.exists():
@@ -468,9 +482,36 @@ class KnowledgeStore:
         context = store.get_planning_context()
     """
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, project_id: str = None):
         self.project_root = project_root.resolve()
         self._repo = get_knowledge_repository()
+        self._project_id = project_id
+        self._context_token = None
+
+    @property
+    def project_id(self) -> Optional[str]:
+        """Get the current project ID (from explicit or context)."""
+        if self._project_id:
+            return self._project_id
+        # Try to get from context
+        try:
+            from db.project_context import get_optional_project_id
+            return get_optional_project_id()
+        except ImportError:
+            return None
+
+    def _ensure_project_context(self):
+        """Set project context if we have an explicit project_id."""
+        if self._project_id and not self._context_token:
+            from db.project_context import project_context
+            self._context_token = project_context.set_project_sync(self._project_id)
+
+    def _clear_project_context(self):
+        """Clear project context if we set it."""
+        if self._context_token:
+            from db.project_context import project_context
+            project_context.reset_project(self._context_token)
+            self._context_token = None
 
     @property
     def codebase_file(self) -> Path:
@@ -849,6 +890,10 @@ class FileKnowledgeStore:
 
     Stores individual file analysis results separately from bulk scans.
 
+    Multi-Project Support:
+        In multi-project mode, file knowledge is scoped to the current project.
+        File paths are unique within a project, not globally.
+
     Usage:
         store = FileKnowledgeStore(project_root)
 
@@ -866,9 +911,21 @@ class FileKnowledgeStore:
         all_files = store.get_all()
     """
 
-    def __init__(self, project_root: Path):
+    def __init__(self, project_root: Path, project_id: str = None):
         self.project_root = project_root.resolve()
         self._repo = get_file_knowledge_repository()
+        self._project_id = project_id
+
+    @property
+    def project_id(self) -> Optional[str]:
+        """Get the current project ID (from explicit or context)."""
+        if self._project_id:
+            return self._project_id
+        try:
+            from db.project_context import get_optional_project_id
+            return get_optional_project_id()
+        except ImportError:
+            return None
 
     def exists(self, file_path: str) -> bool:
         """Check if knowledge exists for a specific file."""

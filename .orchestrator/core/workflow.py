@@ -2,6 +2,11 @@
 Workflow: Base class for orchestrating multiple agents.
 
 A workflow defines how agents work together to accomplish a task.
+
+Multi-Project Support:
+    Workflows can be scoped to a specific project using project_id.
+    When set, all database operations and knowledge stores are
+    automatically filtered by the project context.
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -30,6 +35,7 @@ class WorkflowResult:
     total_tokens: int = 0
     error: Optional[str] = None
     data: dict[str, Any] = field(default_factory=dict)
+    project_id: Optional[str] = None
 
 
 class Workflow(ABC):
@@ -40,9 +46,23 @@ class Workflow(ABC):
     Subclasses implement the `execute` method to define the workflow logic.
 
     Supports cancellation via `cancel()` method and tracks total token usage.
+
+    Multi-Project Support:
+        Pass project_id to scope the workflow to a specific project.
+        The project context is automatically set for all operations.
+
+        Example:
+            workflow = PlanningWorkflow(project_root, project_id="uuid-123")
+            result = workflow.run("Add new feature")
     """
 
-    def __init__(self, name: str, output_dir: Optional[Path] = None):
+    def __init__(
+        self,
+        name: str,
+        output_dir: Optional[Path] = None,
+        project_id: Optional[str] = None,
+        project_slug: Optional[str] = None,
+    ):
         self.name = name
         self.output_dir = output_dir
         self.console = Console()
@@ -52,6 +72,44 @@ class Workflow(ABC):
         self._total_tokens: int = 0
         # Cancellation support (thread-safe)
         self._cancel_event: Event = Event()
+        # Project context (multi-project mode)
+        self._project_id = project_id
+        self._project_slug = project_slug
+        self._context_token = None
+
+    @property
+    def project_id(self) -> Optional[str]:
+        """Get the project ID for this workflow."""
+        if self._project_id:
+            return self._project_id
+        # Try to get from context
+        try:
+            from db.project_context import get_optional_project_id
+            return get_optional_project_id()
+        except ImportError:
+            return None
+
+    def _enter_project_context(self) -> None:
+        """Enter the project context for this workflow."""
+        if self._project_id and not self._context_token:
+            try:
+                from db.project_context import project_context
+                self._context_token = project_context.set_project_sync(
+                    self._project_id,
+                    self._project_slug
+                )
+            except ImportError:
+                pass
+
+    def _exit_project_context(self) -> None:
+        """Exit the project context for this workflow."""
+        if self._context_token:
+            try:
+                from db.project_context import project_context
+                project_context.reset_project(self._context_token)
+                self._context_token = None
+            except ImportError:
+                pass
 
     def register_agent(self, agent: Agent) -> None:
         """Register an agent for use in this workflow."""
@@ -200,10 +258,19 @@ class Workflow(ABC):
         self.reset_cancellation()
         self._total_tokens = 0
 
+        # Enter project context if set
+        self._enter_project_context()
+
         # Escape backslashes in request for Rich markup (Windows paths)
         display_request = str(request).replace("\\", "/")
+
+        # Show project info if available
+        project_info = ""
+        if self.project_id and self._project_slug:
+            project_info = f"\n[dim]Project: {self._project_slug}[/dim]"
+
         self.console.print(Panel(
-            f"[bold]{self.name}[/bold]\n\n{display_request}",
+            f"[bold]{self.name}[/bold]{project_info}\n\n{display_request}",
             title="Workflow Started",
             border_style="cyan",
             width=80
@@ -216,18 +283,24 @@ class Workflow(ABC):
             result = self.execute(request)
             # Ensure total_tokens is set from accumulated count
             result.total_tokens = self._total_tokens
+            result.project_id = self.project_id
         except WorkflowCancelledError:
             result = WorkflowResult(
                 success=False,
                 error="Workflow was cancelled",
-                total_tokens=self._total_tokens
+                total_tokens=self._total_tokens,
+                project_id=self.project_id
             )
         except Exception as e:
             result = WorkflowResult(
                 success=False,
                 error=str(e),
-                total_tokens=self._total_tokens
+                total_tokens=self._total_tokens,
+                project_id=self.project_id
             )
+        finally:
+            # Always exit project context
+            self._exit_project_context()
 
         duration = (datetime.now() - start_time).total_seconds()
 

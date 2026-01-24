@@ -669,7 +669,17 @@ Note: This will be merged with existing knowledge, so only include NEW or CHANGE
 
 def run(args=None) -> int:
     """Run unified scout from CLI."""
-    project_root = Path(__file__).parent.parent.parent
+    # Get active project from registry
+    from core.project_registry import get_project_registry
+    registry = get_project_registry()
+    active = registry.get_active_project()
+
+    if not active:
+        print("Error: No active project. Use 'orch project switch <name>' first.")
+        return 1
+
+    project_root = Path(active.path)
+    print(f"Project: {active.name} ({active.slug})")
 
     # Parse arguments
     force_full = args and "--full" in args

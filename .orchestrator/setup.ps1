@@ -1,20 +1,11 @@
 # SDLC Orchestrator Setup
 # One-time setup that installs 'orch' as a global command
 #
-# Usage:
-#   .\setup.ps1                              # Just asks for DB password, uses all defaults
-#   .\setup.ps1 -DbPassword "mypass"         # Fully automated, no prompts
+# Prerequisites:
+#   - Create .env file with database credentials before running
 #
-# Custom settings (optional):
-#   .\setup.ps1 -DbHost "myserver" -DbPort "5433" -DbName "mydb" -DbUser "myuser"
-
-param(
-    [string]$DbHost,
-    [string]$DbPort,
-    [string]$DbName,
-    [string]$DbUser,
-    [string]$DbPassword
-)
+# Usage:
+#   .\setup.ps1
 
 $ErrorActionPreference = "Stop"
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -67,7 +58,7 @@ Write-Host "============================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  This setup will:" -ForegroundColor White
 Write-Host "    - Install required tools (UV, Node.js, Claude CLI)" -ForegroundColor Gray
-Write-Host "    - Configure database connection" -ForegroundColor Gray
+Write-Host "    - Load database config from .env (must exist)" -ForegroundColor Gray
 Write-Host "    - Install 'orch' command globally" -ForegroundColor Gray
 Write-Host "    - Initialize the orchestrator database" -ForegroundColor Gray
 Write-Host "    - Register this project as 'self'" -ForegroundColor Gray
@@ -77,7 +68,7 @@ Write-Host ""
 # Step 1: Check Prerequisites
 # ============================================
 
-Write-Step "1/6" "Checking prerequisites..."
+Write-Step "1/5" "Checking prerequisites..."
 
 # Check UV
 if (-not (Get-Command "uv" -ErrorAction SilentlyContinue)) {
@@ -144,132 +135,130 @@ if (-not $claudeInstalled) {
 }
 
 # ============================================
-# Step 2: Configuration
+# Step 2: Load Configuration from .env
 # ============================================
 
-Write-Step "2/6" "Configuration"
+Write-Step "2/5" "Loading configuration..."
 
-# Use defaults for everything - only override if explicitly provided
-$dbHost = if ($DbHost) { $DbHost } else { $defaultDbHost }
-$dbPort = if ($DbPort) { $DbPort } else { $defaultDbPort }
-$dbName = if ($DbName) { $DbName } else { $defaultDbName }
-$dbUser = if ($DbUser) { $DbUser } else { $defaultDbUser }
+$envFile = Join-Path $scriptDir ".env"
 
+if (-not (Test-Path $envFile)) {
+    Write-Fail ".env file not found!"
+    Write-Host ""
+    Write-Host "  Please create a .env file at: $envFile" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  Example .env content:" -ForegroundColor Gray
+    Write-Host "    ORCH_DB_HOST=localhost" -ForegroundColor Gray
+    Write-Host "    ORCH_DB_PORT=5432" -ForegroundColor Gray
+    Write-Host "    ORCH_DB_NAME=orchestrator" -ForegroundColor Gray
+    Write-Host "    ORCH_DB_USER=postgres" -ForegroundColor Gray
+    Write-Host "    ORCH_DB_PASSWORD=your_password" -ForegroundColor Gray
+    Write-Host ""
+    exit 1
+}
+
+# Parse .env file
+$envVars = @{}
+Get-Content $envFile | ForEach-Object {
+    if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
+        $key = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        $envVars[$key] = $value
+    }
+}
+
+# Load values from .env (with defaults as fallback)
+$dbHost = if ($envVars['ORCH_DB_HOST']) { $envVars['ORCH_DB_HOST'] } else { $defaultDbHost }
+$dbPort = if ($envVars['ORCH_DB_PORT']) { $envVars['ORCH_DB_PORT'] } else { $defaultDbPort }
+$dbName = if ($envVars['ORCH_DB_NAME']) { $envVars['ORCH_DB_NAME'] } else { $defaultDbName }
+$dbUser = if ($envVars['ORCH_DB_USER']) { $envVars['ORCH_DB_USER'] } else { $defaultDbUser }
+$dbPassword = if ($envVars['ORCH_DB_PASSWORD']) { $envVars['ORCH_DB_PASSWORD'] } else { "" }
+
+Write-Success "Loaded .env from: $envFile"
 Write-Info "Database: $dbUser@$dbHost`:$dbPort/$dbName"
 
-# Only ask for password if not provided
-if ([string]::IsNullOrWhiteSpace($DbPassword)) {
-    Write-Host ""
-    $dbPassword = Read-Host "  Enter database password for '$dbUser'"
-    if ([string]::IsNullOrWhiteSpace($dbPassword)) {
-        Write-Warn "No password provided - using empty password"
-        $dbPassword = ""
-    }
-} else {
-    $dbPassword = $DbPassword
-}
-
-# ============================================
-# Step 3: Create .env Configuration File
-# ============================================
-
-Write-Step "3/6" "Creating configuration..."
-
-# Create .env file in .orchestrator directory (not external home)
-$envFile = Join-Path $scriptDir ".env"
-$envExampleFile = Join-Path $scriptDir ".env.example"
-
-# Build DATABASE_URL
-$databaseUrl = "postgresql+asyncpg://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}"
-
-if (Test-Path $envExampleFile) {
-    # Read the example file and replace values
-    $envContent = Get-Content $envExampleFile -Raw
-
-    # Replace database settings
-    $envContent = $envContent -replace 'DATABASE_URL=.*', "DATABASE_URL=$databaseUrl"
-    $envContent = $envContent -replace 'ORCH_DB_HOST=.*', "ORCH_DB_HOST=$dbHost"
-    $envContent = $envContent -replace 'ORCH_DB_PORT=.*', "ORCH_DB_PORT=$dbPort"
-    $envContent = $envContent -replace 'ORCH_DB_NAME=.*', "ORCH_DB_NAME=$dbName"
-    $envContent = $envContent -replace 'ORCH_DB_USER=.*', "ORCH_DB_USER=$dbUser"
-    $envContent = $envContent -replace 'ORCH_DB_PASSWORD=.*', "ORCH_DB_PASSWORD=$dbPassword"
-
-    # Write the .env file
-    $envContent | Set-Content $envFile -NoNewline
-    Write-Success "Created .env file with database settings"
-} else {
-    # Create minimal .env file
-    $envContent = @"
-# SDLC Orchestrator Configuration
-# Generated by setup.ps1
-
-# Database Configuration
-DATABASE_URL=$databaseUrl
-ORCH_DB_HOST=$dbHost
-ORCH_DB_PORT=$dbPort
-ORCH_DB_NAME=$dbName
-ORCH_DB_USER=$dbUser
-ORCH_DB_PASSWORD=$dbPassword
-
-# Server Configuration
-HOST=0.0.0.0
-PORT=8000
-LOG_LEVEL=INFO
-"@
-    $envContent | Set-Content $envFile
-    Write-Success "Created .env file"
-}
-
-Write-Info "Config file: $envFile"
-
-# Also set env vars for current session (so orch init works)
+# Set env vars for current session (so orch init works)
 $env:ORCH_DB_HOST = $dbHost
 $env:ORCH_DB_PORT = $dbPort
 $env:ORCH_DB_NAME = $dbName
 $env:ORCH_DB_USER = $dbUser
 $env:ORCH_DB_PASSWORD = $dbPassword
 
+# Set SDLC_ORCHESTRATOR_HOME permanently so orch works from any directory
+$env:SDLC_ORCHESTRATOR_HOME = $scriptDir
+[System.Environment]::SetEnvironmentVariable("SDLC_ORCHESTRATOR_HOME", $scriptDir, "User")
+Write-Success "Set SDLC_ORCHESTRATOR_HOME=$scriptDir"
+
 # ============================================
-# Step 4: Install Orchestrator Package
+# Step 3: Install Orchestrator Package
 # ============================================
 
-Write-Step "4/6" "Installing orchestrator package..."
+Write-Step "3/5" "Installing orchestrator package..."
 
 Push-Location $scriptDir
 
-# First, sync dependencies with uv
-Write-Info "Syncing Python dependencies..."
-$ErrorActionPreference = "Continue"
-$env:UV_NO_PROGRESS = "1"
-uv sync --all-extras 2>$null
-$ErrorActionPreference = "Stop"
+# Temporarily allow non-terminating errors for external commands
+$ErrorActionPreference = "SilentlyContinue"
 
-# Install the package so 'orch' command is available
-if ($usePip) {
-    Write-Info "Installing with pip..."
-    pip install -e . --quiet 2>&1 | Out-Null
-    if ($LASTEXITCODE -eq 0) {
-        Write-Success "'orch' command installed via pip"
-    } else {
-        Write-Warn "pip install had issues, trying uv..."
-        uv pip install -e . 2>&1 | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            Write-Success "'orch' command installed via uv"
-        } else {
-            Write-Fail "Package installation failed"
-            Write-Info "You can still use: uv run python cli.py"
-        }
+# Fix pyproject.toml if py-modules is missing (required for cli to be importable)
+$pyprojectFile = Join-Path $scriptDir "pyproject.toml"
+if (Test-Path $pyprojectFile) {
+    $pyprojectContent = Get-Content $pyprojectFile -Raw
+    if ($pyprojectContent -notmatch 'py-modules\s*=') {
+        Write-Info "Fixing pyproject.toml configuration..."
+        # Add py-modules before [tool.setuptools.packages.find]
+        $pyprojectContent = $pyprojectContent -replace '(\[tool\.setuptools\.packages\.find\])', @"
+[tool.setuptools]
+py-modules = ["cli", "commands", "config"]
+
+`$1
+"@
+        $pyprojectContent | Set-Content $pyprojectFile -NoNewline
+        Write-Success "Fixed pyproject.toml"
     }
+}
+
+# Sync dependencies with uv
+Write-Info "Syncing Python dependencies..."
+$env:UV_NO_PROGRESS = "1"
+$null = uv sync --all-extras 2>&1
+
+# Uninstall existing installation first (clean slate)
+Write-Info "Removing any existing installation..."
+$null = pip uninstall sdlc-orchestrator -y 2>&1
+
+# Clean install with force-reinstall to ensure everything is fresh
+Write-Info "Installing package..."
+$installOutput = pip install -e . --force-reinstall 2>&1
+$installSuccess = $LASTEXITCODE -eq 0
+
+if ($installSuccess) {
+    Write-Success "'orch' command installed"
 } else {
-    Write-Info "Installing with uv pip..."
-    uv pip install -e . 2>&1 | Out-Null
+    Write-Warn "pip install had issues, trying uv..."
+    $null = uv pip install -e . 2>&1
     if ($LASTEXITCODE -eq 0) {
         Write-Success "'orch' command installed via uv"
+        $installSuccess = $true
     } else {
         Write-Fail "Package installation failed"
         Write-Info "You can still use: uv run python cli.py"
     }
 }
+
+# Verify installation works
+if ($installSuccess) {
+    Write-Info "Verifying installation..."
+    $verifyOutput = orch --help 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Installation verified - 'orch' command works"
+    } else {
+        Write-Warn "Installation may have issues: $verifyOutput"
+    }
+}
+
+# Restore error preference
+$ErrorActionPreference = "Stop"
 
 Pop-Location
 
@@ -277,7 +266,7 @@ Pop-Location
 # Step 5: Create Directory Structure & Init DB
 # ============================================
 
-Write-Step "5/6" "Creating directory structure..."
+Write-Step "4/5" "Creating directory structure..."
 
 # Create directories inside .orchestrator
 $projectsDir = Join-Path $scriptDir "projects"
@@ -361,7 +350,7 @@ Pop-Location
 # Step 6: Register "self" project
 # ============================================
 
-Write-Step "6/6" "Registering 'self' project..."
+Write-Step "5/5" "Registering 'self' project..."
 
 Push-Location $scriptDir
 

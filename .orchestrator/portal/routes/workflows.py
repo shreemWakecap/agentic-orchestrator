@@ -104,9 +104,21 @@ async def get_sync_status() -> SyncStatusResponse:
     Returns readonly information about files that need to be synced,
     including counts, file lists, and diff summary.
     """
+    from pathlib import Path
     from portal.services.git_service import GitStatusService
+    from core.project_registry import get_project_registry
 
-    git_service = GitStatusService()
+    # Get active project path
+    project_root = None
+    try:
+        registry = get_project_registry()
+        active = registry.get_active_project()
+        if active and active.path:
+            project_root = Path(active.path)
+    except Exception:
+        pass  # Fall back to cwd if no active project
+
+    git_service = GitStatusService(project_root=project_root)
     status = git_service.get_sync_status()
 
     # Count staged and unstaged files
@@ -146,9 +158,21 @@ async def get_git_statistics() -> GitStatisticsResponse:
     Returns repository statistics using only git/gh commands, no AI dependencies.
     Includes commit counts, branch info, PR status, and file statistics.
     """
+    from pathlib import Path
     from portal.services.git_statistics_service import GitStatisticsService
+    from core.project_registry import get_project_registry
 
-    service = GitStatisticsService()
+    # Get active project path
+    project_root = None
+    try:
+        registry = get_project_registry()
+        active = registry.get_active_project()
+        if active and active.path:
+            project_root = Path(active.path)
+    except Exception:
+        pass  # Fall back to cwd if no active project
+
+    service = GitStatisticsService(project_root=project_root)
     stats = service.get_all_statistics()
 
     # Extract PR info

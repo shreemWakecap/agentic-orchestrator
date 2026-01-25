@@ -132,8 +132,8 @@
     font-size: 13px;
     line-height: 1.5;
     padding: 8px 12px;
-    background: #1e1e1e;
-    color: #d4d4d4;
+    background: var(--bg-secondary, #f9fafb);
+    color: var(--text-primary, #111827);
 }
 
 /* Scrollbar styling */
@@ -143,16 +143,16 @@
 }
 
 .log-viewer-content::-webkit-scrollbar-track {
-    background: #2d2d2d;
+    background: var(--bg-tertiary, #f3f4f6);
 }
 
 .log-viewer-content::-webkit-scrollbar-thumb {
-    background: #4d4d4d;
+    background: var(--border-dark, #9ca3af);
     border-radius: 5px;
 }
 
 .log-viewer-content::-webkit-scrollbar-thumb:hover {
-    background: #5d5d5d;
+    background: var(--text-muted, #6b7280);
 }
 
 /* ==========================================================================
@@ -167,11 +167,11 @@
 }
 
 .log-line:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--surface-hover, #f3f4f6);
 }
 
 .log-timestamp {
-    color: #858585;
+    color: var(--text-muted, #9ca3af);
     margin-right: 12px;
     flex-shrink: 0;
     user-select: none;
@@ -195,25 +195,25 @@
 
 .log-level-debug .log-level,
 .log-level-debug .log-message {
-    color: #9cdcfe;
+    color: var(--color-info-600, #0284c7);
 }
 
 .log-level-info .log-level {
-    color: #4ec9b0;
+    color: var(--color-success-600, #059669);
 }
 
 .log-level-info .log-message {
-    color: #d4d4d4;
+    color: var(--text-primary, #111827);
 }
 
 .log-level-warn .log-level,
 .log-level-warn .log-message {
-    color: #dcdcaa;
+    color: var(--color-warning-700, #a16207);
 }
 
 .log-level-error .log-level,
 .log-level-error .log-message {
-    color: #f48771;
+    color: var(--color-danger-600, #e11d48);
 }
 
 /* ==========================================================================
@@ -221,29 +221,29 @@
    ========================================================================== */
 
 .log-type-progress {
-    background: rgba(78, 201, 176, 0.08);
+    background: var(--surface-primary-subtle, rgba(16, 185, 129, 0.08));
 }
 
 .log-type-checkpoint {
-    background: rgba(220, 220, 170, 0.08);
+    background: var(--color-warning-50, rgba(234, 179, 8, 0.08));
 }
 
 .log-type-status {
-    background: rgba(156, 220, 254, 0.08);
+    background: var(--color-info-50, rgba(14, 165, 233, 0.08));
 }
 
 .log-type-complete {
-    border-top: 1px solid #4ec9b0;
+    border-top: 1px solid var(--color-success-500, #10b981);
     padding-top: 4px;
     margin-top: 4px;
 }
 
 .log-type-complete.log-level-error {
-    border-top-color: #f48771;
+    border-top-color: var(--color-danger-500, #f43f5e);
 }
 
 .log-type-error {
-    background: rgba(244, 135, 113, 0.1);
+    background: var(--color-danger-50, rgba(244, 63, 94, 0.1));
 }
 
 /* ==========================================================================
@@ -266,7 +266,7 @@
     align-items: center;
     justify-content: center;
     height: 100%;
-    color: #858585;
+    color: var(--text-muted, #9ca3af);
     font-style: italic;
 }
 

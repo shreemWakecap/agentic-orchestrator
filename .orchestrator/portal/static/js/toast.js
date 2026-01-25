@@ -131,18 +131,6 @@ const Toast = (function() {
                 color: var(--text-primary, #0f172a);
             }
 
-            /* Dark mode support */
-            .dark .toast,
-            [data-theme="dark"] .toast {
-                background: rgba(30, 41, 59, 0.85);
-                border-color: rgba(71, 85, 105, 0.4);
-                box-shadow:
-                    0 20px 25px -5px rgba(0, 0, 0, 0.3),
-                    0 8px 10px -6px rgba(0, 0, 0, 0.2),
-                    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
-                color: #f1f5f9;
-            }
-
             .toast.toast-visible {
                 opacity: 1;
                 transform: translateX(0);
@@ -221,28 +209,6 @@ const Toast = (function() {
                 color: var(--color-primary-600, #2563eb);
             }
 
-            /* Dark mode icon backgrounds */
-            .dark .toast-icon.toast-icon-success,
-            [data-theme="dark"] .toast-icon.toast-icon-success {
-                background: rgba(16, 185, 129, 0.2);
-                color: #34d399;
-            }
-            .dark .toast-icon.toast-icon-error,
-            [data-theme="dark"] .toast-icon.toast-icon-error {
-                background: rgba(239, 68, 68, 0.2);
-                color: #f87171;
-            }
-            .dark .toast-icon.toast-icon-warning,
-            [data-theme="dark"] .toast-icon.toast-icon-warning {
-                background: rgba(245, 158, 11, 0.2);
-                color: #fbbf24;
-            }
-            .dark .toast-icon.toast-icon-info,
-            [data-theme="dark"] .toast-icon.toast-icon-info {
-                background: rgba(59, 130, 246, 0.2);
-                color: #60a5fa;
-            }
-
             .toast-message {
                 flex: 1;
                 word-break: break-word;
@@ -266,11 +232,6 @@ const Toast = (function() {
             .toast-close:hover {
                 opacity: 1;
                 background: rgba(0, 0, 0, 0.06);
-            }
-
-            .dark .toast-close:hover,
-            [data-theme="dark"] .toast-close:hover {
-                background: rgba(255, 255, 255, 0.1);
             }
 
             /* Responsive adjustments */

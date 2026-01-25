@@ -265,3 +265,67 @@ class PermanentError(OrchestratorError):
     """
 
     pass
+
+
+# ============== Project Errors ==============
+
+
+class ProjectError(OrchestratorError):
+    """Base exception for project-related errors."""
+
+    pass
+
+
+class ProjectNotFoundError(ProjectError):
+    """Raised when a project cannot be found by ID or slug.
+
+    HTTP Status: 404
+    """
+
+    def __init__(self, project_id: str, message: str = None):
+        self.project_id = project_id
+        super().__init__(
+            message or f"Project not found: {project_id}",
+            details={"project_id": project_id},
+        )
+
+
+class ProjectPathError(ProjectError):
+    """Raised when a project path is invalid or inaccessible.
+
+    HTTP Status: 400
+    """
+
+    def __init__(self, project_id: str, path: str = None, reason: str = None):
+        self.project_id = project_id
+        self.path = path
+        self.reason = reason or "Path is invalid or inaccessible"
+        message = f"Project {project_id}: {self.reason}"
+        if path:
+            message += f" (path: {path})"
+        super().__init__(
+            message,
+            details={
+                "project_id": project_id,
+                "path": path,
+                "reason": self.reason,
+            },
+        )
+
+
+class ProjectArchivedError(ProjectError):
+    """Raised when attempting to use an archived project.
+
+    HTTP Status: 400
+    """
+
+    def __init__(self, project_id: str, project_name: str = None):
+        self.project_id = project_id
+        self.project_name = project_name or "Unknown"
+        super().__init__(
+            f"Project is archived: {self.project_name} ({project_id})",
+            details={
+                "project_id": project_id,
+                "project_name": self.project_name,
+            },
+        )

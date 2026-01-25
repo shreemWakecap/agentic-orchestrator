@@ -2,24 +2,24 @@
 {# Include with: {% include 'partials/_knowledge_summary.html' %} #}
 <!-- Required context: knowledge (flat dict from get_knowledge_for_template), staleness (optional dict) -->
 
-<div class="bg-secondary-800 rounded-lg border border-secondary-700 overflow-hidden">
-    <div class="px-4 py-3 border-b border-secondary-700 flex items-center justify-between">
+<div class="glass-card overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
         <div class="flex items-center space-x-2">
             <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
             </svg>
-            <h3 class="text-sm font-semibold text-white">Knowledge Summary</h3>
+            <h3 class="text-sm font-semibold text-primary">Knowledge Summary</h3>
         </div>
         {% if staleness %}
         <div class="flex items-center space-x-1.5">
             {% if staleness.is_stale %}
-            <span class="flex items-center text-xs text-warning-400">
+            <span class="flex items-center text-xs text-warning-600">
                 <span class="w-2 h-2 rounded-full bg-warning-500 mr-1.5 animate-pulse"></span>
                 Stale
             </span>
             {% else %}
-            <span class="flex items-center text-xs text-success-400">
+            <span class="flex items-center text-xs text-success-600">
                 <span class="w-2 h-2 rounded-full bg-success-500 mr-1.5"></span>
                 Current
             </span>
@@ -32,15 +32,15 @@
     <div class="p-4">
         <!-- Project Info -->
         <div class="flex items-start space-x-4 mb-4">
-            <div class="w-12 h-12 rounded-lg bg-primary-600/20 flex items-center justify-center flex-shrink-0">
-                <svg class="w-6 h-6 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="w-12 h-12 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+                <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                           d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
                 </svg>
             </div>
             <div>
-                <h4 class="text-lg font-semibold text-white">{{ knowledge.project_name or 'Unknown Project' }}</h4>
-                <p class="text-sm text-secondary-400">
+                <h4 class="text-lg font-semibold text-primary">{{ knowledge.project_name or 'Unknown Project' }}</h4>
+                <p class="text-sm text-secondary">
                     {{ knowledge.project_type or 'Unknown' }} &bull;
                     {{ knowledge.primary_language or 'Unknown Language' }}
                 </p>
@@ -49,21 +49,21 @@
 
         <!-- Quick Stats -->
         <div class="grid grid-cols-2 gap-3 mb-4">
-            <div class="bg-secondary-700/50 rounded-lg p-3">
-                <div class="text-2xl font-bold text-white">{{ knowledge.domains|length if knowledge.domains else 0 }}</div>
-                <div class="text-xs text-secondary-400">Domains</div>
+            <div class="bg-neutral-100 rounded-lg p-3">
+                <div class="text-2xl font-bold text-primary">{{ knowledge.domains|length if knowledge.domains else 0 }}</div>
+                <div class="text-xs text-tertiary">Domains</div>
             </div>
-            <div class="bg-secondary-700/50 rounded-lg p-3">
-                <div class="text-2xl font-bold text-white">{{ knowledge.modules|length if knowledge.modules else 0 }}</div>
-                <div class="text-xs text-secondary-400">Modules</div>
+            <div class="bg-neutral-100 rounded-lg p-3">
+                <div class="text-2xl font-bold text-primary">{{ knowledge.modules|length if knowledge.modules else 0 }}</div>
+                <div class="text-xs text-tertiary">Modules</div>
             </div>
-            <div class="bg-secondary-700/50 rounded-lg p-3">
-                <div class="text-2xl font-bold text-white">{{ coding_rules|length if coding_rules else 0 }}</div>
-                <div class="text-xs text-secondary-400">Coding Rules</div>
+            <div class="bg-neutral-100 rounded-lg p-3">
+                <div class="text-2xl font-bold text-primary">{{ coding_rules|length if coding_rules else 0 }}</div>
+                <div class="text-xs text-tertiary">Coding Rules</div>
             </div>
-            <div class="bg-secondary-700/50 rounded-lg p-3">
-                <div class="text-2xl font-bold text-white">{{ knowledge.architecture_pattern or 'N/A' }}</div>
-                <div class="text-xs text-secondary-400">Architecture</div>
+            <div class="bg-neutral-100 rounded-lg p-3">
+                <div class="text-2xl font-bold text-primary">{{ knowledge.architecture_pattern or 'N/A' }}</div>
+                <div class="text-xs text-tertiary">Architecture</div>
             </div>
         </div>
 
@@ -73,7 +73,7 @@
             {% if knowledge.frameworks %}
             <div class="flex flex-wrap gap-1.5">
                 {% for fw in knowledge.frameworks[:5] %}
-                <span class="px-2 py-1 bg-primary-900/30 text-primary-400 text-xs rounded-full border border-primary-700/50">
+                <span class="px-2 py-1 bg-primary-100 text-primary-700 text-xs rounded-full border border-primary-200">
                     {{ fw.name }}
                 </span>
                 {% endfor %}
@@ -83,7 +83,7 @@
             {% if knowledge.languages %}
             <div class="flex flex-wrap gap-1.5">
                 {% for lang in knowledge.languages[:5] %}
-                <span class="px-2 py-1 bg-secondary-700 text-secondary-300 text-xs rounded-full">
+                <span class="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs rounded-full border border-neutral-200">
                     {{ lang.name }}{% if lang.version %} {{ lang.version }}{% endif %}
                 </span>
                 {% endfor %}
@@ -94,9 +94,9 @@
 
         <!-- Staleness Info -->
         {% if staleness %}
-        <div class="mt-4 pt-4 border-t border-secondary-700">
+        <div class="mt-4 pt-4 border-t border-gray-200">
             <div class="flex items-center justify-between text-xs">
-                <span class="text-secondary-500">
+                <span class="text-tertiary">
                     {% if staleness.last_scan_time %}
                     Last scanned: {{ staleness.last_scan_time }}
                     {% else %}
@@ -104,28 +104,28 @@
                     {% endif %}
                 </span>
                 {% if staleness.commits_behind > 0 %}
-                <span class="text-warning-400">{{ staleness.commits_behind }} commits behind</span>
+                <span class="text-warning-600">{{ staleness.commits_behind }} commits behind</span>
                 {% endif %}
             </div>
             {% if staleness.is_stale %}
-            <p class="mt-2 text-xs text-secondary-400">{{ staleness.reason }}</p>
+            <p class="mt-2 text-xs text-tertiary">{{ staleness.reason }}</p>
             {% endif %}
         </div>
         {% endif %}
     </div>
     {% else %}
     <div class="p-6 text-center">
-        <svg class="w-12 h-12 mx-auto text-secondary-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="w-12 h-12 mx-auto text-neutral-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
-        <h3 class="text-sm font-medium text-secondary-300 mb-1">No Knowledge Available</h3>
-        <p class="text-xs text-secondary-500 mb-4">
+        <h3 class="text-sm font-medium text-secondary mb-1">No Knowledge Available</h3>
+        <p class="text-xs text-tertiary mb-4">
             Run a scan to analyze your codebase and build the knowledge base.
         </p>
         <button hx-post="/api/knowledge/scan"
                 hx-swap="none"
-                class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors">
+                class="btn btn-primary btn-sm">
             Scan Now
         </button>
     </div>

@@ -253,7 +253,7 @@ const PlanEditDialog = (function() {
 
         return [
             // Header with gradient
-            '<div class="relative px-6 py-4 border-b border-primary/10 dark:border-primary/10">',
+            '<div class="relative px-6 py-4 border-b border-primary/10">',
             '  <div class="absolute inset-0 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-indigo-500/10"></div>',
             '  <div class="relative flex items-center justify-between">',
             '    <div class="flex items-center">',
@@ -264,7 +264,7 @@ const PlanEditDialog = (function() {
             '      </div>',
             '      <div>',
             '        <h2 class="text-xl font-bold text-gradient-primary">Edit Plan</h2>',
-            '        <p class="text-xs text-tertiary dark:text-tertiary">Modify plan goal, request, and content</p>',
+            '        <p class="text-xs text-tertiary">Modify plan goal, request, and content</p>',
             '      </div>',
             '    </div>',
             '    <button id="plan-edit-close-btn" type="button" class="p-2 text-tertiary hover:text-primary transition-colors rounded-lg hover:bg-tertiary/50">',
@@ -280,21 +280,21 @@ const PlanEditDialog = (function() {
 
             // Goal input
             '  <div class="space-y-2">',
-            '    <label for="plan-edit-goal" class="block text-sm font-medium text-primary dark:text-primary">',
+            '    <label for="plan-edit-goal" class="block text-sm font-medium text-primary">',
             '      Plan Goal',
             '    </label>',
             '    <input type="text" id="plan-edit-goal" value="' + escapedGoal + '"',
-            '           class="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-primary/20 bg-tertiary/30 dark:bg-tertiary/30 text-primary dark:text-primary focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"',
+            '           class="w-full px-4 py-3 rounded-xl border border-primary/20 bg-tertiary/30 text-primary focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"',
             '           placeholder="Enter the plan goal...">',
             '  </div>',
 
             // Request textarea with AI improve button
             '  <div class="space-y-2">',
             '    <div class="flex items-center justify-between">',
-            '      <label for="plan-edit-request" class="block text-sm font-medium text-primary dark:text-primary">',
+            '      <label for="plan-edit-request" class="block text-sm font-medium text-primary">',
             '        Original Request',
             '      </label>',
-            '      <button id="plan-edit-improve-request-btn" type="button" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors">',
+            '      <button id="plan-edit-improve-request-btn" type="button" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">',
             '        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>',
             '        </svg>',
@@ -302,17 +302,17 @@ const PlanEditDialog = (function() {
             '      </button>',
             '    </div>',
             '    <textarea id="plan-edit-request" rows="4"',
-            '              class="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-primary/20 bg-tertiary/30 dark:bg-tertiary/30 text-primary dark:text-primary focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all resize-none font-mono text-sm"',
+            '              class="w-full px-4 py-3 rounded-xl border border-primary/20 bg-tertiary/30 text-primary focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all resize-none font-mono text-sm"',
             '              placeholder="Enter the original request...">' + escapedRequest + '</textarea>',
             '  </div>',
 
             // Content textarea with AI improve button
             '  <div class="space-y-2">',
             '    <div class="flex items-center justify-between">',
-            '      <label for="plan-edit-content" class="block text-sm font-medium text-primary dark:text-primary">',
+            '      <label for="plan-edit-content" class="block text-sm font-medium text-primary">',
             '        Plan Content',
             '      </label>',
-            '      <button id="plan-edit-improve-content-btn" type="button" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 hover:bg-violet-200 dark:hover:bg-violet-900/50 transition-colors">',
+            '      <button id="plan-edit-improve-content-btn" type="button" class="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">',
             '        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>',
             '        </svg>',
@@ -320,14 +320,14 @@ const PlanEditDialog = (function() {
             '      </button>',
             '    </div>',
             '    <textarea id="plan-edit-content" rows="8"',
-            '              class="w-full px-4 py-3 rounded-xl border border-primary/20 dark:border-primary/20 bg-tertiary/30 dark:bg-tertiary/30 text-primary dark:text-primary focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all resize-none font-mono text-sm"',
+            '              class="w-full px-4 py-3 rounded-xl border border-primary/20 bg-tertiary/30 text-primary focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all resize-none font-mono text-sm"',
             '              placeholder="Enter the plan content...">' + escapedContent + '</textarea>',
             '  </div>',
 
             '</div>',
 
             // Footer with actions
-            '<div class="px-6 py-4 border-t border-primary/10 dark:border-primary/10 bg-tertiary/30 dark:bg-tertiary/30">',
+            '<div class="px-6 py-4 border-t border-primary/10 bg-tertiary/30">',
             '  <div class="flex items-center justify-end gap-3">',
             '    <button id="plan-edit-cancel-btn" type="button" class="btn btn-secondary btn-modern">',
             '      Cancel',

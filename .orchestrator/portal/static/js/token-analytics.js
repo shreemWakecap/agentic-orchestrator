@@ -214,11 +214,11 @@ const TokenAnalytics = (function() {
         // Remove active class from all quick range buttons
         document.querySelectorAll('.quick-range-btn').forEach(function(b) {
             b.classList.remove('bg-blue-500', 'text-white');
-            b.classList.add('bg-gray-100', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+            b.classList.add('bg-gray-100', 'text-gray-700');
         });
 
         // Add active class to clicked button
-        btn.classList.remove('bg-gray-100', 'dark:bg-gray-700', 'text-gray-700', 'dark:text-gray-300');
+        btn.classList.remove('bg-gray-100', 'text-gray-700');
         btn.classList.add('bg-blue-500', 'text-white');
 
         if (range === '7d') {
@@ -665,29 +665,29 @@ const TokenAnalytics = (function() {
         var typeClass = getRunTypeClass(runType);
         var statusClass = getStatusClass(status);
 
-        var html = '<tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">';
+        var html = '<tr class="hover:bg-gray-50 transition-colors">';
         html += '<td class="px-4 py-3 whitespace-nowrap">';
-        html += '<a href="/runs/' + escapeHtml(runId) + '" class="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">';
+        html += '<a href="/runs/' + escapeHtml(runId) + '" class="text-sm font-medium text-blue-600 hover:underline">';
         html += escapeHtml(runId.substring(0, 8)) + '...';
         html += '</a></td>';
         html += '<td class="px-4 py-3 whitespace-nowrap">';
         html += '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + typeClass + '">';
         html += escapeHtml(capitalize(runType));
         html += '</span></td>';
-        html += '<td class="px-4 py-3 whitespace-nowrap text-sm text-primary dark:text-primary font-mono">';
+        html += '<td class="px-4 py-3 whitespace-nowrap text-sm text-primary font-mono">';
         html += formatNumber(inputTokens);
         html += '</td>';
-        html += '<td class="px-4 py-3 whitespace-nowrap text-sm text-primary dark:text-primary font-mono">';
+        html += '<td class="px-4 py-3 whitespace-nowrap text-sm text-primary font-mono">';
         html += formatNumber(outputTokens);
         html += '</td>';
-        html += '<td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-emerald-600 dark:text-emerald-400">';
+        html += '<td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-emerald-600">';
         html += '$' + cost.toFixed(4);
         html += '</td>';
         html += '<td class="px-4 py-3 whitespace-nowrap">';
         html += '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + statusClass + '">';
         html += escapeHtml(capitalize(status));
         html += '</span></td>';
-        html += '<td class="px-4 py-3 whitespace-nowrap text-sm text-tertiary dark:text-tertiary">';
+        html += '<td class="px-4 py-3 whitespace-nowrap text-sm text-tertiary">';
         html += escapeHtml(formatDatetime(createdAt));
         html += '</td></tr>';
 
@@ -699,8 +699,8 @@ const TokenAnalytics = (function() {
      * @returns {string} HTML string
      */
     function createEmptyTableRow() {
-        var html = '<tr><td colspan="7" class="px-4 py-8 text-center text-tertiary dark:text-tertiary">';
-        html += '<svg class="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
+        var html = '<tr><td colspan="7" class="px-4 py-8 text-center text-tertiary">';
+        html += '<svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
         html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>';
         html += '</svg>';
         html += '<p class="text-sm">No token usage records found for the selected date range.</p>';
@@ -893,10 +893,10 @@ const TokenAnalytics = (function() {
      */
     function getRunTypeClass(runType) {
         var classes = {
-            planning: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-            building: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+            planning: 'bg-blue-100 text-blue-800',
+            building: 'bg-emerald-100 text-emerald-800'
         };
-        return classes[runType] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+        return classes[runType] || 'bg-gray-100 text-gray-800';
     }
 
     /**
@@ -906,11 +906,11 @@ const TokenAnalytics = (function() {
      */
     function getStatusClass(status) {
         var classes = {
-            completed: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300',
-            failed: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300',
-            running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300'
+            completed: 'bg-emerald-100 text-emerald-800',
+            failed: 'bg-red-100 text-red-800',
+            running: 'bg-blue-100 text-blue-800'
         };
-        return classes[status] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+        return classes[status] || 'bg-gray-100 text-gray-800';
     }
 
     // =========================================================================

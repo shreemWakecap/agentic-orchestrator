@@ -28,12 +28,12 @@
                 </svg>
             </div>
             <div>
-                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ task.name|default('Planning workflow...', true) }}</span>
-                <div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{{ task.description|default('Analyzing requirements and generating plan...', true)|truncate(60) }}</div>
+                <span class="text-sm font-medium text-gray-500">{{ task.name|default('Planning workflow...', true) }}</span>
+                <div class="text-xs text-gray-400 mt-0.5">{{ task.description|default('Analyzing requirements and generating plan...', true)|truncate(60) }}</div>
             </div>
         </div>
         <div class="flex items-center space-x-2">
-            <span class="status-badge pill bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+            <span class="status-badge pill bg-gray-100 text-gray-500">
                 <span class="status-dot bg-gray-400 animate-pulse"></span>
                 Planning
             </span>
@@ -41,7 +41,7 @@
     </div>
     <!-- Planning Progress Indicator -->
     <div class="mt-3">
-        <div class="relative w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div class="relative w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div class="absolute inset-0 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300 animate-pulse" style="animation-duration: 2s;"></div>
         </div>
     </div>

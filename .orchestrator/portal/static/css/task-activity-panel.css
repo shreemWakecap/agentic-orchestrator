@@ -177,11 +177,11 @@
     overflow-y: auto;
     overflow-x: hidden;
     padding: 1rem;
-    background: #1e1e2e;
+    background: var(--surface-tertiary, #f3f4f6);
     font-family: ui-monospace, 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
     font-size: 0.8125rem;
     line-height: 1.6;
-    color: #cdd6f4;
+    color: var(--text-primary, #111827);
     scroll-behavior: smooth;
 }
 
@@ -201,7 +201,7 @@
     display: flex;
     gap: 0.75rem;
     padding: 0.25rem 0;
-    border-bottom: 1px solid rgba(205, 214, 244, 0.05);
+    border-bottom: 1px solid var(--border-light, #e5e7eb);
     animation: logLineAppear 0.2s ease-out;
 }
 
@@ -212,7 +212,7 @@
 /* Log timestamp */
 .task-log-timestamp {
     flex-shrink: 0;
-    color: #6c7086;
+    color: var(--text-tertiary, #6b7280);
     font-size: 0.75rem;
 }
 
@@ -226,23 +226,23 @@
 }
 
 .task-log-level.info {
-    color: #89b4fa;
+    color: var(--color-info-600, #0284c7);
 }
 
 .task-log-level.success {
-    color: #a6e3a1;
+    color: var(--color-success-600, #059669);
 }
 
 .task-log-level.warning {
-    color: #f9e2af;
+    color: var(--color-warning-600, #ca8a04);
 }
 
 .task-log-level.error {
-    color: #f38ba8;
+    color: var(--color-danger-600, #e11d48);
 }
 
 .task-log-level.debug {
-    color: #b4befe;
+    color: var(--color-building-600, #9333ea);
 }
 
 /* Log message content */
@@ -254,14 +254,14 @@
 
 /* Highlighted log lines */
 .task-log-line.highlight {
-    background: rgba(137, 180, 250, 0.1);
+    background: var(--color-info-50, #f0f9ff);
     margin: 0 -1rem;
     padding: 0.25rem 1rem;
 }
 
 /* Error log lines */
 .task-log-line.error {
-    background: rgba(243, 139, 168, 0.1);
+    background: var(--color-danger-50, #fff1f2);
     margin: 0 -1rem;
     padding: 0.25rem 1rem;
 }
@@ -272,16 +272,16 @@
 }
 
 .task-log-output::-webkit-scrollbar-track {
-    background: #181825;
+    background: var(--surface-secondary, #f9fafb);
 }
 
 .task-log-output::-webkit-scrollbar-thumb {
-    background: #45475a;
+    background: var(--border-default, #d1d5db);
     border-radius: 4px;
 }
 
 .task-log-output::-webkit-scrollbar-thumb:hover {
-    background: #585b70;
+    background: var(--border-strong, #9ca3af);
 }
 
 /* Log controls bar */
@@ -290,8 +290,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.5rem 1rem;
-    background: #11111b;
-    border-top: 1px solid #313244;
+    background: var(--surface-secondary, #f9fafb);
+    border-top: 1px solid var(--border-default, #d1d5db);
 }
 
 .task-log-controls-left,
@@ -307,24 +307,24 @@
     justify-content: center;
     gap: 0.375rem;
     padding: 0.375rem 0.625rem;
-    background: #1e1e2e;
-    border: 1px solid #313244;
+    background: var(--surface-primary, #ffffff);
+    border: 1px solid var(--border-default, #d1d5db);
     border-radius: var(--radius-md, 0.375rem);
-    color: #cdd6f4;
+    color: var(--text-secondary, #4b5563);
     font-size: 0.75rem;
     cursor: pointer;
     transition: all var(--transition-fast, 150ms ease);
 }
 
 .task-log-control-btn:hover {
-    background: #313244;
-    border-color: #45475a;
+    background: var(--surface-tertiary, #f3f4f6);
+    border-color: var(--border-strong, #9ca3af);
 }
 
 .task-log-control-btn.active {
-    background: rgba(137, 180, 250, 0.2);
-    border-color: #89b4fa;
-    color: #89b4fa;
+    background: var(--color-primary-50, #eef2ff);
+    border-color: var(--color-primary-500, #6366f1);
+    color: var(--color-primary-600, #4f46e5);
 }
 
 .task-log-control-btn svg {

@@ -6,6 +6,10 @@ This enables:
 - Testability through dependency overrides
 - Loose coupling between routes and data layer
 - Consistent repository access patterns
+
+SOLID Revamp:
+- Added IProjectContextProvider for proper project context abstraction
+- Routes should use get_project_context_provider() instead of querying registry directly
 """
 from typing import Generator
 from pathlib import Path
@@ -25,6 +29,9 @@ from db import (
     KnowledgeRepository,
     FileKnowledgeRepository,
     TokenUsageRepository,
+    # SOLID revamp: Project context providers (database is source of truth)
+    IProjectContextProvider,
+    DatabaseProjectProvider,
 )
 from portal.services.task_manager import TaskManager, get_task_manager as _get_task_manager
 from portal.services.recovery_service import RecoveryService, get_recovery_service as _get_recovery_service
@@ -125,3 +132,57 @@ def get_experts_service() -> ExpertsService:
     content retrieval with token count estimation.
     """
     return ExpertsService(project_root=PROJECT_ROOT)
+
+
+# =============================================================================
+# SOLID Revamp: Project Context Providers
+# =============================================================================
+
+def get_project_context_provider() -> IProjectContextProvider:
+    """Get project context provider for dependency injection.
+
+    This provider is the single source of truth for getting the current
+    project ID in route handlers. It:
+    1. First checks the contextvar (set by middleware)
+    2. Falls back to the active project from the database
+
+    Routes should use this instead of directly accessing any registry
+    to ensure consistent project context handling. The database is
+    the single source of truth for project data.
+
+    Returns:
+        IProjectContextProvider: Provider that returns current project ID.
+    """
+    return DatabaseProjectProvider()
+
+
+# =============================================================================
+# SOLID Revamp: Workflow Services with Full DI
+# =============================================================================
+
+def get_workflow_submission_service():
+    """Get WorkflowSubmissionService instance for dependency injection.
+
+    This service handles business logic for submitting workflows to
+    background execution, extracted from route handlers for SRP compliance.
+    """
+    from portal.services.workflow_submission_service import WorkflowSubmissionService
+
+    return WorkflowSubmissionService(
+        run_repo=get_run_repo(),
+        task_manager=get_task_manager(),
+        context_provider=get_project_context_provider(),
+    )
+
+
+def get_recovery_service_with_di() -> RecoveryService:
+    """Get RecoveryService instance with full dependency injection.
+
+    This version injects PlanStatusService for proper SOLID compliance,
+    avoiding internal imports in the service methods.
+    """
+    return RecoveryService(
+        build_state_repo=get_build_state_repo(),
+        plan_repo=get_plan_repo(),
+        plan_status_service=get_plan_status_service(),
+    )

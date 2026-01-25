@@ -1,8 +1,8 @@
 """
 Project Service: High-level project management operations.
 
-This service combines project registry, database, and git operations
-to provide a unified interface for project management.
+This service uses the database repository directly for project management.
+The database is the single source of truth - no file-based registry is needed.
 """
 import logging
 from dataclasses import dataclass
@@ -11,22 +11,17 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from core.git_manager import GitManager, get_git_manager, GitStatus
-from core.project_registry import (
-    ProjectRegistry,
-    ProjectEntry,
-    ProjectStatus,
-    ProjectSourceType,
-    get_project_registry,
-)
 from core.home import get_orchestrator_home, OrchestratorHome
+from db.models import ProjectStatus, ProjectSourceType
+from db.repositories.project import ProjectRepository, get_project_repository
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class ProjectInfo:
-    """Combined project information from registry and git."""
-    entry: ProjectEntry
+    """Combined project information from database and git."""
+    entry: Dict[str, Any]  # Project dict from repository
     git_status: Optional[GitStatus] = None
     knowledge_exists: bool = False
     expert_count: int = 0
@@ -36,7 +31,7 @@ class ProjectInfo:
 class AddProjectResult:
     """Result of adding a project."""
     success: bool
-    project: Optional[ProjectEntry] = None
+    project: Optional[Dict[str, Any]] = None  # Project dict from repository
     error: Optional[str] = None
 
 
@@ -44,8 +39,8 @@ class ProjectService:
     """
     High-level project management service.
 
-    Combines registry, database, and git operations for unified
-    project management.
+    Uses database repository directly for unified project management.
+    The database is the single source of truth.
 
     Usage:
         service = ProjectService()
@@ -72,7 +67,7 @@ class ProjectService:
 
     def __init__(
         self,
-        registry: ProjectRegistry = None,
+        repository: ProjectRepository = None,
         git_manager: GitManager = None,
         home: OrchestratorHome = None
     ):
@@ -80,20 +75,20 @@ class ProjectService:
         Initialize ProjectService.
 
         Args:
-            registry: Project registry (default: get from orchestrator home).
+            repository: Project repository (default: singleton).
             git_manager: Git manager (default: singleton).
             home: Orchestrator home (default: from env).
         """
-        self._registry = registry
+        self._repository = repository
         self._git = git_manager or get_git_manager()
         self._home = home
 
     @property
-    def registry(self) -> ProjectRegistry:
-        """Get the project registry (lazy load)."""
-        if self._registry is None:
-            self._registry = get_project_registry()
-        return self._registry
+    def repository(self) -> ProjectRepository:
+        """Get the project repository (lazy load)."""
+        if self._repository is None:
+            self._repository = get_project_repository()
+        return self._repository
 
     @property
     def home(self) -> OrchestratorHome:
@@ -119,7 +114,7 @@ class ProjectService:
             auto_index: Automatically run scout after adding.
 
         Returns:
-            AddProjectResult with status and project entry.
+            AddProjectResult with status and project dict.
         """
         path = Path(path).resolve()
 
@@ -131,11 +126,11 @@ class ProjectService:
             return AddProjectResult(success=False, error=f"Path is not a directory: {path}")
 
         # Check if already registered
-        existing = self.registry.get_project_by_path(str(path))
+        existing = self.repository.get_by_path(str(path), as_dict=True)
         if existing:
             return AddProjectResult(
                 success=False,
-                error=f"Project already registered as '{existing.name}' ({existing.slug})"
+                error=f"Project already registered as '{existing['name']}' ({existing['slug']})"
             )
 
         # Determine name
@@ -143,8 +138,8 @@ class ProjectService:
             name = path.name
 
         try:
-            # Create project in registry
-            entry = self.registry.add_project(
+            # Create project directly in database
+            project = self.repository.create_with_auto_slug(
                 name=name,
                 path=str(path),
                 source_type=ProjectSourceType.LOCAL,
@@ -152,17 +147,14 @@ class ProjectService:
             )
 
             # Create project data directory
-            self.home.ensure_project_structure(entry.slug)
+            self.home.ensure_project_structure(project['slug'])
 
             # Set status to ready
-            self.registry.set_status(entry.slug, ProjectStatus.READY)
-
-            # Sync to database
-            self._sync_to_database(entry)
+            self.repository.update_status(project['id'], ProjectStatus.READY)
 
             logger.info(f"Added local project: {name} at {path}")
 
-            return AddProjectResult(success=True, project=entry)
+            return AddProjectResult(success=True, project=project)
 
         except Exception as e:
             logger.error(f"Failed to add project: {e}")
@@ -189,7 +181,7 @@ class ProjectService:
             auto_index: Automatically run scout after adding.
 
         Returns:
-            AddProjectResult with status and project entry.
+            AddProjectResult with status and project dict.
         """
         dest_path = Path(destination).resolve()
 
@@ -216,8 +208,8 @@ class ProjectService:
                     error=clone_result.error or "Clone failed"
                 )
 
-            # Create project in registry
-            entry = self.registry.add_project(
+            # Create project directly in database
+            project = self.repository.create_with_auto_slug(
                 name=name,
                 path=str(dest_path),
                 source_type=ProjectSourceType.GIT,
@@ -227,17 +219,14 @@ class ProjectService:
             )
 
             # Create project data directory
-            self.home.ensure_project_structure(entry.slug)
+            self.home.ensure_project_structure(project['slug'])
 
             # Set status to ready
-            self.registry.set_status(entry.slug, ProjectStatus.READY)
-
-            # Sync to database
-            self._sync_to_database(entry)
+            self.repository.update_status(project['id'], ProjectStatus.READY)
 
             logger.info(f"Added git project: {name} from {url}")
 
-            return AddProjectResult(success=True, project=entry)
+            return AddProjectResult(success=True, project=project)
 
         except Exception as e:
             # Clean up on failure
@@ -248,7 +237,7 @@ class ProjectService:
             logger.error(f"Failed to add git project: {e}")
             return AddProjectResult(success=False, error=str(e))
 
-    def switch(self, slug_or_id: str) -> Optional[ProjectEntry]:
+    def switch(self, slug_or_id: str) -> Optional[Dict[str, Any]]:
         """
         Switch to a project.
 
@@ -256,9 +245,9 @@ class ProjectService:
             slug_or_id: Project slug or ID.
 
         Returns:
-            The activated project entry or None if not found.
+            The activated project dict or None if not found.
         """
-        project = self.registry.get_project(slug_or_id)
+        project = self.repository.get_by_slug_or_id(slug_or_id)
 
         if not project:
             return None
@@ -267,18 +256,18 @@ class ProjectService:
             logger.warning(f"Cannot switch to archived project: {project.name}")
             return None
 
-        self.registry.set_active(project.slug)
+        self.repository.set_active(project.project_id)
         logger.info(f"Switched to project: {project.name}")
 
-        return self.registry.get_project(project.slug)
+        return self.repository.get_active(as_dict=True)
 
-    def get_active(self) -> Optional[ProjectEntry]:
+    def get_active(self) -> Optional[Dict[str, Any]]:
         """Get the currently active project."""
-        return self.registry.get_active_project()
+        return self.repository.get_active(as_dict=True)
 
-    def list_projects(self, include_archived: bool = False) -> List[ProjectEntry]:
+    def list_projects(self, include_archived: bool = False) -> List[Dict[str, Any]]:
         """List all projects."""
-        return self.registry.list_projects(include_archived=include_archived)
+        return self.repository.list_all(include_archived=include_archived, as_dict=True)
 
     def get_info(self, slug_or_id: str = None) -> Optional[ProjectInfo]:
         """
@@ -288,19 +277,20 @@ class ProjectService:
             slug_or_id: Project slug or ID (default: active project).
 
         Returns:
-            ProjectInfo with registry and git status.
+            ProjectInfo with database and git status.
         """
         if slug_or_id:
-            project = self.registry.get_project(slug_or_id)
+            project_orm = self.repository.get_by_slug_or_id(slug_or_id)
+            project = self.repository.to_registry_dict(project_orm) if project_orm else None
         else:
-            project = self.registry.get_active_project()
+            project = self.repository.get_active(as_dict=True)
 
         if not project:
             return None
 
         # Get git status
         git_status = None
-        project_path = Path(project.path)
+        project_path = Path(project['path'])
         if self._git.is_git_repository(project_path):
             git_status = self._git.status(project_path)
 
@@ -308,7 +298,7 @@ class ProjectService:
         knowledge_exists = False
         try:
             from core.knowledge_store import KnowledgeStore
-            store = KnowledgeStore(project_path, project_id=project.id)
+            store = KnowledgeStore(project_path, project_id=project['id'])
             knowledge_exists = store.exists()
         except Exception:
             pass
@@ -317,7 +307,7 @@ class ProjectService:
         expert_count = 0
         try:
             from core.expert_loader import ExpertLoader
-            loader = ExpertLoader(project_path, project_slug=project.slug)
+            loader = ExpertLoader(project_path, project_slug=project['slug'])
             experts = loader.discover_experts()
             expert_count = len(experts)
         except Exception:
@@ -330,27 +320,29 @@ class ProjectService:
             expert_count=expert_count,
         )
 
-    def archive(self, slug_or_id: str) -> Optional[ProjectEntry]:
+    def archive(self, slug_or_id: str) -> Optional[Dict[str, Any]]:
         """Archive a project."""
-        project = self.registry.get_project(slug_or_id)
+        project = self.repository.get_by_slug_or_id(slug_or_id)
         if not project:
             return None
 
-        self.registry.archive_project(project.slug)
+        self.repository.archive(project.project_id)
         logger.info(f"Archived project: {project.name}")
 
-        return self.registry.get_project(project.slug)
+        updated = self.repository.get_by_id(project.project_id)
+        return self.repository.to_registry_dict(updated) if updated else None
 
-    def restore(self, slug_or_id: str) -> Optional[ProjectEntry]:
+    def restore(self, slug_or_id: str) -> Optional[Dict[str, Any]]:
         """Restore an archived project."""
-        project = self.registry.get_project(slug_or_id)
+        project = self.repository.get_by_slug_or_id(slug_or_id)
         if not project:
             return None
 
-        self.registry.restore_project(project.slug)
+        self.repository.restore(project.project_id)
         logger.info(f"Restored project: {project.name}")
 
-        return self.registry.get_project(project.slug)
+        updated = self.repository.get_by_id(project.project_id)
+        return self.repository.to_registry_dict(updated) if updated else None
 
     def remove(
         self,
@@ -367,12 +359,17 @@ class ProjectService:
         Returns:
             True if removed, False if not found.
         """
-        project = self.registry.get_project(slug_or_id)
+        project = self.repository.get_by_slug_or_id(slug_or_id)
         if not project:
             return False
 
+        project_slug = project.slug
+        project_id = project.project_id
+        project_name = project.name
+        project_path = project.path
+
         # Remove project data directory
-        project_data_dir = self.home.project_dir(project.slug)
+        project_data_dir = self.home.project_dir(project_slug)
         if project_data_dir.exists():
             import shutil
             shutil.rmtree(project_data_dir, ignore_errors=True)
@@ -380,18 +377,15 @@ class ProjectService:
 
         # Optionally delete project files
         if delete_files:
-            project_path = Path(project.path)
-            if project_path.exists():
+            file_path = Path(project_path)
+            if file_path.exists():
                 import shutil
-                shutil.rmtree(project_path, ignore_errors=True)
-                logger.info(f"Removed project files: {project_path}")
+                shutil.rmtree(file_path, ignore_errors=True)
+                logger.info(f"Removed project files: {file_path}")
 
         # Remove from database
-        self._remove_from_database(project.id)
-
-        # Remove from registry
-        self.registry.remove_project(project.slug)
-        logger.info(f"Removed project: {project.name}")
+        self.repository.delete(project_id)
+        logger.info(f"Removed project: {project_name}")
 
         return True
 
@@ -406,14 +400,15 @@ class ProjectService:
             Dict with fetch result or None if not a git project.
         """
         if slug_or_id:
-            project = self.registry.get_project(slug_or_id)
+            project_orm = self.repository.get_by_slug_or_id(slug_or_id)
+            project = self.repository.to_registry_dict(project_orm) if project_orm else None
         else:
-            project = self.registry.get_active_project()
+            project = self.repository.get_active(as_dict=True)
 
         if not project:
             return None
 
-        project_path = Path(project.path)
+        project_path = Path(project['path'])
         if not self._git.is_git_repository(project_path):
             return {"error": "Not a git repository"}
 
@@ -435,14 +430,15 @@ class ProjectService:
             Dict with pull result or None if not a git project.
         """
         if slug_or_id:
-            project = self.registry.get_project(slug_or_id)
+            project_orm = self.repository.get_by_slug_or_id(slug_or_id)
+            project = self.repository.to_registry_dict(project_orm) if project_orm else None
         else:
-            project = self.registry.get_active_project()
+            project = self.repository.get_active(as_dict=True)
 
         if not project:
             return None
 
-        project_path = Path(project.path)
+        project_path = Path(project['path'])
         if not self._git.is_git_repository(project_path):
             return {"error": "Not a git repository"}
 
@@ -465,52 +461,19 @@ class ProjectService:
             GitStatus or None if not a git project.
         """
         if slug_or_id:
-            project = self.registry.get_project(slug_or_id)
+            project_orm = self.repository.get_by_slug_or_id(slug_or_id)
+            project = self.repository.to_registry_dict(project_orm) if project_orm else None
         else:
-            project = self.registry.get_active_project()
+            project = self.repository.get_active(as_dict=True)
 
         if not project:
             return None
 
-        project_path = Path(project.path)
+        project_path = Path(project['path'])
         if not self._git.is_git_repository(project_path):
             return GitStatus(error="Not a git repository")
 
         return self._git.status(project_path)
-
-    def _sync_to_database(self, entry: ProjectEntry) -> None:
-        """Sync project entry to database."""
-        try:
-            from db.repositories.project import get_project_repository
-
-            repo = get_project_repository()
-
-            # Check if exists
-            existing = repo.get_by_id(entry.id)
-            if existing:
-                repo.update(entry.id, **entry.to_dict())
-            else:
-                repo.create(
-                    name=entry.name,
-                    slug=entry.slug,
-                    path=entry.path,
-                    source_type=entry.source_type,
-                    description=entry.description,
-                    git_url=entry.git_url,
-                    git_branch=entry.git_branch,
-                )
-        except Exception as e:
-            logger.warning(f"Failed to sync project to database: {e}")
-
-    def _remove_from_database(self, project_id: str) -> None:
-        """Remove project from database."""
-        try:
-            from db.repositories.project import get_project_repository
-
-            repo = get_project_repository()
-            repo.delete(project_id)
-        except Exception as e:
-            logger.warning(f"Failed to remove project from database: {e}")
 
 
 # Singleton instance

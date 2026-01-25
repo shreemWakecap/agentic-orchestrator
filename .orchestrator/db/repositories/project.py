@@ -1,9 +1,10 @@
 """
 Project Repository for CRUD operations on Project entities.
 
-This repository manages project records in the database and
-synchronizes with the file-based project registry.
+This repository is the single source of truth for project data.
+The database is authoritative - no file-based registry is needed.
 """
+import re
 import uuid
 import logging
 from datetime import datetime
@@ -24,10 +25,78 @@ class ProjectRepository(BaseRepository):
     Repository for Project entities.
 
     Provides CRUD operations and specialized queries for projects.
+    This is the single source of truth for project data.
     """
 
     model = Project
     table_name = "projects"
+
+    @staticmethod
+    def generate_slug(name: str, existing_slugs: List[str] = None) -> str:
+        """
+        Generate a URL-safe slug from a project name.
+
+        Args:
+            name: The project name.
+            existing_slugs: List of existing slugs to avoid conflicts.
+
+        Returns:
+            A unique slug.
+        """
+        # Convert to lowercase and replace non-alphanumeric with hyphens
+        slug = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
+
+        # Limit length
+        if len(slug) > 50:
+            slug = slug[:50].rsplit('-', 1)[0]
+
+        # Ensure uniqueness
+        if existing_slugs:
+            base_slug = slug
+            counter = 1
+            while slug in existing_slugs:
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+
+        return slug
+
+    def get_all_slugs(self) -> List[str]:
+        """
+        Get all existing project slugs.
+
+        Returns:
+            List of all project slugs in the database.
+        """
+        with self.session() as session:
+            stmt = select(Project.slug)
+            return [row[0] for row in session.execute(stmt).fetchall()]
+
+    def create_with_auto_slug(
+        self,
+        name: str,
+        path: str,
+        source_type: ProjectSourceType = ProjectSourceType.LOCAL,
+        description: str = None,
+        git_url: str = None,
+        git_branch: str = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a project with auto-generated unique slug.
+
+        Args:
+            name: Project name.
+            path: Path to project directory.
+            source_type: Source type (local or git).
+            description: Project description.
+            git_url: Git repository URL (for git projects).
+            git_branch: Git branch name.
+
+        Returns:
+            Dictionary with the created project's data.
+        """
+        existing_slugs = self.get_all_slugs()
+        slug = self.generate_slug(name, existing_slugs)
+        return self.create(name, slug, path, source_type, description, git_url, git_branch)
 
     def create(
         self,
@@ -38,7 +107,7 @@ class ProjectRepository(BaseRepository):
         description: str = None,
         git_url: str = None,
         git_branch: str = None,
-    ) -> Project:
+    ) -> Dict[str, Any]:
         """
         Create a new project.
 
@@ -52,7 +121,7 @@ class ProjectRepository(BaseRepository):
             git_branch: Git branch name.
 
         Returns:
-            The created Project entity.
+            Dictionary with the created project's data (avoids detached session issues).
         """
         project_id = str(uuid.uuid4())
 
@@ -80,8 +149,11 @@ class ProjectRepository(BaseRepository):
                 "source_type": source_type.value,
             })
 
+            # Convert to dict BEFORE session closes to avoid detached session issues
+            result = self.to_registry_dict(project)
+
             logger.info(f"Created project: {name} ({project_id})")
-            return project
+            return result
 
     def get_by_id(self, project_id: str) -> Optional[Project]:
         """
@@ -129,39 +201,52 @@ class ProjectRepository(BaseRepository):
             row = result.scalar_one_or_none()
             return row
 
-    def get_by_path(self, path: str) -> Optional[Project]:
+    def get_by_path(self, path: str, as_dict: bool = False):
         """
         Get a project by its path.
 
         Args:
             path: The project path.
+            as_dict: If True, return as dictionary instead of ORM object.
 
         Returns:
-            The Project or None if not found.
+            The Project (or dict if as_dict=True) or None if not found.
         """
         resolved_path = str(Path(path).resolve())
         with self.session() as session:
             stmt = select(Project).where(Project.path == resolved_path)
             result = session.execute(stmt)
-            return result.scalar_one_or_none()
+            project = result.scalar_one_or_none()
+            if project and as_dict:
+                return self.to_registry_dict(project)
+            return project
 
-    def get_by_slug_or_id(self, slug_or_id: str) -> Optional[Project]:
+    def get_by_slug_or_id(self, slug_or_id: str, as_dict: bool = False):
         """
         Get a project by slug or ID.
 
         Args:
             slug_or_id: The project slug or UUID.
+            as_dict: If True, return as dictionary instead of ORM object.
 
         Returns:
-            The Project or None if not found.
+            The Project (or dict if as_dict=True) or None if not found.
         """
-        # Try slug first (more common)
-        project = self.get_by_slug(slug_or_id)
-        if project:
-            return project
+        with self.session() as session:
+            # Try slug first (more common)
+            stmt = select(Project).where(Project.slug == slug_or_id)
+            result = session.execute(stmt)
+            project = result.scalar_one_or_none()
 
-        # Try ID
-        return self.get_by_id(slug_or_id)
+            if not project:
+                # Try ID
+                stmt = select(Project).where(Project.project_id == slug_or_id)
+                result = session.execute(stmt)
+                project = result.scalar_one_or_none()
+
+            if project and as_dict:
+                return self.to_registry_dict(project)
+            return project
 
     def list_all(self, include_archived: bool = False, as_dict: bool = False) -> List[Project]:
         """

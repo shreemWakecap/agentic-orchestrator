@@ -12,12 +12,14 @@ The home directory structure:
     ├── .env            (database credentials)
     ├── config/         (global configuration)
     ├── projects/       (per-project data)
-    │   ├── registry.json
     │   └── {project-slug}/
     │       ├── knowledge/
     │       ├── experts/
     │       └── config/
     └── logs/           (global logs)
+
+Note: Project data is stored in the PostgreSQL database (single source of truth).
+The projects/ directory only contains per-project file-based data (knowledge, experts).
 """
 import os
 import json
@@ -63,11 +65,6 @@ class OrchestratorHome:
         return self.root / "logs"
 
     @property
-    def registry_file(self) -> Path:
-        """Project registry file."""
-        return self.projects_dir / "registry.json"
-
-    @property
     def global_config_file(self) -> Path:
         """Global configuration file."""
         return self.config_dir / "config.json"
@@ -94,10 +91,6 @@ class OrchestratorHome:
         self.projects_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
-        # Initialize registry if it doesn't exist
-        if not self.registry_file.exists():
-            self._init_registry()
-
         # Initialize global config if it doesn't exist
         if not self.global_config_file.exists():
             self._init_global_config()
@@ -107,17 +100,6 @@ class OrchestratorHome:
         self.project_knowledge_dir(project_slug).mkdir(parents=True, exist_ok=True)
         self.project_experts_dir(project_slug).mkdir(parents=True, exist_ok=True)
         self.project_config_dir(project_slug).mkdir(parents=True, exist_ok=True)
-
-    def _init_registry(self) -> None:
-        """Initialize an empty project registry."""
-        registry = {
-            "version": "1.0",
-            "created_at": datetime.utcnow().isoformat(),
-            "active_project": None,
-            "projects": {}
-        }
-        self.registry_file.write_text(json.dumps(registry, indent=2))
-        logger.info(f"Initialized project registry at {self.registry_file}")
 
     def _init_global_config(self) -> None:
         """Initialize global configuration with defaults."""
@@ -138,8 +120,7 @@ class OrchestratorHome:
         return (
             self.root.exists() and
             self.config_dir.exists() and
-            self.projects_dir.exists() and
-            self.registry_file.exists()
+            self.projects_dir.exists()
         )
 
     @classmethod

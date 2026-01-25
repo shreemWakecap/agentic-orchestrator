@@ -4,8 +4,8 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
-from db import PlanRepository, BuildStateRepository, RunRepository
-from portal.dependencies import get_plan_repo, get_build_state_repo, get_run_repo, get_recovery_service
+from db import PlanRepository, BuildStateRepository, RunRepository, IProjectContextProvider
+from portal.dependencies import get_plan_repo, get_build_state_repo, get_run_repo, get_recovery_service, get_project_context_provider
 from portal.schemas.requests import MovePlanRequest, ResumeBuildRequest, RecoverPlanRequest, UpdatePlanRequest
 from portal.schemas.responses import (
     PlanResponse,
@@ -27,6 +27,7 @@ from portal.schemas.responses import (
 )
 from portal.services.recovery_service import RecoveryService
 from portal.services.plan_service import PlanService
+
 
 router = APIRouter(prefix="/api/plans", tags=["plans"])
 
@@ -167,6 +168,7 @@ async def start_plan_build(
     background_tasks: BackgroundTasks,
     plan_repo: PlanRepository = Depends(get_plan_repo),
     run_repo: RunRepository = Depends(get_run_repo),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
 ) -> WorkflowStartResponse:
     """Start a build workflow for a specific plan.
 
@@ -190,10 +192,11 @@ async def start_plan_build(
 
     # Create run entry in database
     run_id = str(uuid.uuid4())[:8]
+    project_id = context_provider.get_project_id()
     run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
 
-    # Start build workflow in background
-    background_tasks.add_task(run_building_workflow, run_id, plan_id)
+    # Start build workflow in background with project context
+    background_tasks.add_task(run_building_workflow, run_id, plan_id, project_id)
 
     return WorkflowStartResponse(run_id=run_id, status="started", plan_id=plan_id)
 
@@ -206,6 +209,7 @@ async def resume_plan_build(
     plan_repo: PlanRepository = Depends(get_plan_repo),
     build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
     run_repo: RunRepository = Depends(get_run_repo),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
 ) -> WorkflowStartResponse:
     """Resume a build workflow for a plan that is stuck or failed.
 
@@ -258,10 +262,11 @@ async def resume_plan_build(
 
     # Create run entry in database with resume flag
     run_id = str(uuid.uuid4())[:8]
+    project_id = context_provider.get_project_id()
     run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
 
-    # Start build workflow in background with resume flag
-    background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, from_step)
+    # Start build workflow in background with resume flag and project context
+    background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, from_step, project_id)
 
     return WorkflowStartResponse(run_id=run_id, status="resumed", plan_id=plan_id)
 
@@ -750,6 +755,7 @@ async def recover_plan(
     plan_repo: PlanRepository = Depends(get_plan_repo),
     build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
     run_repo: RunRepository = Depends(get_run_repo),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
 ) -> WorkflowStartResponse:
     """Recover a stuck plan by resuming or restarting the build.
 
@@ -804,8 +810,9 @@ async def recover_plan(
         from portal.services.workflow_runner import run_building_workflow
 
         run_id = str(uuid.uuid4())[:8]
+        project_id = context_provider.get_project_id()
         run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
-        background_tasks.add_task(run_building_workflow, run_id, plan_id)
+        background_tasks.add_task(run_building_workflow, run_id, plan_id, project_id)
 
         return WorkflowStartResponse(run_id=run_id, status="restarted", plan_id=plan_id)
 
@@ -817,8 +824,9 @@ async def recover_plan(
         from portal.services.workflow_runner import run_building_workflow_resume
 
         run_id = str(uuid.uuid4())[:8]
+        project_id = context_provider.get_project_id()
         run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
-        background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, from_step)
+        background_tasks.add_task(run_building_workflow_resume, run_id, plan_id, from_step, project_id)
 
         return WorkflowStartResponse(run_id=run_id, status="resumed", plan_id=plan_id)
 

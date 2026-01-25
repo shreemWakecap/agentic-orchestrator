@@ -298,23 +298,46 @@ async def projects_page(request: Request):
         projects = service.list_projects(include_archived=True)
         active = service.get_active()
 
-        # Convert to dict for template
+        # Convert to dict for template (handle both dict and object formats)
         projects_data = []
         for p in projects:
-            projects_data.append({
-                "id": p.id,
-                "name": p.name,
-                "slug": p.slug,
-                "path": p.path,
-                "status": p.status.value if hasattr(p.status, 'value') else str(p.status),
-                "source_type": p.source_type.value if hasattr(p.source_type, 'value') else str(p.source_type),
-                "git_url": p.git_url,
-                "git_branch": p.git_branch,
-                "description": p.description,
-                "created_at": p.added_at,
-                "last_accessed_at": p.last_accessed,
-                "indexed_at": p.indexed_at,
-            })
+            if isinstance(p, dict):
+                status = p.get('status', 'unknown')
+                source_type = p.get('source_type', 'local')
+                projects_data.append({
+                    "id": p.get('id'),
+                    "name": p.get('name'),
+                    "slug": p.get('slug'),
+                    "path": p.get('path'),
+                    "status": status.value if hasattr(status, 'value') else str(status),
+                    "source_type": source_type.value if hasattr(source_type, 'value') else str(source_type),
+                    "git_url": p.get('git_url'),
+                    "git_branch": p.get('git_branch'),
+                    "description": p.get('description'),
+                    "created_at": p.get('added_at'),
+                    "last_accessed_at": p.get('last_accessed'),
+                    "indexed_at": p.get('indexed_at'),
+                })
+            else:
+                projects_data.append({
+                    "id": p.id,
+                    "name": p.name,
+                    "slug": p.slug,
+                    "path": p.path,
+                    "status": p.status.value if hasattr(p.status, 'value') else str(p.status),
+                    "source_type": p.source_type.value if hasattr(p.source_type, 'value') else str(p.source_type),
+                    "git_url": p.git_url,
+                    "git_branch": p.git_branch,
+                    "description": p.description,
+                    "created_at": p.added_at,
+                    "last_accessed_at": p.last_accessed,
+                    "indexed_at": p.indexed_at,
+                })
+
+        # Handle active project (dict or object)
+        active_slug = None
+        if active:
+            active_slug = active.get('slug') if isinstance(active, dict) else active.slug
 
         return templates.TemplateResponse(
             request,
@@ -322,7 +345,7 @@ async def projects_page(request: Request):
             {
                 "is_multi_project": True,
                 "projects": projects_data,
-                "active_project": active.slug if active else None,
+                "active_project": active_slug,
                 "error": None,
             },
         )

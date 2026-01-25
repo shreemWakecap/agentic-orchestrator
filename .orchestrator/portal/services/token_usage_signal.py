@@ -75,7 +75,7 @@ class TokenUsageSignal:
         """Initialize the token usage signal."""
         self._handlers: List[SignalHandler] = []
         self._event_history: List[TokenUsageEvent] = []
-        self._history_max_size: int = 1000
+        self._history_max_size: int = 100  # Reduced from 1000 to prevent memory bloat
         self._lock = asyncio.Lock()
 
     def subscribe(self, handler: SignalHandler) -> None:
@@ -118,11 +118,13 @@ class TokenUsageSignal:
             timestamp=datetime.utcnow(),
         )
 
-        # Add to history
+        # Add to history with proactive cleanup
         async with self._lock:
             self._event_history.append(event)
+            # Proactive cleanup: trim 20% when limit reached to reduce frequency of trimming
             if len(self._event_history) > self._history_max_size:
-                self._event_history = self._event_history[-self._history_max_size:]
+                trim_count = int(self._history_max_size * 0.2)  # Remove 20%
+                self._event_history = self._event_history[trim_count:]
 
         logger.info(
             f"TokenUsageSignal emitting {signal_type.value} for job {data.job_id}, "

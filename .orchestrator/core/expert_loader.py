@@ -95,13 +95,13 @@ class ExpertLoader:
             slug = self.project_slug
             if not slug:
                 from db.project_context import get_optional_project_id
-                # We need the slug, not ID, so try to get from registry
+                # We need the slug, not ID, so try to get from database
                 project_id = get_optional_project_id()
                 if project_id:
                     try:
-                        from core.project_registry import get_project_registry
-                        registry = get_project_registry()
-                        project = registry.get_project(project_id)
+                        from db.repositories.project import get_project_repository
+                        repo = get_project_repository()
+                        project = repo.get_by_id(project_id)
                         if project:
                             slug = project.slug
                     except Exception:

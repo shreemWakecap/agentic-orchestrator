@@ -76,7 +76,7 @@ class ProjectContextManager:
             The current project slug or None if not set.
         """
         ctx = _project_context.get()
-        return ctx.slug if ctx else None
+        return ctx.project_slug if ctx else None
 
     @staticmethod
     def get_project_path() -> Optional[str]:
@@ -277,3 +277,140 @@ async def with_project_context_async(project_id: str, project_slug: str = None, 
                 return await func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+class IProjectContextProvider:
+    """Interface for getting current project context.
+
+    This abstraction allows different implementations for getting the
+    current project ID, enabling dependency injection and testability.
+    """
+
+    def get_project_id(self) -> Optional[str]:
+        """Get the current project ID.
+
+        Returns:
+            The current project ID or None if not set.
+        """
+        raise NotImplementedError
+
+    def require_project_id(self) -> str:
+        """Get the current project ID, raising if not set.
+
+        Returns:
+            The current project ID.
+
+        Raises:
+            ProjectContextError: If no project context is available.
+        """
+        raise NotImplementedError
+
+
+class ContextVarProjectProvider(IProjectContextProvider):
+    """Gets project ID from contextvar only (set by middleware).
+
+    This provider only reads from the contextvar and does not
+    fall back to the registry. Use this when you want strict
+    context enforcement.
+    """
+
+    def get_project_id(self) -> Optional[str]:
+        """Get project ID from contextvar only."""
+        return project_context.get_project_id()
+
+    def require_project_id(self) -> str:
+        """Get project ID from contextvar, raising if not set."""
+        project_id = self.get_project_id()
+        if not project_id:
+            raise ProjectContextError(
+                "No project context set. "
+                "Use 'orch project switch <name>' to select a project."
+            )
+        return project_id
+
+
+class DatabaseProjectProvider(IProjectContextProvider):
+    """Gets project ID from contextvar, falls back to DATABASE.
+
+    This provider first checks the contextvar (set by middleware),
+    and if not set, falls back to the active project from the database.
+    This is the standard provider - database is the single source of truth.
+    """
+
+    def get_project_id(self) -> Optional[str]:
+        """Get project ID from contextvar, falling back to database."""
+        # First try contextvar (set by middleware)
+        project_id = project_context.get_project_id()
+        if project_id:
+            return project_id
+
+        # Fallback to active project from DATABASE (not registry)
+        try:
+            from db.repositories.project import get_project_repository
+            repo = get_project_repository()
+            active = repo.get_active(as_dict=True)
+            if active:
+                logger.debug(f"Using database fallback: {active['id']}")
+                return active['id']
+        except Exception as e:
+            logger.warning(f"Database fallback failed: {e}")
+
+        return None
+
+    def require_project_id(self) -> str:
+        """Get project ID with database fallback, raising if not available."""
+        project_id = self.get_project_id()
+        if not project_id:
+            raise ProjectContextError(
+                "No project context available. "
+                "Set X-Project-ID header or switch to an active project."
+            )
+        return project_id
+
+
+class RegistryFallbackProjectProvider(IProjectContextProvider):
+    """DEPRECATED: Use DatabaseProjectProvider instead.
+
+    This class is kept for backward compatibility but now delegates
+    to DatabaseProjectProvider internally. The database is the
+    single source of truth - no registry file is used.
+    """
+
+    def __init__(self):
+        self._delegate = DatabaseProjectProvider()
+        logger.debug("RegistryFallbackProjectProvider is deprecated, using DatabaseProjectProvider")
+
+    def get_project_id(self) -> Optional[str]:
+        """Get project ID (delegates to DatabaseProjectProvider)."""
+        return self._delegate.get_project_id()
+
+    def require_project_id(self) -> str:
+        """Get project ID, raising if not available (delegates to DatabaseProjectProvider)."""
+        return self._delegate.require_project_id()
+
+
+def get_project_id_for_query() -> Optional[str]:
+    """
+    Get project ID for database queries with fallback to database.
+
+    This is the standard way for repositories to get the current project ID.
+    Returns None only if multi-project mode is disabled or no project is active.
+
+    Returns:
+        Project ID string or None.
+    """
+    # Use the DatabaseProjectProvider - database is single source of truth
+    provider = DatabaseProjectProvider()
+    project_id = provider.get_project_id()
+
+    # Log warning if in multi-project mode but no context
+    if not project_id:
+        try:
+            from config import get_config
+            config = get_config()
+            if config.is_multi_project_mode:
+                logger.warning("Multi-project mode enabled but no project context available")
+        except Exception:
+            pass
+
+    return project_id

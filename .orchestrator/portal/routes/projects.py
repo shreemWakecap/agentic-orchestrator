@@ -105,21 +105,41 @@ def _get_project_service():
 
 
 def _entry_to_response(entry) -> ProjectResponse:
-    """Convert a ProjectEntry to ProjectResponse."""
-    return ProjectResponse(
-        id=entry.id,
-        name=entry.name,
-        slug=entry.slug,
-        path=entry.path,
-        status=entry.status.value if hasattr(entry.status, 'value') else str(entry.status),
-        source_type=entry.source_type.value if hasattr(entry.source_type, 'value') else str(entry.source_type),
-        git_url=entry.git_url,
-        git_branch=entry.git_branch,
-        description=entry.description,
-        created_at=entry.added_at,
-        last_accessed_at=entry.last_accessed,
-        indexed_at=entry.indexed_at,
-    )
+    """Convert a project dict or object to ProjectResponse."""
+    # Handle both dict (from repository) and object formats
+    if isinstance(entry, dict):
+        status = entry.get('status', 'unknown')
+        source_type = entry.get('source_type', 'local')
+        return ProjectResponse(
+            id=entry.get('id'),
+            name=entry.get('name'),
+            slug=entry.get('slug'),
+            path=entry.get('path'),
+            status=status.value if hasattr(status, 'value') else str(status),
+            source_type=source_type.value if hasattr(source_type, 'value') else str(source_type),
+            git_url=entry.get('git_url'),
+            git_branch=entry.get('git_branch'),
+            description=entry.get('description'),
+            created_at=entry.get('added_at'),
+            last_accessed_at=entry.get('last_accessed'),
+            indexed_at=entry.get('indexed_at'),
+        )
+    else:
+        # Legacy object format
+        return ProjectResponse(
+            id=entry.id,
+            name=entry.name,
+            slug=entry.slug,
+            path=entry.path,
+            status=entry.status.value if hasattr(entry.status, 'value') else str(entry.status),
+            source_type=entry.source_type.value if hasattr(entry.source_type, 'value') else str(entry.source_type),
+            git_url=entry.git_url,
+            git_branch=entry.git_branch,
+            description=entry.description,
+            created_at=entry.added_at,
+            last_accessed_at=entry.last_accessed,
+            indexed_at=entry.indexed_at,
+        )
 
 
 # =============================================================================
@@ -145,7 +165,7 @@ async def list_projects(include_archived: bool = False):
 
     return ProjectListResponse(
         projects=[_entry_to_response(p) for p in projects],
-        active_project=active.slug if active else None,
+        active_project=active.get('slug') if isinstance(active, dict) else (active.slug if active else None),
         total=len(projects)
     )
 
@@ -284,14 +304,14 @@ async def index_project(slug_or_id: str, background_tasks: BackgroundTasks):
     _check_multi_project_mode()
     service = _get_project_service()
 
-    project = service.registry.get_project(slug_or_id)
+    project = service.repository.get_by_slug_or_id(slug_or_id, as_dict=True)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     # TODO: Trigger scout workflow in background
-    # background_tasks.add_task(run_scout, project.slug)
+    # background_tasks.add_task(run_scout, project['slug'])
 
-    return MessageResponse(message=f"Indexing started for {project.name}")
+    return MessageResponse(message=f"Indexing started for {project['name']}")
 
 
 @router.post("/{slug_or_id}/archive", response_model=ProjectResponse)
@@ -352,11 +372,11 @@ async def remove_project(slug_or_id: str, delete_files: bool = False):
     service = _get_project_service()
 
     # Get project info before deletion
-    project = service.registry.get_project(slug_or_id)
+    project = service.repository.get_by_slug_or_id(slug_or_id, as_dict=True)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    name = project.name
+    name = project['name']
     success = service.remove(slug_or_id, delete_files=delete_files)
 
     if not success:

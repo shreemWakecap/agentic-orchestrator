@@ -2,6 +2,11 @@
 Build State Repository - ORM-based implementation.
 
 Handles build state and step state database operations using SQLAlchemy ORM.
+
+SOLID Revamp:
+- Implements IBuildStateRepository interface
+- Accepts optional project_id for future scoping needs
+- BuildState is linked to Plan which is already project-scoped
 """
 import json
 from datetime import datetime
@@ -11,13 +16,25 @@ if TYPE_CHECKING:
     from ..connection import Database
 
 from ..models import BuildState, StepState, GoalVerificationState
+from .interfaces import IBuildStateRepository
 
 
-class BuildStateRepository:
-    """Repository for build state operations using ORM."""
+class BuildStateRepository(IBuildStateRepository):
+    """Repository for build state operations using ORM.
 
-    def __init__(self, db: "Database"):
+    Implements IBuildStateRepository interface for dependency injection.
+
+    Note: BuildState is linked to Plan via plan_id, and Plan is already
+    project-scoped, so build states are transitively project-scoped.
+
+    Args:
+        db: Database connection instance
+        project_id: Optional project ID (for consistency with other repos)
+    """
+
+    def __init__(self, db: "Database", project_id: Optional[str] = None):
         self.db = db
+        self._project_id = project_id  # Reserved for future use
 
     def create(self, plan_id: str, total_steps: int = 0) -> int:
         """Create build state for a plan."""

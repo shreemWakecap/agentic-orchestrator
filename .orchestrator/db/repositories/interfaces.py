@@ -157,6 +157,39 @@ class ICostRepository(ABC):
         ...
 
 
+class IProjectContextProvider(ABC):
+    """Interface for getting current project context.
+
+    This abstraction allows different implementations for getting the
+    current project ID, enabling dependency injection and testability.
+
+    Implementations:
+    - ContextVarProjectProvider: Gets from contextvar only
+    - RegistryFallbackProjectProvider: Gets from contextvar, falls back to registry
+    """
+
+    @abstractmethod
+    def get_project_id(self) -> Optional[str]:
+        """Get the current project ID.
+
+        Returns:
+            The current project ID or None if not set.
+        """
+        ...
+
+    @abstractmethod
+    def require_project_id(self) -> str:
+        """Get the current project ID, raising if not set.
+
+        Returns:
+            The current project ID.
+
+        Raises:
+            ProjectContextError: If no project context is available.
+        """
+        ...
+
+
 class IFileKnowledgeRepository(ABC):
     """Interface for file-level knowledge repository operations."""
 

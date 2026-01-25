@@ -248,38 +248,28 @@ def _sync_plan_status(plan_id: str, status: str, error: str = None):
     This ensures Plan.status and BuildState.status stay in sync
     when a workflow completes or fails.
 
+    Delegates to PlanStatusService for centralized status management.
+
     Args:
         plan_id: The plan ID to update
         status: New status ('completed', 'failed', 'building', etc.)
         error: Optional error message for failed builds
     """
     try:
+        from portal.services.plan_status_service import PlanStatusService
+
         plan_repo = get_plan_repository()
         build_state_repo = get_build_state_repository()
 
-        # Update plan status (aggregate root)
-        plan_repo.update_status(plan_id, status)
+        # Use centralized PlanStatusService for status updates
+        status_service = PlanStatusService(plan_repo, build_state_repo)
 
-        # Update build_state status if exists
-        if build_state_repo.exists(plan_id):
-            update_data = {"status": status}
-            if error:
-                update_data["last_error"] = error
-            build_state_repo.update(plan_id, **update_data)
+        if error:
+            status_service.fail(plan_id, error=error)
+        else:
+            status_service.update_status(plan_id, status)
 
         logger.info(f"Plan {plan_id} status synced to '{status}'")
-
-        # Broadcast via WebSocket (non-blocking)
-        try:
-            from portal.streaming.websocket import get_websocket_manager
-            import asyncio
-
-            manager = get_websocket_manager()
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(manager.broadcast_plan_status(plan_id, status))
-        except Exception as ws_error:
-            logger.debug(f"WebSocket broadcast skipped: {ws_error}")
 
     except Exception as e:
         logger.error(f"Failed to sync plan {plan_id} status to '{status}': {e}")
@@ -329,7 +319,7 @@ def _add_activity_log(run_id: str, activity: str, details: Dict = None):
     })
 
 
-def run_planning_workflow(run_id: str, description: str):
+def run_planning_workflow(run_id: str, description: str, project_id: Optional[str] = None):
     """Execute planning workflow in background thread.
 
     This function runs in a ThreadPoolExecutor worker thread.
@@ -344,15 +334,24 @@ def run_planning_workflow(run_id: str, description: str):
     Args:
         run_id: Unique identifier for this run
         description: Planning request description
+        project_id: Optional project ID for scoping (passed from API route)
     """
     from workflows.planning import PlanningWorkflow
+    from db.project_context import project_context
 
     run_repo = _get_run_repo()
 
+    # Set project context for this thread if provided
+    # This ensures all database operations are scoped to the correct project
+    context_token = None
+    if project_id:
+        context_token = project_context.set_project_sync(project_id)
+        logger.debug(f"Set project context for planning workflow: {project_id}")
+
     try:
         run_repo.update(run_id, status="running")
-        _add_event(run_id, "start", {"workflow": "planning"})
-        _add_activity_log(run_id, "Workflow started", {"workflow_type": "planning"})
+        _add_event(run_id, "start", {"workflow": "planning", "project_id": project_id})
+        _add_activity_log(run_id, "Workflow started", {"workflow_type": "planning", "project_id": project_id})
 
         try:
             # Phase 1: Analyzing (0-25%)
@@ -430,10 +429,13 @@ def run_planning_workflow(run_id: str, description: str):
             _mark_run_failed(run_id, e)
 
     finally:
+        # Reset project context if it was set
+        if context_token:
+            project_context.reset_project(context_token)
         _cleanup_thread_local()
 
 
-def run_building_workflow(run_id: str, plan_id: str):
+def run_building_workflow(run_id: str, plan_id: str, project_id: Optional[str] = None):
     """Execute building workflow in background thread.
 
     This function runs in a ThreadPoolExecutor worker thread.
@@ -442,14 +444,22 @@ def run_building_workflow(run_id: str, plan_id: str):
     Args:
         run_id: Unique identifier for this run
         plan_id: ID of the plan to build
+        project_id: Optional project ID for scoping (passed from API route)
     """
     from workflows.building import BuildingWorkflow
+    from db.project_context import project_context
 
     run_repo = _get_run_repo()
 
+    # Set project context for this thread if provided
+    context_token = None
+    if project_id:
+        context_token = project_context.set_project_sync(project_id)
+        logger.debug(f"Set project context for building workflow: {project_id}")
+
     try:
         run_repo.update(run_id, status="running")
-        _add_event(run_id, "start", {"workflow": "building", "plan_id": plan_id})
+        _add_event(run_id, "start", {"workflow": "building", "plan_id": plan_id, "project_id": project_id})
 
         try:
             workflow = BuildingWorkflow(project_root=PROJECT_ROOT)
@@ -481,10 +491,13 @@ def run_building_workflow(run_id: str, plan_id: str):
             _mark_run_failed(run_id, e, plan_id=plan_id)
 
     finally:
+        # Reset project context if it was set
+        if context_token:
+            project_context.reset_project(context_token)
         _cleanup_thread_local()
 
 
-def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[str] = None):
+def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[str] = None, project_id: Optional[str] = None):
     """Execute building workflow in resume mode.
 
     This function runs in a ThreadPoolExecutor worker thread.
@@ -499,10 +512,18 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
         run_id: Unique identifier for this run
         plan_id: ID of the plan to resume building
         from_step: Optional step ID to resume from (if None, resumes from last incomplete)
+        project_id: Optional project ID for scoping (passed from API route)
     """
     from workflows.building import BuildingWorkflow
+    from db.project_context import project_context
 
     run_repo = _get_run_repo()
+
+    # Set project context for this thread if provided
+    context_token = None
+    if project_id:
+        context_token = project_context.set_project_sync(project_id)
+        logger.debug(f"Set project context for building workflow resume: {project_id}")
 
     try:
         run_repo.update(run_id, status="running")
@@ -511,6 +532,7 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
             "plan_id": plan_id,
             "resume": True,
             "from_step": from_step,
+            "project_id": project_id,
         })
 
         try:
@@ -550,6 +572,9 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
             _mark_run_failed(run_id, e, plan_id=plan_id)
 
     finally:
+        # Reset project context if it was set
+        if context_token:
+            project_context.reset_project(context_token)
         _cleanup_thread_local()
 
 
@@ -608,6 +633,7 @@ def run_scouting_workflow(
     target_keywords: list = None,
     target_tech: list = None,
     generate_experts: bool = False,
+    project_id: Optional[str] = None,
 ):
     """Execute scouting workflow in background thread.
 
@@ -621,10 +647,18 @@ def run_scouting_workflow(
         target_keywords: Optional list of keywords to search for
         target_tech: Optional list of technologies to focus on
         generate_experts: Whether to auto-generate missing experts after scan
+        project_id: Optional project ID for scoping (passed from API route)
     """
     from workflows.scouting import ScoutingWorkflow
+    from db.project_context import project_context
 
     run_repo = _get_run_repo()
+
+    # Set project context for this thread if provided
+    context_token = None
+    if project_id:
+        context_token = project_context.set_project_sync(project_id)
+        logger.debug(f"Set project context for scouting workflow: {project_id}")
 
     try:
         run_repo.update(run_id, status="running")
@@ -638,6 +672,7 @@ def run_scouting_workflow(
                 "target_keywords": target_keywords or [],
                 "target_tech": target_tech or [],
                 "generate_experts": generate_experts,
+                "project_id": project_id,
             },
         )
 
@@ -683,6 +718,9 @@ def run_scouting_workflow(
             _mark_run_failed(run_id, e)
 
     finally:
+        # Reset project context if it was set
+        if context_token:
+            project_context.reset_project(context_token)
         _cleanup_thread_local()
 
 

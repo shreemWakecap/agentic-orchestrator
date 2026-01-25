@@ -124,6 +124,83 @@ class PlanStatusService:
 
         return False
 
+    # --- Convenience methods for common status transitions ---
+
+    def complete(self, plan_id: str, broadcast: bool = True) -> bool:
+        """Mark a plan as completed.
+
+        Args:
+            plan_id: The plan identifier
+            broadcast: Whether to broadcast status change
+
+        Returns:
+            True if update succeeded
+        """
+        return self.update_status(plan_id, "completed", broadcast)
+
+    def fail(self, plan_id: str, error: Optional[str] = None, broadcast: bool = True) -> bool:
+        """Mark a plan as failed.
+
+        Args:
+            plan_id: The plan identifier
+            error: Optional error message to record
+            broadcast: Whether to broadcast status change
+
+        Returns:
+            True if update succeeded
+        """
+        if error and self._build_state_repo.exists(plan_id):
+            self._build_state_repo.update(plan_id, last_error=error)
+        return self.update_status(plan_id, "failed", broadcast)
+
+    def pause(self, plan_id: str, broadcast: bool = True) -> bool:
+        """Pause a plan execution.
+
+        Args:
+            plan_id: The plan identifier
+            broadcast: Whether to broadcast status change
+
+        Returns:
+            True if update succeeded
+        """
+        return self.update_status(plan_id, "paused", broadcast)
+
+    def resume(self, plan_id: str, broadcast: bool = True) -> bool:
+        """Resume a paused plan (set to building).
+
+        Args:
+            plan_id: The plan identifier
+            broadcast: Whether to broadcast status change
+
+        Returns:
+            True if update succeeded
+        """
+        return self.update_status(plan_id, "building", broadcast)
+
+    def start(self, plan_id: str, broadcast: bool = True) -> bool:
+        """Start a pending plan (set to building).
+
+        Args:
+            plan_id: The plan identifier
+            broadcast: Whether to broadcast status change
+
+        Returns:
+            True if update succeeded
+        """
+        return self.update_status(plan_id, "building", broadcast)
+
+    def reset(self, plan_id: str, broadcast: bool = True) -> bool:
+        """Reset a plan to pending status.
+
+        Args:
+            plan_id: The plan identifier
+            broadcast: Whether to broadcast status change
+
+        Returns:
+            True if update succeeded
+        """
+        return self.update_status(plan_id, "pending", broadcast)
+
     def broadcast_build_progress(
         self,
         plan_id: str,

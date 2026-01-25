@@ -1,8 +1,9 @@
 """Git service for retrieving repository sync status information."""
-import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
+
+from .utils.git_runner import GitRunner
 
 
 @dataclass
@@ -34,9 +35,12 @@ class GitStatusService:
                          Defaults to current working directory.
         """
         self.project_root = project_root or Path.cwd()
+        self._git = GitRunner(self.project_root)
 
     def _run_git(self, cmd: List[str], check: bool = False) -> Optional[str]:
         """Run a git command and return output.
+
+        Delegates to shared GitRunner utility.
 
         Args:
             cmd: Git command arguments (without 'git' prefix).
@@ -45,20 +49,7 @@ class GitStatusService:
         Returns:
             Command stdout as string, or None if command failed.
         """
-        try:
-            result = subprocess.run(
-                ["git"] + cmd,
-                cwd=self.project_root,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-            if check and result.returncode != 0:
-                return None
-            return result.stdout.strip() if result.returncode == 0 else None
-        except Exception:
-            return None
+        return self._git.run(cmd, check)
 
     def is_git_repository(self) -> bool:
         """Check if the project root is a git repository."""

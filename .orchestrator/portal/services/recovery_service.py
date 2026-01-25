@@ -2,12 +2,19 @@
 
 This module provides functionality to identify plans that are stuck in building
 status and enables recovery operations to resume or restart failed builds.
+
+SOLID Revamp:
+- Accepts PlanStatusService via constructor injection
+- No more internal imports for service creation
 """
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 from db import get_database, get_build_state_repository, get_plan_repository, BuildStateRepository, PlanRepository
+
+if TYPE_CHECKING:
+    from portal.services.plan_status_service import PlanStatusService
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +28,8 @@ class RecoveryService:
     Identifies plans that have been in 'building' or 'in_progress' status
     without updates for a configurable time period, allowing them to be
     resumed or restarted.
+
+    SOLID: Accepts all dependencies via constructor for proper DI.
     """
 
     # Status values that indicate an active build
@@ -30,6 +39,7 @@ class RecoveryService:
         self,
         build_state_repo: Optional[BuildStateRepository] = None,
         plan_repo: Optional[PlanRepository] = None,
+        plan_status_service: Optional["PlanStatusService"] = None,
         stale_threshold_minutes: int = DEFAULT_STALE_THRESHOLD_MINUTES
     ):
         """Initialize the recovery service.
@@ -37,12 +47,46 @@ class RecoveryService:
         Args:
             build_state_repo: Repository for build state. If None, uses default.
             plan_repo: Repository for plans. If None, uses default.
+            plan_status_service: Service for plan status management. If None, creates default.
             stale_threshold_minutes: Minutes without update before build is stale.
         """
-        self._repo = build_state_repo or get_build_state_repository()
-        self._plan_repo = plan_repo or get_plan_repository()
-        self._db = get_database()
+        self._build_state_repo = build_state_repo
+        self._plan_repo_instance = plan_repo
+        self._db_instance = None
         self.stale_threshold_minutes = stale_threshold_minutes
+        self._plan_status_service = plan_status_service
+
+    @property
+    def _repo(self) -> BuildStateRepository:
+        """Get build state repository, creating if not injected."""
+        if self._build_state_repo is None:
+            self._build_state_repo = get_build_state_repository()
+        return self._build_state_repo
+
+    @property
+    def _plan_repo(self) -> PlanRepository:
+        """Get plan repository, creating if not injected."""
+        if self._plan_repo_instance is None:
+            self._plan_repo_instance = get_plan_repository()
+        return self._plan_repo_instance
+
+    @property
+    def _db(self):
+        """Get database, creating if needed."""
+        if self._db_instance is None:
+            self._db_instance = get_database()
+        return self._db_instance
+
+    @property
+    def plan_status_service(self) -> "PlanStatusService":
+        """Get PlanStatusService, creating if not injected.
+
+        Lazy initialization to avoid circular imports at module load time.
+        """
+        if self._plan_status_service is None:
+            from portal.services.plan_status_service import PlanStatusService
+            self._plan_status_service = PlanStatusService(self._plan_repo, self._repo)
+        return self._plan_status_service
 
     def is_build_stale(
         self,
@@ -476,7 +520,7 @@ class RecoveryService:
         """Cancel a build that is in progress or stale.
 
         Validates that the plan is in a cancelable state before cancelling.
-        Uses aggregate root pattern: Plan.status is updated first, then build_states.
+        Uses PlanStatusService for centralized status management.
 
         Args:
             plan_id: The plan identifier to cancel
@@ -502,31 +546,25 @@ class RecoveryService:
                 'error': f'Build cannot be cancelled: current status is {current_status}'
             }
 
-        # Cancel the build using aggregate root pattern:
-        # 1. Update Plan first (authoritative)
-        self._plan_repo.update_status(plan_id, 'cancelled')
-        # 2. Cascade to build_states
-        cancelled = self._repo.cancel(plan_id)
+        # Use centralized PlanStatusService for status updates (injected or lazy-created)
+        self.plan_status_service.fail(plan_id, error="Build cancelled by user")
 
-        if cancelled:
-            plan_name = self.get_plan_name(plan_id) or plan_id
-            logger.info(f"Build cancelled for plan: {plan_name} ({plan_id})")
-            return {
-                'success': True,
-                'message': f'Build cancelled for plan: {plan_name}'
-            }
-        else:
-            return {
-                'success': False,
-                'error': 'Failed to cancel build'
-            }
+        # Also call cancel on repo for any repo-specific cleanup
+        self._repo.cancel(plan_id)
+
+        plan_name = self.get_plan_name(plan_id) or plan_id
+        logger.info(f"Build cancelled for plan: {plan_name} ({plan_id})")
+        return {
+            'success': True,
+            'message': f'Build cancelled for plan: {plan_name}'
+        }
 
     def pause_build(self, plan_id: str) -> Dict:
         """Pause a build that is in progress.
 
         Validates that the plan is in a pausable state before pausing.
         Paused builds can be resumed later.
-        Uses aggregate root pattern: Plan.status is updated first, then build_states.
+        Uses PlanStatusService for centralized status management.
 
         Args:
             plan_id: The plan identifier to pause
@@ -552,24 +590,18 @@ class RecoveryService:
                 'error': f'Build cannot be paused: current status is {current_status}'
             }
 
-        # Pause the build using aggregate root pattern:
-        # 1. Update Plan first (authoritative)
-        self._plan_repo.update_status(plan_id, 'paused')
-        # 2. Cascade to build_states
-        paused = self._repo.pause(plan_id)
+        # Use centralized PlanStatusService for status updates (injected or lazy-created)
+        self.plan_status_service.pause(plan_id)
 
-        if paused:
-            plan_name = self.get_plan_name(plan_id) or plan_id
-            logger.info(f"Build paused for plan: {plan_name} ({plan_id})")
-            return {
-                'success': True,
-                'message': f'Build paused for plan: {plan_name}'
-            }
-        else:
-            return {
-                'success': False,
-                'error': 'Failed to pause build'
-            }
+        # Also call pause on repo for any repo-specific cleanup
+        self._repo.pause(plan_id)
+
+        plan_name = self.get_plan_name(plan_id) or plan_id
+        logger.info(f"Build paused for plan: {plan_name} ({plan_id})")
+        return {
+            'success': True,
+            'message': f'Build paused for plan: {plan_name}'
+        }
 
 
 # Factory function for consistency with other services

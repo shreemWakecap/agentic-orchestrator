@@ -1,9 +1,10 @@
 """Workflow-related API routes."""
 import uuid
+from typing import Optional
 from fastapi import APIRouter, Depends
 
-from db import RunRepository
-from portal.dependencies import get_run_repo
+from db import RunRepository, IProjectContextProvider
+from portal.dependencies import get_run_repo, get_project_context_provider
 from portal.schemas.requests import PlanRequest, BuildRequest, SyncRemoteRequest, ImproveRequestRequest
 from portal.schemas.responses import WorkflowStartResponse, SyncStatusResponse, GitStatisticsResponse, ImproveRequestResponse
 from portal.services.task_manager import TaskManager, get_task_manager
@@ -16,23 +17,26 @@ async def create_plan(
     request: PlanRequest,
     run_repo: RunRepository = Depends(get_run_repo),
     task_manager: TaskManager = Depends(get_task_manager),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
 ) -> WorkflowStartResponse:
     """Start a new planning workflow."""
     from portal.services.workflow_runner import run_planning_workflow_sync
 
     run_id = str(uuid.uuid4())[:8]
+    project_id = context_provider.get_project_id()
 
     # Create run entry in database (triggered by user via portal)
     run_repo.create(run_id, workflow="planning", description=request.description, triggered_by="manual")
 
     # Submit to TaskManager for background execution
+    # Pass project_id to ensure proper context in background thread
     task_manager.submit_task(
         func=run_planning_workflow_sync,
-        args=(run_id, request.description),
+        args=(run_id, request.description, project_id),
         name=f"Planning: {request.description[:50]}..." if len(request.description) > 50 else f"Planning: {request.description}",
         task_id=run_id,
         task_type="plan",
-        metadata={"run_id": run_id, "description": request.description[:100]},
+        metadata={"run_id": run_id, "description": request.description[:100], "project_id": project_id},
     )
 
     return WorkflowStartResponse(run_id=run_id, status="started")
@@ -43,6 +47,7 @@ async def start_build(
     request: BuildRequest,
     run_repo: RunRepository = Depends(get_run_repo),
     task_manager: TaskManager = Depends(get_task_manager),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
 ) -> WorkflowStartResponse:
     """Start a build workflow.
 
@@ -52,18 +57,20 @@ async def start_build(
 
     run_id = str(uuid.uuid4())[:8]
     plan_id = request.plan_path  # plan_path is now plan_id
+    project_id = context_provider.get_project_id()
 
     # Create run entry in database (triggered by user via portal)
     run_repo.create(run_id, workflow="building", plan_id=plan_id, triggered_by="manual")
 
     # Submit to TaskManager for background execution
+    # Pass project_id to ensure proper context in background thread
     task_manager.submit_task(
         func=run_building_workflow_sync,
-        args=(run_id, plan_id),
+        args=(run_id, plan_id, project_id),
         name=f"Building: {plan_id}",
         task_id=run_id,
         task_type="build",
-        metadata={"run_id": run_id, "plan_id": plan_id},
+        metadata={"run_id": run_id, "plan_id": plan_id, "project_id": project_id},
     )
 
     return WorkflowStartResponse(run_id=run_id, status="started", plan_id=plan_id)
@@ -106,15 +113,15 @@ async def get_sync_status() -> SyncStatusResponse:
     """
     from pathlib import Path
     from portal.services.git_service import GitStatusService
-    from core.project_registry import get_project_registry
+    from db.repositories.project import get_project_repository
 
     # Get active project path
     project_root = None
     try:
-        registry = get_project_registry()
-        active = registry.get_active_project()
-        if active and active.path:
-            project_root = Path(active.path)
+        repo = get_project_repository()
+        active = repo.get_active(as_dict=True)
+        if active and active.get('path'):
+            project_root = Path(active['path'])
     except Exception:
         pass  # Fall back to cwd if no active project
 
@@ -160,15 +167,15 @@ async def get_git_statistics() -> GitStatisticsResponse:
     """
     from pathlib import Path
     from portal.services.git_statistics_service import GitStatisticsService
-    from core.project_registry import get_project_registry
+    from db.repositories.project import get_project_repository
 
     # Get active project path
     project_root = None
     try:
-        registry = get_project_registry()
-        active = registry.get_active_project()
-        if active and active.path:
-            project_root = Path(active.path)
+        repo = get_project_repository()
+        active = repo.get_active(as_dict=True)
+        if active and active.get('path'):
+            project_root = Path(active['path'])
     except Exception:
         pass  # Fall back to cwd if no active project
 

@@ -15,6 +15,59 @@ automatically filters by the current project context.
 from typing import List, Optional, Set, Any, Dict
 from contextlib import contextmanager
 
+
+def get_current_project_id() -> Optional[str]:
+    """Get the current project ID from context or registry.
+
+    This is the standard way for repositories to get the current project ID.
+    Returns None only if multi-project mode is disabled or no project is active.
+
+    Returns:
+        Project ID string or None.
+    """
+    from db.project_context import get_project_id_for_query
+    return get_project_id_for_query()
+
+
+class JSONFieldsMixin:
+    """Mixin for JSON field serialization/deserialization.
+
+    Provides standardized methods for handling JSON fields in database models,
+    eliminating duplicate serialization patterns across repositories.
+    """
+
+    @staticmethod
+    def deserialize_json(value: str, default=None):
+        """Deserialize a JSON string to Python object.
+
+        Args:
+            value: JSON string to deserialize.
+            default: Default value if deserialization fails (defaults to []).
+
+        Returns:
+            Deserialized Python object or default.
+        """
+        import json
+        if value is None:
+            return default if default is not None else []
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return default if default is not None else []
+
+    @staticmethod
+    def serialize_json(value) -> str:
+        """Serialize a Python object to JSON string.
+
+        Args:
+            value: Python object to serialize.
+
+        Returns:
+            JSON string representation.
+        """
+        import json
+        return json.dumps(value or [])
+
 # Import will be done at runtime to avoid circular imports
 # from db.connection import Database
 

@@ -4,16 +4,33 @@ Project Context Middleware for FastAPI.
 This middleware automatically sets the project context for requests
 based on the X-Project-ID header or query parameter.
 
+SOLID Revamp Architecture Notes:
+--------------------------------
+The middleware provides TWO modes of operation:
+
+1. STRICT MODE (auto_set_active=False):
+   - Only extracts project ID from request headers/params
+   - Does NOT access the registry
+   - Routes must use IProjectContextProvider for fallback logic
+   - Recommended for API clients that always specify project
+
+2. CONVENIENCE MODE (auto_set_active=True, default):
+   - Falls back to registry's active project if no header/param
+   - Provides good UX for the portal UI
+   - Routes can still override with IProjectContextProvider
+
+The registry fallback in middleware is convenient but technically
+redundant with RegistryFallbackProjectProvider. Keep it for UX.
+
 Usage:
     app = FastAPI()
     app.add_middleware(ProjectContextMiddleware)
 
-    # Then in routes, the project context is automatically available:
-    from db.project_context import require_project_context
-    project_id = require_project_context()
+    # Strict mode (no registry access):
+    app.add_middleware(ProjectContextMiddleware, auto_set_active=False)
 """
 import logging
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -34,9 +51,12 @@ class ProjectContextMiddleware(BaseHTTPMiddleware):
     The project context is set from (in priority order):
     1. X-Project-ID header
     2. project_id query parameter
-    3. Active project from registry (if in multi-project mode)
+    3. Active project from registry (if auto_set_active=True)
 
-    The context is automatically cleared after the request completes.
+    SOLID Notes:
+    - The registry fallback (step 3) is optional via auto_set_active flag
+    - Routes can override by using IProjectContextProvider from dependencies.py
+    - Context is automatically cleared after request completes
     """
 
     def __init__(self, app, auto_set_active: bool = True):
@@ -45,7 +65,9 @@ class ProjectContextMiddleware(BaseHTTPMiddleware):
 
         Args:
             app: The ASGI application.
-            auto_set_active: Automatically set active project if none specified.
+            auto_set_active: If True (default), falls back to active project
+                           from registry when no header/param specified.
+                           Set to False for strict mode (no registry access).
         """
         super().__init__(app)
         self.auto_set_active = auto_set_active
@@ -96,15 +118,27 @@ class ProjectContextMiddleware(BaseHTTPMiddleware):
 
         return None
 
-    def _get_active_project(self) -> tuple[Optional[str], Optional[str]]:
-        """Get the active project from registry."""
-        try:
-            from core.project_registry import get_project_registry
+    def _get_active_project(self) -> Tuple[Optional[str], Optional[str]]:
+        """Get the active project from database.
 
-            registry = get_project_registry()
-            active = registry.get_active_project()
+        SOLID Note:
+        This method is only called when auto_set_active=True and no
+        project ID is provided in the request. It provides a fallback
+        for convenience (especially for the portal UI).
+
+        Routes can always override this by using IProjectContextProvider
+        from dependencies.py, which has its own fallback logic.
+
+        The database is the single source of truth for project data.
+        """
+        try:
+            from db.repositories.project import get_project_repository
+
+            repo = get_project_repository()
+            active = repo.get_active(as_dict=True)
             if active:
-                return active.id, active.slug
+                logger.debug(f"Middleware using active project: {active['id']}")
+                return active['id'], active['slug']
         except Exception as e:
             logger.debug(f"Could not get active project: {e}")
 

@@ -74,6 +74,11 @@ from .project_context import (
     ProjectContextError,
     ProjectContextData,
     with_project_context,
+    # SOLID revamp: Project context providers for dependency injection
+    IProjectContextProvider,
+    ContextVarProjectProvider,
+    DatabaseProjectProvider,  # Primary provider - uses database as source of truth
+    RegistryFallbackProjectProvider,  # Deprecated alias for backward compatibility
 )
 
 from .repositories.project import ProjectRepository, get_project_repository

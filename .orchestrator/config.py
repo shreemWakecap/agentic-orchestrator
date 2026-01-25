@@ -202,13 +202,6 @@ class OrchestratorHomeConfig:
     config_dir: Optional[Path]
     logs_dir: Optional[Path]
 
-    @property
-    def registry_file(self) -> Optional[Path]:
-        """Path to project registry file."""
-        if self.projects_dir:
-            return self.projects_dir / "registry.json"
-        return None
-
     def get_project_dir(self, project_slug: str) -> Optional[Path]:
         """Get data directory for a specific project."""
         if self.projects_dir:

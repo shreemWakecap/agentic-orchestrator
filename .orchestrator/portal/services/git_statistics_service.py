@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple
 
+from .utils.git_runner import GitRunner
+
 
 @dataclass
 class CommitCount:
@@ -105,9 +107,12 @@ class GitStatisticsService:
                          Defaults to current working directory.
         """
         self.project_root = project_root or Path.cwd()
+        self._git = GitRunner(self.project_root)
 
     def _run_git(self, cmd: List[str], check: bool = False) -> Tuple[Optional[str], Optional[str]]:
         """Run a git command and return output and error.
+
+        Delegates to shared GitRunner utility.
 
         Args:
             cmd: Git command arguments (without 'git' prefix).
@@ -116,20 +121,7 @@ class GitStatisticsService:
         Returns:
             Tuple of (stdout, stderr) as strings, or (None, error_message) if failed.
         """
-        try:
-            result = subprocess.run(
-                ["git"] + cmd,
-                cwd=self.project_root,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-            if check and result.returncode != 0:
-                return None, result.stderr.strip()
-            return result.stdout.strip() if result.returncode == 0 else None, result.stderr.strip()
-        except Exception as e:
-            return None, str(e)
+        return self._git.run_with_error(cmd, check)
 
     def _run_gh(self, cmd: List[str]) -> Tuple[Optional[str], Optional[str]]:
         """Run a GitHub CLI command and return output and error.

@@ -42,7 +42,6 @@ def run_init(args=None) -> int:
     print(f"  [+] {home.config_dir}")
     print(f"  [+] {home.projects_dir}")
     print(f"  [+] {home.logs_dir}")
-    print(f"  [+] {home.registry_file}")
 
     # Check prerequisites
     print("\nChecking prerequisites...")
@@ -226,53 +225,54 @@ def run_project(args=None) -> int:
         parser.print_help()
         return 0
 
-    # Import project management components
-    from core.project_registry import get_project_registry, ProjectSourceType, ProjectStatus
+    # Import project management components (database is source of truth)
+    from db.repositories.project import get_project_repository
+    from db.models import ProjectSourceType, ProjectStatus
 
-    registry = get_project_registry()
+    repo = get_project_repository()
 
     if parsed.action == "list":
-        return _project_list(registry, include_archived=parsed.all)
+        return _project_list(repo, include_archived=parsed.all)
 
     elif parsed.action == "add":
         if parsed.git:
-            return _project_add_git(registry, parsed.git, parsed.dest, parsed.branch, parsed.name)
+            return _project_add_git(repo, parsed.git, parsed.dest, parsed.branch, parsed.name)
         elif parsed.path:
-            return _project_add_local(registry, parsed.path, parsed.name)
+            return _project_add_local(repo, parsed.path, parsed.name)
         else:
             print("Error: Provide a path or --git URL")
             return 1
 
     elif parsed.action == "switch":
-        return _project_switch(registry, parsed.name)
+        return _project_switch(repo, parsed.name)
 
     elif parsed.action == "info":
-        return _project_info(registry, parsed.name)
+        return _project_info(repo, parsed.name)
 
     elif parsed.action == "archive":
-        return _project_archive(registry, parsed.name)
+        return _project_archive(repo, parsed.name)
 
     elif parsed.action == "restore":
-        return _project_restore(registry, parsed.name)
+        return _project_restore(repo, parsed.name)
 
     elif parsed.action == "remove":
-        return _project_remove(registry, parsed.name, parsed.force, parsed.delete_files)
+        return _project_remove(repo, parsed.name, parsed.force, parsed.delete_files)
 
     elif parsed.action == "fetch":
-        return _project_git_fetch(registry, parsed.name)
+        return _project_git_fetch(repo, parsed.name)
 
     elif parsed.action == "pull":
-        return _project_git_pull(registry, parsed.name)
+        return _project_git_pull(repo, parsed.name)
 
     elif parsed.action == "status":
-        return _project_git_status(registry, parsed.name)
+        return _project_git_status(repo, parsed.name)
 
     return 0
 
 
-def _project_list(registry, include_archived: bool = False) -> int:
+def _project_list(repo, include_archived: bool = False) -> int:
     """List all projects."""
-    projects = registry.list_projects(include_archived=include_archived)
+    projects = repo.list_all(include_archived=include_archived, as_dict=True)
 
     if not projects:
         print("No projects found.")
@@ -282,36 +282,37 @@ def _project_list(registry, include_archived: bool = False) -> int:
     print("Projects")
     print("=" * 60)
 
-    active = registry.get_active_project()
-    active_slug = active.slug if active else None
+    active = repo.get_active(as_dict=True)
+    active_slug = active['slug'] if active else None
 
     for p in projects:
-        marker = "*" if p.slug == active_slug else " "
+        marker = "*" if p['slug'] == active_slug else " "
         status_indicator = {
             "pending": "[...]",
             "indexing": "[IDX]",
             "ready": "[RDY]",
             "active": "[ACT]",
             "archived": "[ARC]",
-        }.get(p.status.value, "[???]")
+        }.get(p['status'], "[???]")
 
-        print(f"{marker} {status_indicator} {p.name}")
-        print(f"    Slug: {p.slug}")
-        print(f"    Path: {p.path}")
-        if p.git_url:
-            print(f"    Git:  {p.git_url}")
+        print(f"{marker} {status_indicator} {p['name']}")
+        print(f"    Slug: {p['slug']}")
+        print(f"    Path: {p['path']}")
+        if p.get('git_url'):
+            print(f"    Git:  {p['git_url']}")
         print()
 
     print(f"Total: {len(projects)} project(s)")
     if active:
-        print(f"Active: {active.name}")
+        print(f"Active: {active['name']}")
 
     return 0
 
 
-def _project_add_local(registry, path: str, name: Optional[str] = None) -> int:
+def _project_add_local(repo, path: str, name: Optional[str] = None) -> int:
     """Add a local project."""
     from core.home import get_orchestrator_home
+    from db.models import ProjectSourceType, ProjectStatus
 
     path = Path(path).resolve()
 
@@ -324,9 +325,9 @@ def _project_add_local(registry, path: str, name: Optional[str] = None) -> int:
         return 1
 
     # Check if already registered
-    existing = registry.get_project_by_path(str(path))
+    existing = repo.get_by_path(str(path), as_dict=True)
     if existing:
-        print(f"Error: Project already registered as '{existing.name}' ({existing.slug})")
+        print(f"Error: Project already registered as '{existing['name']}' ({existing['slug']})")
         return 1
 
     # Determine name
@@ -336,10 +337,8 @@ def _project_add_local(registry, path: str, name: Optional[str] = None) -> int:
     print(f"Adding local project: {name}")
     print(f"  Path: {path}")
 
-    # Create project in registry
-    from core.project_registry import ProjectSourceType
-
-    entry = registry.add_project(
+    # Create project directly in database
+    project = repo.create_with_auto_slug(
         name=name,
         path=str(path),
         source_type=ProjectSourceType.LOCAL,
@@ -347,22 +346,23 @@ def _project_add_local(registry, path: str, name: Optional[str] = None) -> int:
 
     # Create project data directory
     home = get_orchestrator_home()
-    home.ensure_project_structure(entry.slug)
+    home.ensure_project_structure(project['slug'])
 
     # Update status to ready (no cloning needed)
-    registry.set_status(entry.slug, registry.get_project(entry.slug).status.READY)
+    repo.update_status(project['id'], ProjectStatus.READY)
 
-    print(f"\n[+] Project added: {entry.name} ({entry.slug})")
+    print(f"\n[+] Project added: {project['name']} ({project['slug']})")
     print(f"\nNext steps:")
-    print(f"  orch project switch {entry.slug}")
+    print(f"  orch project switch {project['slug']}")
     print(f"  orch scout")
 
     return 0
 
 
-def _project_add_git(registry, git_url: str, dest: Optional[str], branch: Optional[str], name: Optional[str]) -> int:
+def _project_add_git(repo, git_url: str, dest: Optional[str], branch: Optional[str], name: Optional[str]) -> int:
     """Add a git project by cloning."""
     from core.home import get_orchestrator_home
+    from db.models import ProjectSourceType, ProjectStatus
 
     if not dest:
         print("Error: --dest is required for git projects")
@@ -402,10 +402,8 @@ def _project_add_git(registry, git_url: str, dest: Optional[str], branch: Option
 
     print("  [+] Clone complete")
 
-    # Create project in registry
-    from core.project_registry import ProjectSourceType
-
-    entry = registry.add_project(
+    # Create project directly in database
+    project = repo.create_with_auto_slug(
         name=name,
         path=str(dest_path),
         source_type=ProjectSourceType.GIT,
@@ -415,44 +413,44 @@ def _project_add_git(registry, git_url: str, dest: Optional[str], branch: Option
 
     # Create project data directory
     home = get_orchestrator_home()
-    home.ensure_project_structure(entry.slug)
+    home.ensure_project_structure(project['slug'])
 
     # Update status to ready
-    registry.set_status(entry.slug, registry.get_project(entry.slug).status.READY)
+    repo.update_status(project['id'], ProjectStatus.READY)
 
-    print(f"\n[+] Project added: {entry.name} ({entry.slug})")
+    print(f"\n[+] Project added: {project['name']} ({project['slug']})")
     print(f"\nNext steps:")
-    print(f"  orch project switch {entry.slug}")
+    print(f"  orch project switch {project['slug']}")
     print(f"  orch scout")
 
     return 0
 
 
-def _project_switch(registry, name: str) -> int:
+def _project_switch(repo, name: str) -> int:
     """Switch to a project."""
-    project = registry.get_project(name)
+    project = repo.get_by_slug_or_id(name, as_dict=True)
 
     if not project:
         print(f"Error: Project not found: {name}")
         return 1
 
-    if project.status.value == "archived":
+    if project['status'] == "archived":
         print(f"Error: Project is archived. Restore it first:")
         print(f"  orch project restore {name}")
         return 1
 
-    registry.set_active(project.slug)
-    print(f"Switched to: {project.name}")
+    repo.set_active(project['id'])
+    print(f"Switched to: {project['name']}")
 
     return 0
 
 
-def _project_info(registry, name: Optional[str]) -> int:
+def _project_info(repo, name: Optional[str]) -> int:
     """Show project info."""
     if name:
-        project = registry.get_project(name)
+        project = repo.get_by_slug_or_id(name, as_dict=True)
     else:
-        project = registry.get_active_project()
+        project = repo.get_active(as_dict=True)
         if not project:
             print("No active project. Specify a project name.")
             return 1
@@ -461,65 +459,65 @@ def _project_info(registry, name: Optional[str]) -> int:
         print(f"Error: Project not found: {name}")
         return 1
 
-    print(f"Project: {project.name}")
+    print(f"Project: {project['name']}")
     print("=" * 50)
-    print(f"  ID:          {project.id}")
-    print(f"  Slug:        {project.slug}")
-    print(f"  Path:        {project.path}")
-    print(f"  Status:      {project.status.value}")
-    print(f"  Source:      {project.source_type.value}")
-    if project.git_url:
-        print(f"  Git URL:     {project.git_url}")
-    if project.git_branch:
-        print(f"  Git Branch:  {project.git_branch}")
-    print(f"  Added:       {project.added_at}")
-    if project.last_accessed:
-        print(f"  Last Access: {project.last_accessed}")
-    if project.indexed_at:
-        print(f"  Indexed:     {project.indexed_at}")
+    print(f"  ID:          {project['id']}")
+    print(f"  Slug:        {project['slug']}")
+    print(f"  Path:        {project['path']}")
+    print(f"  Status:      {project['status']}")
+    print(f"  Source:      {project['source_type']}")
+    if project.get('git_url'):
+        print(f"  Git URL:     {project['git_url']}")
+    if project.get('git_branch'):
+        print(f"  Git Branch:  {project['git_branch']}")
+    print(f"  Added:       {project.get('added_at')}")
+    if project.get('last_accessed'):
+        print(f"  Last Access: {project['last_accessed']}")
+    if project.get('indexed_at'):
+        print(f"  Indexed:     {project['indexed_at']}")
 
     return 0
 
 
-def _project_archive(registry, name: str) -> int:
+def _project_archive(repo, name: str) -> int:
     """Archive a project."""
-    project = registry.get_project(name)
+    project = repo.get_by_slug_or_id(name, as_dict=True)
 
     if not project:
         print(f"Error: Project not found: {name}")
         return 1
 
-    registry.archive_project(project.slug)
-    print(f"Archived: {project.name}")
+    repo.archive(project['id'])
+    print(f"Archived: {project['name']}")
 
     return 0
 
 
-def _project_restore(registry, name: str) -> int:
+def _project_restore(repo, name: str) -> int:
     """Restore an archived project."""
-    project = registry.get_project(name)
+    project = repo.get_by_slug_or_id(name, as_dict=True)
 
     if not project:
         print(f"Error: Project not found: {name}")
         return 1
 
-    registry.restore_project(project.slug)
-    print(f"Restored: {project.name}")
+    repo.restore(project['id'])
+    print(f"Restored: {project['name']}")
 
     return 0
 
 
-def _project_remove(registry, name: str, force: bool, delete_files: bool) -> int:
+def _project_remove(repo, name: str, force: bool, delete_files: bool) -> int:
     """Remove a project."""
-    project = registry.get_project(name)
+    project = repo.get_by_slug_or_id(name, as_dict=True)
 
     if not project:
         print(f"Error: Project not found: {name}")
         return 1
 
     if not force:
-        print(f"Remove project: {project.name}?")
-        print(f"  Path: {project.path}")
+        print(f"Remove project: {project['name']}?")
+        print(f"  Path: {project['path']}")
         if delete_files:
             print("  WARNING: Project files will be deleted!")
         response = input("\nType 'yes' to confirm: ")
@@ -530,7 +528,7 @@ def _project_remove(registry, name: str, force: bool, delete_files: bool) -> int
     # Remove project data directory
     from core.home import get_orchestrator_home
     home = get_orchestrator_home()
-    project_dir = home.project_dir(project.slug)
+    project_dir = home.project_dir(project['slug'])
 
     if project_dir.exists():
         import shutil
@@ -539,25 +537,25 @@ def _project_remove(registry, name: str, force: bool, delete_files: bool) -> int
 
     # Optionally delete project files
     if delete_files:
-        project_path = Path(project.path)
+        project_path = Path(project['path'])
         if project_path.exists():
             import shutil
             shutil.rmtree(project_path)
             print(f"  [+] Removed project files: {project_path}")
 
-    # Remove from registry
-    registry.remove_project(project.slug)
-    print(f"\n[+] Project removed: {project.name}")
+    # Remove from database
+    repo.delete(project['id'])
+    print(f"\n[+] Project removed: {project['name']}")
 
     return 0
 
 
-def _project_git_fetch(registry, name: Optional[str]) -> int:
+def _project_git_fetch(repo, name: Optional[str]) -> int:
     """Git fetch for a project."""
     if name:
-        project = registry.get_project(name)
+        project = repo.get_by_slug_or_id(name, as_dict=True)
     else:
-        project = registry.get_active_project()
+        project = repo.get_active(as_dict=True)
 
     if not project:
         print("Error: No project specified and no active project")
@@ -566,7 +564,7 @@ def _project_git_fetch(registry, name: Optional[str]) -> int:
     import subprocess
     result = subprocess.run(
         ["git", "fetch", "--all"],
-        cwd=project.path,
+        cwd=project['path'],
         capture_output=True,
         text=True
     )
@@ -575,19 +573,19 @@ def _project_git_fetch(registry, name: Optional[str]) -> int:
         print(f"Error: {result.stderr}")
         return 1
 
-    print(f"Fetched: {project.name}")
+    print(f"Fetched: {project['name']}")
     if result.stdout:
         print(result.stdout)
 
     return 0
 
 
-def _project_git_pull(registry, name: Optional[str]) -> int:
+def _project_git_pull(repo, name: Optional[str]) -> int:
     """Git pull for a project."""
     if name:
-        project = registry.get_project(name)
+        project = repo.get_by_slug_or_id(name, as_dict=True)
     else:
-        project = registry.get_active_project()
+        project = repo.get_active(as_dict=True)
 
     if not project:
         print("Error: No project specified and no active project")
@@ -596,7 +594,7 @@ def _project_git_pull(registry, name: Optional[str]) -> int:
     import subprocess
     result = subprocess.run(
         ["git", "pull"],
-        cwd=project.path,
+        cwd=project['path'],
         capture_output=True,
         text=True
     )
@@ -605,19 +603,19 @@ def _project_git_pull(registry, name: Optional[str]) -> int:
         print(f"Error: {result.stderr}")
         return 1
 
-    print(f"Pulled: {project.name}")
+    print(f"Pulled: {project['name']}")
     if result.stdout:
         print(result.stdout)
 
     return 0
 
 
-def _project_git_status(registry, name: Optional[str]) -> int:
+def _project_git_status(repo, name: Optional[str]) -> int:
     """Git status for a project."""
     if name:
-        project = registry.get_project(name)
+        project = repo.get_by_slug_or_id(name, as_dict=True)
     else:
-        project = registry.get_active_project()
+        project = repo.get_active(as_dict=True)
 
     if not project:
         print("Error: No project specified and no active project")
@@ -626,7 +624,7 @@ def _project_git_status(registry, name: Optional[str]) -> int:
     import subprocess
     result = subprocess.run(
         ["git", "status", "--short", "--branch"],
-        cwd=project.path,
+        cwd=project['path'],
         capture_output=True,
         text=True
     )
@@ -635,8 +633,8 @@ def _project_git_status(registry, name: Optional[str]) -> int:
         print(f"Error: {result.stderr}")
         return 1
 
-    print(f"Git status: {project.name}")
-    print(f"Path: {project.path}")
+    print(f"Git status: {project['name']}")
+    print(f"Path: {project['path']}")
     print()
     if result.stdout:
         print(result.stdout)

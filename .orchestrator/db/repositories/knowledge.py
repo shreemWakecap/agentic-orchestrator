@@ -3,6 +3,11 @@ Knowledge Repository - ORM-based implementation.
 
 Handles codebase knowledge, expert index, and scan metadata operations
 using SQLAlchemy ORM for clean, type-safe database access.
+
+SOLID Revamp:
+- Implements IKnowledgeRepository interface
+- Accepts optional project_id for dependency injection
+- Falls back to contextvar if project_id not provided
 """
 import json
 from datetime import datetime
@@ -16,26 +21,55 @@ from ..models import (
     Domain, Pattern, ExpertIndex, ExpertEntry, ScanMetadata,
     ExtendedScanMetadata, CodingRule
 )
+from .base import get_current_project_id
+from .interfaces import IKnowledgeRepository
 
 
-class KnowledgeRepository:
-    """Repository for knowledge store operations using ORM."""
+class KnowledgeRepository(IKnowledgeRepository):
+    """Repository for knowledge store operations using ORM.
 
-    def __init__(self, db: "Database"):
+    Implements IKnowledgeRepository interface for dependency injection.
+
+    Args:
+        db: Database connection instance
+        project_id: Optional project ID for explicit scoping.
+                   If not provided, falls back to contextvar.
+    """
+
+    def __init__(self, db: "Database", project_id: Optional[str] = None):
         self.db = db
+        self._project_id = project_id
+
+    @property
+    def project_id(self) -> Optional[str]:
+        """Get the project ID for this repository.
+
+        Returns injected project_id if available, otherwise
+        falls back to the contextvar.
+        """
+        if self._project_id:
+            return self._project_id
+        return get_current_project_id()
 
     def save_knowledge(self, project_name: str, project_type: str, primary_language: str,
                        languages: list[dict], frameworks: list[dict], tools: list[dict],
                        architecture_pattern: str, modules: list[dict], entry_points: list[str],
                        domains: list[dict], naming: dict, structure: dict, conventions: list[str],
                        statistics: dict, version: str = "1.0") -> int:
-        """Save codebase knowledge, replacing any existing."""
-        with self.db.session() as session:
-            # Clear existing knowledge
-            session.query(CodebaseKnowledge).delete()
+        """Save codebase knowledge, replacing any existing for current project."""
+        project_id = self.project_id
 
-            # Create main knowledge record
+        with self.db.session() as session:
+            # Clear existing knowledge for current project only
+            if project_id:
+                session.query(CodebaseKnowledge).filter_by(project_id=project_id).delete()
+            else:
+                # Legacy: clear all if no project context (shouldn't happen in multi-project mode)
+                session.query(CodebaseKnowledge).filter_by(project_id=None).delete()
+
+            # Create main knowledge record with project_id
             knowledge = CodebaseKnowledge(
+                project_id=project_id,
                 version=version,
                 last_updated=datetime.now(),
                 project_name=project_name,
@@ -114,18 +148,40 @@ class KnowledgeRepository:
             return knowledge.id
 
     def load_knowledge(self) -> Optional[dict]:
-        """Load codebase knowledge from database."""
+        """Load codebase knowledge from database for current project.
+
+        Uses eager loading to fetch all related data in a single query,
+        avoiding N+1 query issues.
+        """
+        from sqlalchemy.orm import joinedload
+
+        project_id = self.project_id
+
         with self.db.session() as session:
-            knowledge = session.query(CodebaseKnowledge).first()
+            # Eager load all related data in a single query
+            query = session.query(CodebaseKnowledge).options(
+                joinedload(CodebaseKnowledge.technologies),
+                joinedload(CodebaseKnowledge.architecture),
+                joinedload(CodebaseKnowledge.modules),
+                joinedload(CodebaseKnowledge.domains),
+                joinedload(CodebaseKnowledge.patterns),
+            )
+
+            # Filter by project_id if available
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+
+            knowledge = query.first()
+
             if not knowledge:
                 return None
 
-            # Load related data
-            technologies = session.query(Technology).filter_by(knowledge_id=knowledge.id).all()
-            arch = session.query(ArchitectureInfo).filter_by(knowledge_id=knowledge.id).first()
-            modules = session.query(ArchitectureModule).filter_by(knowledge_id=knowledge.id).all()
-            domains = session.query(Domain).filter_by(knowledge_id=knowledge.id).all()
-            patterns = session.query(Pattern).filter_by(knowledge_id=knowledge.id).first()
+            # Access pre-loaded relationships
+            technologies = knowledge.technologies or []
+            arch = knowledge.architecture
+            modules = knowledge.modules or []
+            domains = knowledge.domains or []
+            patterns = knowledge.patterns
 
             languages = [t for t in technologies if t.tech_type == 'language']
             frameworks = [t for t in technologies if t.tech_type == 'framework']
@@ -172,13 +228,19 @@ class KnowledgeRepository:
 
     def save_expert_index(self, experts: list[dict], keyword_map: dict,
                           path_map: dict, version: str = "1.0") -> int:
-        """Save expert index, replacing any existing."""
-        with self.db.session() as session:
-            # Clear existing index
-            session.query(ExpertIndex).delete()
+        """Save expert index for current project, replacing any existing."""
+        project_id = self.project_id
 
-            # Create index record
+        with self.db.session() as session:
+            # Clear existing index for current project only
+            if project_id:
+                session.query(ExpertIndex).filter_by(project_id=project_id).delete()
+            else:
+                session.query(ExpertIndex).filter_by(project_id=None).delete()
+
+            # Create index record with project_id
             index = ExpertIndex(
+                project_id=project_id,
                 version=version,
                 last_updated=datetime.now(),
                 keyword_map_json=json.dumps(keyword_map),
@@ -204,9 +266,15 @@ class KnowledgeRepository:
             return index.id
 
     def load_expert_index(self) -> Optional[dict]:
-        """Load expert index from database."""
+        """Load expert index from database for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            index = session.query(ExpertIndex).first()
+            query = session.query(ExpertIndex)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            index = query.first()
+
             if not index:
                 return None
 
@@ -231,9 +299,14 @@ class KnowledgeRepository:
             }
 
     def has_expert_index(self) -> bool:
-        """Check if expert index exists."""
+        """Check if expert index exists for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            return session.query(ExpertIndex).count() > 0
+            query = session.query(ExpertIndex)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            return query.count() > 0
 
     # --- Scan Metadata ---
 
@@ -241,7 +314,9 @@ class KnowledgeRepository:
                        duration_seconds: float = 0, files_scanned: int = 0,
                        scan_type: str = "full", trigger: str = "manual",
                        experts_generated: list[str] = None) -> int:
-        """Save scan metadata."""
+        """Save scan metadata for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
             # Check for existing scan
             existing = session.query(ScanMetadata).filter_by(scan_id=scan_id).first()
@@ -254,6 +329,7 @@ class KnowledgeRepository:
                 return existing.id
             else:
                 scan = ScanMetadata(
+                    project_id=project_id,
                     scan_id=scan_id,
                     started_at=datetime.fromisoformat(started_at) if started_at else datetime.now(),
                     completed_at=datetime.fromisoformat(completed_at) if completed_at else None,
@@ -268,9 +344,15 @@ class KnowledgeRepository:
                 return scan.id
 
     def load_scan_meta(self) -> Optional[dict]:
-        """Load most recent scan metadata."""
+        """Load most recent scan metadata for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            scan = session.query(ScanMetadata).order_by(ScanMetadata.started_at.desc()).first()
+            query = session.query(ScanMetadata).order_by(ScanMetadata.started_at.desc())
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            scan = query.first()
+
             if not scan:
                 return None
 
@@ -289,12 +371,18 @@ class KnowledgeRepository:
     # --- Search Methods for Codebase Explorer ---
 
     def search_domains_by_keyword(self, keywords: list[str]) -> list[dict]:
-        """Search domains that match any of the given keywords."""
+        """Search domains that match any of the given keywords for current project."""
         if not keywords:
             return []
 
+        project_id = self.project_id
+
         with self.db.session() as session:
-            knowledge = session.query(CodebaseKnowledge).first()
+            query = session.query(CodebaseKnowledge)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            knowledge = query.first()
+
             if not knowledge:
                 return []
 
@@ -324,12 +412,18 @@ class KnowledgeRepository:
             return results
 
     def search_modules_by_path(self, path_pattern: str) -> list[dict]:
-        """Search modules whose path matches the given pattern."""
+        """Search modules whose path matches the given pattern for current project."""
         if not path_pattern:
             return []
 
+        project_id = self.project_id
+
         with self.db.session() as session:
-            knowledge = session.query(CodebaseKnowledge).first()
+            query = session.query(CodebaseKnowledge)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            knowledge = query.first()
+
             if not knowledge:
                 return []
 
@@ -352,9 +446,15 @@ class KnowledgeRepository:
             return results
 
     def get_technologies(self) -> dict:
-        """Get all technologies from knowledge store."""
+        """Get all technologies from knowledge store for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            knowledge = session.query(CodebaseKnowledge).first()
+            query = session.query(CodebaseKnowledge)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            knowledge = query.first()
+
             if not knowledge:
                 return {'languages': [], 'frameworks': [], 'tools': []}
 
@@ -367,9 +467,15 @@ class KnowledgeRepository:
             }
 
     def get_conventions(self) -> dict:
-        """Get coding conventions and patterns from knowledge store."""
+        """Get coding conventions and patterns from knowledge store for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            knowledge = session.query(CodebaseKnowledge).first()
+            query = session.query(CodebaseKnowledge)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            knowledge = query.first()
+
             if not knowledge:
                 return {'naming': {}, 'structure': {}, 'conventions': []}
 
@@ -386,14 +492,22 @@ class KnowledgeRepository:
     # --- Coding Rules ---
 
     def save_coding_rule(self, rule) -> int:
-        """Save a coding rule to the database."""
+        """Save a coding rule to the database for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            # Get knowledge ID
-            knowledge = session.query(CodebaseKnowledge).first()
+            # Get knowledge ID for current project
+            query = session.query(CodebaseKnowledge)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            knowledge = query.first()
             knowledge_id = knowledge.id if knowledge else None
 
-            # Check for existing rule
-            existing = session.query(CodingRule).filter_by(rule_id=rule.id).first()
+            # Check for existing rule (scoped to project)
+            rule_query = session.query(CodingRule).filter_by(rule_id=rule.id)
+            if project_id:
+                rule_query = rule_query.filter_by(project_id=project_id)
+            existing = rule_query.first()
 
             if existing:
                 existing.category = rule.category
@@ -406,6 +520,7 @@ class KnowledgeRepository:
                 return existing.id
             else:
                 coding_rule = CodingRule(
+                    project_id=project_id,
                     knowledge_id=knowledge_id,
                     rule_id=rule.id,
                     category=rule.category,
@@ -420,9 +535,14 @@ class KnowledgeRepository:
                 return coding_rule.id
 
     def get_coding_rules(self, category: str = None, min_confidence: float = 0.0) -> list[dict]:
-        """Get coding rules from the database."""
+        """Get coding rules from the database for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
             query = session.query(CodingRule).filter(CodingRule.confidence >= min_confidence)
+
+            if project_id:
+                query = query.filter_by(project_id=project_id)
 
             if category:
                 query = query.filter_by(category=category)
@@ -440,22 +560,35 @@ class KnowledgeRepository:
             } for r in rules]
 
     def delete_coding_rule(self, rule_id: str) -> bool:
-        """Delete a coding rule by its ID."""
+        """Delete a coding rule by its ID for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            deleted = session.query(CodingRule).filter_by(rule_id=rule_id).delete()
+            query = session.query(CodingRule).filter_by(rule_id=rule_id)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            deleted = query.delete()
             return deleted > 0
 
     def clear_coding_rules(self):
-        """Clear all coding rules."""
+        """Clear all coding rules for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            session.query(CodingRule).delete()
+            query = session.query(CodingRule)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            query.delete()
 
     # --- Extended Scan Metadata (with Git State) ---
 
     def save_scan_metadata(self, metadata: dict) -> int:
-        """Save extended scan metadata including git state."""
+        """Save extended scan metadata including git state for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
             scan = ExtendedScanMetadata(
+                project_id=project_id,
                 git_commit_hash=metadata.get('git_commit_hash'),
                 git_branch=metadata.get('git_branch'),
                 scanned_paths_json=json.dumps(metadata.get('scanned_paths', [])),
@@ -468,9 +601,15 @@ class KnowledgeRepository:
             return scan.id
 
     def get_scan_metadata(self) -> Optional[dict]:
-        """Get the most recent extended scan metadata."""
+        """Get the most recent extended scan metadata for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            scan = session.query(ExtendedScanMetadata).order_by(ExtendedScanMetadata.scan_time.desc()).first()
+            query = session.query(ExtendedScanMetadata).order_by(ExtendedScanMetadata.scan_time.desc())
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            scan = query.first()
+
             if not scan:
                 return None
 
@@ -485,11 +624,16 @@ class KnowledgeRepository:
             }
 
     def get_scan_history(self, limit: int = 10) -> list[dict]:
-        """Get recent scan history."""
+        """Get recent scan history for current project."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            scans = session.query(ExtendedScanMetadata).order_by(
+            query = session.query(ExtendedScanMetadata).order_by(
                 ExtendedScanMetadata.scan_time.desc()
-            ).limit(limit).all()
+            )
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            scans = query.limit(limit).all()
 
             return [{
                 'id': s.id,

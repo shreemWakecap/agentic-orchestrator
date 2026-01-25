@@ -3,8 +3,8 @@ import uuid
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 
-from db import KnowledgeRepository, RunRepository
-from portal.dependencies import get_knowledge_repo, get_run_repo
+from db import KnowledgeRepository, RunRepository, IProjectContextProvider
+from portal.dependencies import get_knowledge_repo, get_run_repo, get_project_context_provider
 from portal.schemas.requests import ScoutingRequest, PathScoutRequest, KeywordScoutRequest
 from portal.schemas.responses import WorkflowStartResponse
 from portal.services.knowledge_service import KnowledgeService
@@ -96,6 +96,7 @@ async def start_scouting(
     request: ScoutingRequest,
     run_repo: RunRepository = Depends(get_run_repo),
     task_manager: TaskManager = Depends(get_task_manager),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
 ) -> WorkflowStartResponse:
     """Start a scouting workflow to discover codebase knowledge.
 
@@ -105,11 +106,12 @@ async def start_scouting(
     from portal.services.workflow_runner import run_scouting_workflow_sync
 
     run_id = str(uuid.uuid4())[:8]
+    project_id = context_provider.get_project_id()
 
     # Create run entry in database (triggered by user via portal)
     run_repo.create(run_id, workflow="scouting", triggered_by="manual")
 
-    # Submit to TaskManager for background execution
+    # Submit to TaskManager for background execution with project context
     task_manager.submit_task(
         func=run_scouting_workflow_sync,
         args=(run_id,),
@@ -119,11 +121,12 @@ async def start_scouting(
             "target_keywords": request.target_keywords,
             "target_tech": request.target_tech,
             "generate_experts": request.generate_experts if request.generate_experts is not None else True,
+            "project_id": project_id,
         },
         name=f"Scouting: {request.scan_type or 'quick'}",
         task_id=run_id,
         task_type="scout",
-        metadata={"run_id": run_id, "scan_type": request.scan_type or "quick"},
+        metadata={"run_id": run_id, "scan_type": request.scan_type or "quick", "project_id": project_id},
     )
 
     return WorkflowStartResponse(run_id=run_id, status="started")
@@ -134,6 +137,7 @@ async def scout_path(
     request: PathScoutRequest,
     run_repo: RunRepository = Depends(get_run_repo),
     task_manager: TaskManager = Depends(get_task_manager),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
 ) -> WorkflowStartResponse:
     """Scout a specific path for knowledge extraction.
 
@@ -143,11 +147,12 @@ async def scout_path(
     from portal.services.workflow_runner import run_scouting_workflow_sync
 
     run_id = str(uuid.uuid4())[:8]
+    project_id = context_provider.get_project_id()
 
     # Create run entry in database (triggered by user via portal)
     run_repo.create(run_id, workflow="scouting", triggered_by="manual")
 
-    # Submit to TaskManager for background execution
+    # Submit to TaskManager for background execution with project context
     task_manager.submit_task(
         func=run_scouting_workflow_sync,
         args=(run_id,),
@@ -157,11 +162,12 @@ async def scout_path(
             "target_keywords": None,
             "target_tech": None,
             "generate_experts": True,
+            "project_id": project_id,
         },
         name=f"Scouting: {request.path}",
         task_id=run_id,
         task_type="scout",
-        metadata={"run_id": run_id, "path": request.path},
+        metadata={"run_id": run_id, "path": request.path, "project_id": project_id},
     )
 
     return WorkflowStartResponse(run_id=run_id, status="started")
@@ -172,6 +178,7 @@ async def scout_keywords(
     request: KeywordScoutRequest,
     run_repo: RunRepository = Depends(get_run_repo),
     task_manager: TaskManager = Depends(get_task_manager),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
 ) -> WorkflowStartResponse:
     """Scout based on keywords for knowledge extraction.
 
@@ -182,6 +189,7 @@ async def scout_keywords(
     from portal.services.workflow_runner import run_scouting_workflow_sync
 
     run_id = str(uuid.uuid4())[:8]
+    project_id = context_provider.get_project_id()
 
     # Parse comma-separated keywords into list
     keywords_list = [kw.strip() for kw in request.keywords.split(",") if kw.strip()]
@@ -189,7 +197,7 @@ async def scout_keywords(
     # Create run entry in database (triggered by user via portal)
     run_repo.create(run_id, workflow="scouting", triggered_by="manual")
 
-    # Submit to TaskManager for background execution
+    # Submit to TaskManager for background execution with project context
     task_manager.submit_task(
         func=run_scouting_workflow_sync,
         args=(run_id,),
@@ -199,11 +207,12 @@ async def scout_keywords(
             "target_keywords": keywords_list,
             "target_tech": None,
             "generate_experts": True,
+            "project_id": project_id,
         },
         name=f"Scouting: {request.keywords[:30]}..." if len(request.keywords) > 30 else f"Scouting: {request.keywords}",
         task_id=run_id,
         task_type="scout",
-        metadata={"run_id": run_id, "keywords": request.keywords},
+        metadata={"run_id": run_id, "keywords": request.keywords, "project_id": project_id},
     )
 
     return WorkflowStartResponse(run_id=run_id, status="started")

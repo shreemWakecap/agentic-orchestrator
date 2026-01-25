@@ -2,6 +2,12 @@
 Run Repository - ORM-based implementation.
 
 Handles active run tracking and events using SQLAlchemy ORM.
+All operations are scoped to the current active project.
+
+SOLID Revamp:
+- Implements IRunRepository interface
+- Accepts optional project_id for dependency injection
+- Falls back to contextvar if project_id not provided
 """
 import json
 from datetime import datetime
@@ -11,13 +17,36 @@ if TYPE_CHECKING:
     from ..connection import Database
 
 from ..models import ActiveRun, RunEvent
+from .base import get_current_project_id
+from .interfaces import IRunRepository
 
 
-class RunRepository:
-    """Repository for active run tracking using ORM."""
+class RunRepository(IRunRepository):
+    """Repository for active run tracking using ORM.
 
-    def __init__(self, db: "Database"):
+    Implements IRunRepository interface for dependency injection.
+    All operations are scoped to the current active project.
+
+    Args:
+        db: Database connection instance
+        project_id: Optional project ID for explicit scoping.
+                   If not provided, falls back to contextvar.
+    """
+
+    def __init__(self, db: "Database", project_id: Optional[str] = None):
         self.db = db
+        self._project_id = project_id
+
+    @property
+    def project_id(self) -> Optional[str]:
+        """Get the project ID for this repository.
+
+        Returns injected project_id if available, otherwise
+        falls back to the contextvar.
+        """
+        if self._project_id:
+            return self._project_id
+        return get_current_project_id()
 
     def create(self, run_id: str, workflow: str, description: str = None,
                plan_id: str = None, plan_path: str = None,
@@ -32,6 +61,8 @@ class RunRepository:
             plan_path: Path to plan file (optional)
             triggered_by: How this run was triggered (manual, system, auto_pre_planning, post_build)
         """
+        project_id = self.project_id
+
         with self.db.session() as session:
             run = ActiveRun(
                 run_id=run_id,
@@ -43,16 +74,22 @@ class RunRepository:
                 description=description,
                 progress=0,
                 data_json='{}',
-                triggered_by=triggered_by
+                triggered_by=triggered_by,
+                project_id=project_id
             )
             session.add(run)
             session.flush()
             return run.id
 
     def get(self, run_id: str) -> Optional[dict]:
-        """Get run by ID."""
+        """Get run by ID (scoped to current project)."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            run = session.query(ActiveRun).filter_by(run_id=run_id).first()
+            query = session.query(ActiveRun).filter_by(run_id=run_id)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            run = query.first()
             if not run:
                 return None
             return self._run_to_dict(run)
@@ -100,18 +137,27 @@ class RunRepository:
             } for e in events]
 
     def list_active(self, status: str = None) -> List[dict]:
-        """List active runs with optional status filter."""
+        """List active runs with optional status filter (scoped to current project)."""
+        project_id = self.project_id
+
         with self.db.session() as session:
             query = session.query(ActiveRun)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
             if status:
                 query = query.filter_by(status=status)
             runs = query.order_by(ActiveRun.started_at.desc()).all()
             return [self._run_to_dict(r) for r in runs]
 
     def delete(self, run_id: str):
-        """Delete a run and its events."""
+        """Delete a run and its events (scoped to current project)."""
+        project_id = self.project_id
+
         with self.db.session() as session:
-            session.query(ActiveRun).filter_by(run_id=run_id).delete()
+            query = session.query(ActiveRun).filter_by(run_id=run_id)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            query.delete()
 
     def _run_to_dict(self, run: ActiveRun) -> dict:
         """Convert ActiveRun model to dictionary."""

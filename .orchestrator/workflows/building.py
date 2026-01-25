@@ -2608,16 +2608,16 @@ def run(args=None) -> int:
     project_slug = None
 
     if config.is_multi_project_mode:
-        from core.project_registry import get_project_registry
-        registry = get_project_registry()
-        active = registry.get_active_project()
+        from db.repositories.project import get_project_repository
+        repo = get_project_repository()
+        active = repo.get_active(as_dict=True)
         if not active:
             print("Error: No active project. Use 'orch project switch <name>' first.")
             return 1
-        project_root = Path(active.path)
-        project_id = active.id
-        project_slug = active.slug
-        print(f"Project: {active.name} ({active.slug})")
+        project_root = Path(active['path'])
+        project_id = active['id']
+        project_slug = active['slug']
+        print(f"Project: {active['name']} ({active['slug']})")
     else:
         project_root = Path(__file__).parent.parent.parent
 

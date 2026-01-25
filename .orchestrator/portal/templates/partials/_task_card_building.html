@@ -41,14 +41,14 @@
                 </svg>
             </div>
             <div>
-                <a href="/runs/{{ run.id }}" class="text-lg font-semibold text-primary dark:text-primary hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                <a href="/runs/{{ run.id }}" class="text-lg font-semibold text-primary hover:text-blue-600 transition-colors">
                     {{ run.workflow|title }} Workflow
                 </a>
-                <div class="text-xs text-tertiary dark:text-tertiary mt-0.5 font-mono">ID: {{ run.id[:8] }}</div>
+                <div class="text-xs text-tertiary mt-0.5 font-mono">ID: {{ run.id[:8] }}</div>
             </div>
         </div>
         <div class="flex items-center space-x-4">
-            <span class="text-sm font-mono text-secondary dark:text-secondary elapsed-time bg-tertiary dark:bg-tertiary px-3 py-1 rounded-lg" data-started="{{ run.started_at }}">--:--</span>
+            <span class="text-sm font-mono text-secondary elapsed-time bg-tertiary px-3 py-1 rounded-lg" data-started="{{ run.started_at }}">--:--</span>
             <span class="status-badge pill {% if run.status == 'completed' %}status-badge-completed{% elif run.status == 'running' %}status-badge-running{% elif run.status == 'pending' %}status-badge-pending{% else %}status-badge-failed{% endif %}">
                 <span class="status-dot {% if run.status == 'completed' %}status-dot-completed{% elif run.status == 'running' %}status-dot-running{% elif run.status == 'pending' %}status-dot-pending{% else %}status-dot-failed{% endif %}"></span>
                 {{ run.status|title }}
@@ -78,10 +78,10 @@
     <!-- Progress Bar -->
     <div class="space-y-3">
         <div class="flex items-center justify-between text-sm">
-            <span class="current-step text-secondary dark:text-secondary font-medium">{{ run.current_step|default('Initializing...', true) }}</span>
-            <span class="progress-percent font-bold text-primary dark:text-primary text-lg">{{ run.progress|default(0, true) }}%</span>
+            <span class="current-step text-secondary font-medium">{{ run.current_step|default('Initializing...', true) }}</span>
+            <span class="progress-percent font-bold text-primary text-lg">{{ run.progress|default(0, true) }}%</span>
         </div>
-        <div class="relative w-full h-3 bg-tertiary dark:bg-tertiary rounded-full overflow-hidden">
+        <div class="relative w-full h-3 bg-tertiary rounded-full overflow-hidden">
             <div class="absolute inset-0 opacity-30">
                 <div class="h-full w-full bg-gradient-to-r from-transparent via-white to-transparent animate-shimmer" style="background-size: 200% 100%;"></div>
             </div>
@@ -97,7 +97,7 @@
 
     <!-- Step Details -->
     {% if run.total_steps %}
-    <div class="mt-4 flex items-center text-sm text-tertiary dark:text-tertiary">
+    <div class="mt-4 flex items-center text-sm text-tertiary">
         <div class="flex items-center glass rounded-lg px-3 py-1.5">
             <svg class="h-4 w-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>

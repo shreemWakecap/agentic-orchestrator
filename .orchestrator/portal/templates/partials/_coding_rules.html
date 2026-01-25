@@ -3,20 +3,20 @@
 <!-- Required context: coding_rules (list of rule dicts with id, category, rule, severity, examples, confidence) -->
 
 {% if coding_rules %}
-<div class="bg-secondary-800 rounded-lg border border-secondary-700 overflow-hidden">
-    <div class="px-4 py-3 border-b border-secondary-700 flex items-center justify-between">
+<div class="glass-card overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
         <div class="flex items-center space-x-2">
             <svg class="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
-            <h3 class="text-sm font-semibold text-white">Coding Rules</h3>
-            <span class="text-xs text-secondary-400">({{ coding_rules|length }} rules)</span>
+            <h3 class="text-sm font-semibold text-primary">Coding Rules</h3>
+            <span class="text-xs text-tertiary">({{ coding_rules|length }} rules)</span>
         </div>
-        <span class="text-xs text-secondary-500">Auto-extracted from codebase</span>
+        <span class="text-xs text-muted">Auto-extracted from codebase</span>
     </div>
 
-    <div class="divide-y divide-secondary-700">
+    <div class="divide-y divide-gray-200">
         {% set categories = {} %}
         {% for rule in coding_rules %}
             {% set cat = rule.category or 'general' %}
@@ -28,37 +28,37 @@
 
         {% for category, rules in categories|dictsort %}
         <div class="p-4">
-            <h4 class="text-xs font-semibold text-secondary-400 uppercase tracking-wider mb-3">{{ category }}</h4>
+            <h4 class="text-xs font-semibold text-tertiary uppercase tracking-wider mb-3">{{ category }}</h4>
             <ul class="space-y-3">
                 {% for rule in rules[:5] %}
                 <li class="flex items-start space-x-3">
                     <span class="flex-shrink-0 mt-0.5">
                         {% if rule.severity == 'error' %}
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-danger-900/50 text-danger-400 border border-danger-700/50">
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-error-100 text-error-700 border border-error-200">
                             error
                         </span>
                         {% elif rule.severity == 'warning' %}
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning-900/50 text-warning-400 border border-warning-700/50">
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-warning-100 text-warning-700 border border-warning-200">
                             warning
                         </span>
                         {% else %}
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary-900/50 text-primary-400 border border-primary-700/50">
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary-100 text-primary-700 border border-primary-200">
                             info
                         </span>
                         {% endif %}
                     </span>
                     <div class="flex-1 min-w-0">
-                        <p class="text-sm text-secondary-200">{{ rule.rule }}</p>
+                        <p class="text-sm text-primary">{{ rule.rule }}</p>
                         {% if rule.examples %}
                         <div class="mt-1.5 flex flex-wrap gap-1">
                             {% for example in rule.examples[:2] %}
-                            <span class="text-xs px-2 py-0.5 bg-secondary-700 rounded text-secondary-400 font-mono">
+                            <span class="text-xs px-2 py-0.5 bg-neutral-100 rounded text-tertiary font-mono border border-neutral-200">
                                 {{ example[:40] }}{% if example|length > 40 %}...{% endif %}
                             </span>
                             {% endfor %}
                         </div>
                         {% endif %}
-                        <div class="mt-1 flex items-center space-x-2 text-xs text-secondary-500">
+                        <div class="mt-1 flex items-center space-x-2 text-xs text-muted">
                             <span>Confidence: {{ (rule.confidence * 100)|int }}%</span>
                             {% if rule.source_files %}
                             <span>&bull;</span>
@@ -69,7 +69,7 @@
                 </li>
                 {% endfor %}
                 {% if rules|length > 5 %}
-                <li class="text-xs text-secondary-500 pl-14">
+                <li class="text-xs text-muted pl-14">
                     ...and {{ rules|length - 5 }} more {{ category }} rules
                 </li>
                 {% endif %}
@@ -79,13 +79,13 @@
     </div>
 </div>
 {% else %}
-<div class="bg-secondary-800 rounded-lg border border-secondary-700 p-6 text-center">
-    <svg class="w-12 h-12 mx-auto text-secondary-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<div class="glass-card p-6 text-center">
+    <svg class="w-12 h-12 mx-auto text-neutral-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
     </svg>
-    <h3 class="text-sm font-medium text-secondary-300 mb-1">No Coding Rules Detected</h3>
-    <p class="text-xs text-secondary-500">
+    <h3 class="text-sm font-medium text-secondary mb-1">No Coding Rules Detected</h3>
+    <p class="text-xs text-tertiary">
         Run a scan to automatically extract coding conventions from your codebase.
     </p>
 </div>

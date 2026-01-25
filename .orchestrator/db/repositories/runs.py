@@ -159,11 +159,73 @@ class RunRepository(IRunRepository):
                 query = query.filter_by(project_id=project_id)
             query.delete()
 
+    def list_by_project(
+        self,
+        project_id: str,
+        status: str = None,
+        workflow_type: str = None,
+        limit: int = 50,
+    ) -> List[dict]:
+        """List runs for a specific project.
+
+        Args:
+            project_id: Project to filter by
+            status: Optional status filter
+            workflow_type: Optional workflow type filter
+            limit: Maximum results
+
+        Returns:
+            List of run dicts
+        """
+        with self.db.session() as session:
+            query = session.query(ActiveRun).filter(ActiveRun.project_id == project_id)
+
+            if status:
+                query = query.filter(ActiveRun.status == status)
+            if workflow_type:
+                query = query.filter(ActiveRun.workflow == workflow_type)
+
+            query = query.order_by(ActiveRun.started_at.desc()).limit(limit)
+
+            return [self._run_to_dict(run) for run in query.all()]
+
+    def get_project_stats(self, project_id: str) -> dict:
+        """Get run statistics for a project.
+
+        Args:
+            project_id: Project to get stats for
+
+        Returns:
+            Dict with counts by status and workflow type
+        """
+        with self.db.session() as session:
+            runs = session.query(ActiveRun).filter(
+                ActiveRun.project_id == project_id
+            ).all()
+
+            stats = {
+                "total": len(runs),
+                "by_status": {},
+                "by_workflow": {},
+            }
+
+            for run in runs:
+                # Count by status
+                status = run.status or "unknown"
+                stats["by_status"][status] = stats["by_status"].get(status, 0) + 1
+
+                # Count by workflow type
+                workflow = run.workflow or "unknown"
+                stats["by_workflow"][workflow] = stats["by_workflow"].get(workflow, 0) + 1
+
+            return stats
+
     def _run_to_dict(self, run: ActiveRun) -> dict:
         """Convert ActiveRun model to dictionary."""
         return {
             'id': run.id,
             'run_id': run.run_id,
+            'project_id': run.project_id,
             'workflow': run.workflow,
             'status': run.status,
             'started_at': run.started_at.isoformat() if run.started_at else None,

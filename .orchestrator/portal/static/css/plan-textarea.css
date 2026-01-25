@@ -43,9 +43,10 @@
     font-size: 0.9375rem;
     line-height: 1.7;
 
-    /* Visual Styling */
-    background: var(--bg-primary);
-    color: var(--text-primary);
+    /* Visual Styling - Light mode defaults */
+    background: var(--bg-primary, #ffffff);
+    color: var(--text-primary, #111827);
+    caret-color: var(--text-primary, #111827);
     border: 2px solid var(--border-default);
     border-radius: var(--radius-lg);
 
@@ -454,3 +455,4 @@
         display: none;
     }
 }
+

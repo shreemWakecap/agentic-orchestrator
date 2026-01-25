@@ -247,17 +247,18 @@ class ProjectService:
         Returns:
             The activated project dict or None if not found.
         """
-        project = self.repository.get_by_slug_or_id(slug_or_id)
+        # Use as_dict=True to avoid DetachedInstanceError when session closes
+        project = self.repository.get_by_slug_or_id(slug_or_id, as_dict=True)
 
         if not project:
             return None
 
-        if project.status == ProjectStatus.ARCHIVED:
-            logger.warning(f"Cannot switch to archived project: {project.name}")
+        if project["status"] == ProjectStatus.ARCHIVED.value:
+            logger.warning(f"Cannot switch to archived project: {project['name']}")
             return None
 
-        self.repository.set_active(project.project_id)
-        logger.info(f"Switched to project: {project.name}")
+        self.repository.set_active(project["id"])
+        logger.info(f"Switched to project: {project['name']}")
 
         return self.repository.get_active(as_dict=True)
 

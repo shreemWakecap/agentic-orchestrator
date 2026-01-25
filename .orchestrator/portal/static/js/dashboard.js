@@ -146,12 +146,12 @@ function updateBranchList(branches) {
 
     var html = '';
     branches.forEach(function(branch) {
-        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30 dark:hover:bg-tertiary/30">';
+        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30">';
         html += '<div class="min-w-0 flex-1">';
-        html += '<div class="text-sm font-mono text-primary dark:text-primary truncate">' + escapeHtml(branch.name) + '</div>';
-        html += '<div class="text-xs text-tertiary dark:text-tertiary truncate">' + escapeHtml(branch.message || '') + '</div>';
+        html += '<div class="text-sm font-mono text-primary truncate">' + escapeHtml(branch.name) + '</div>';
+        html += '<div class="text-xs text-tertiary truncate">' + escapeHtml(branch.message || '') + '</div>';
         html += '</div>';
-        html += '<button type="button" class="ml-3 btn btn-xs text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20" onclick="deleteBranch(\'' + escapeHtml(branch.name) + '\')" title="Delete branch">';
+        html += '<button type="button" class="ml-3 btn btn-xs text-red-600 hover:bg-red-100" onclick="deleteBranch(\'' + escapeHtml(branch.name) + '\')" title="Delete branch">';
         html += '<svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>';
         html += '</button>';
         html += '</li>';
@@ -176,12 +176,12 @@ function updatePRList(prs) {
 
     var html = '';
     prs.forEach(function(pr) {
-        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30 dark:hover:bg-tertiary/30">';
+        html += '<li class="px-4 py-3 flex items-center justify-between hover:bg-tertiary/30">';
         html += '<div class="min-w-0 flex-1">';
-        html += '<a href="' + escapeHtml(pr.url) + '" target="_blank" class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">';
+        html += '<a href="' + escapeHtml(pr.url) + '" target="_blank" class="text-sm font-medium text-blue-600 hover:text-blue-800">';
         html += '#' + pr.number + ' ' + escapeHtml(pr.title);
         html += '</a>';
-        html += '<div class="text-xs text-tertiary dark:text-tertiary">' + escapeHtml(pr.head_branch) + ' → ' + escapeHtml(pr.base_branch) + '</div>';
+        html += '<div class="text-xs text-tertiary">' + escapeHtml(pr.head_branch) + ' → ' + escapeHtml(pr.base_branch) + '</div>';
         html += '</div>';
         html += '<button type="button" class="ml-3 btn btn-xs btn-primary" onclick="mergePR(' + pr.number + ')" title="Merge PR">';
         html += '<svg class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>';
@@ -317,7 +317,7 @@ async function fetchSyncStatus() {
                     if (listContainer) {
                         var listHtml = '';
                         data.files.forEach(function(file) {
-                            listHtml += '<li class="px-4 py-2 flex items-center text-sm text-secondary dark:text-secondary">';
+                            listHtml += '<li class="px-4 py-2 flex items-center text-sm text-secondary">';
                             listHtml += '<svg class="h-4 w-4 mr-2 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
                             listHtml += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>';
                             listHtml += '</svg>';
@@ -549,11 +549,11 @@ function createBuildCard(run) {
     // Apply appropriate classes based on status
     var cardClasses = 'border rounded-lg p-4 live-build-card transition-all duration-300';
     if (isPlanning) {
-        cardClasses += ' border-gray-300 bg-gray-50 dark:bg-gray-800/50 opacity-75 pointer-events-none';
+        cardClasses += ' border-gray-300 bg-gray-50 opacity-75 pointer-events-none';
     } else if (isBuilding) {
-        cardClasses += ' border-violet-200 dark:border-violet-800 bg-violet-50/30 dark:bg-violet-900/10';
+        cardClasses += ' border-violet-200 bg-violet-50/30';
     } else {
-        cardClasses += ' border-gray-200 dark:border-gray-700';
+        cardClasses += ' border-gray-200';
     }
 
     card.className = cardClasses;
@@ -585,11 +585,11 @@ function createBuildCard(run) {
     // Determine link behavior (disabled for planning)
     var titleHtml;
     if (isPlanning) {
-        titleHtml = '<span class="text-sm font-medium text-gray-500 dark:text-gray-400 cursor-not-allowed">' +
+        titleHtml = '<span class="text-sm font-medium text-gray-500 cursor-not-allowed">' +
             escapeHtml(workflow) +
             '</span>';
     } else {
-        titleHtml = '<a href="/runs/' + escapeHtml(run.id) + '" class="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">' +
+        titleHtml = '<a href="/runs/' + escapeHtml(run.id) + '" class="text-sm font-medium text-blue-600 hover:text-blue-800">' +
             escapeHtml(workflow) +
             '</a>';
     }
@@ -614,7 +614,7 @@ function createBuildCard(run) {
     // Build expand button for log streaming (not for planning)
     var expandButtonHtml = '';
     if (!isPlanning) {
-        expandButtonHtml = '<button type="button" class="expand-logs-btn ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="View live logs">' +
+        expandButtonHtml = '<button type="button" class="expand-logs-btn ml-2 p-1 rounded hover:bg-gray-100 transition-colors" title="View live logs">' +
             '<svg class="h-4 w-4 text-gray-400 expand-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
             '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>' +
             '</svg>' +
@@ -626,10 +626,10 @@ function createBuildCard(run) {
             '<div class="flex items-center">' +
                 statusIconHtml +
                 titleHtml +
-                '<span class="ml-2 text-xs text-gray-500 dark:text-gray-400">' + escapeHtml(run.id.substring(0, 8)) + '</span>' +
+                '<span class="ml-2 text-xs text-gray-500">' + escapeHtml(run.id.substring(0, 8)) + '</span>' +
             '</div>' +
             '<div class="flex items-center space-x-3">' +
-                '<span class="text-xs text-gray-500 dark:text-gray-400 elapsed-time" data-started="' + escapeHtml(run.started_at || '') + '">--:--</span>' +
+                '<span class="text-xs text-gray-500 elapsed-time" data-started="' + escapeHtml(run.started_at || '') + '">--:--</span>' +
                 '<span class="status-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' + statusClasses + '">' +
                     '<span class="status-dot status-dot-' + escapeHtml(run.status) + ' mr-1.5"></span>' +
                     escapeHtml(run.status) +
@@ -638,15 +638,15 @@ function createBuildCard(run) {
             '</div>' +
         '</div>' +
         '<div class="mb-2">' +
-            '<div class="flex items-center justify-between text-xs text-gray-600 dark:text-gray-400 mb-1">' +
+            '<div class="flex items-center justify-between text-xs text-gray-600 mb-1">' +
                 '<span class="current-step">' + escapeHtml(currentStep) + '</span>' +
                 '<span class="progress-percent">' + progress + '%</span>' +
             '</div>' +
-            '<div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">' +
+            '<div class="w-full bg-gray-200 rounded-full h-2.5">' +
                 '<div class="progress-bar ' + progressBarClass + ' h-2.5 rounded-full transition-all duration-300" style="width: ' + progress + '%"></div>' +
             '</div>' +
         '</div>' +
-        '<div class="step-details mt-2 text-xs text-gray-500 dark:text-gray-400">' +
+        '<div class="step-details mt-2 text-xs text-gray-500">' +
             (run.total_steps ? '<span>Step ' + (run.current_step_num || 0) + ' of ' + run.total_steps + '</span>' : '') +
         '</div>' +
         // Hidden log container that expands
@@ -1337,10 +1337,10 @@ function createStuckPlanCard(plan) {
     html += '</svg>';
     html += '</div>';
     html += '<div>';
-    html += '<a href="/plans/' + escapeHtml(plan.plan_id) + '" class="text-lg font-semibold text-primary dark:text-primary hover:text-blue-600 dark:hover:text-blue-400 transition-colors">';
+    html += '<a href="/plans/' + escapeHtml(plan.plan_id) + '" class="text-lg font-semibold text-primary hover:text-blue-600 transition-colors">';
     html += escapeHtml(planName);
     html += '</a>';
-    html += '<div class="text-xs text-tertiary dark:text-tertiary mt-0.5">Stuck for <span class="font-semibold text-amber-600 dark:text-amber-400">' + timeStale + '</span></div>';
+    html += '<div class="text-xs text-tertiary mt-0.5">Stuck for <span class="font-semibold text-amber-600">' + timeStale + '</span></div>';
     html += '</div>';
     html += '</div>';
 
@@ -1353,10 +1353,10 @@ function createStuckPlanCard(plan) {
     // Progress info
     html += '<div class="mb-4">';
     html += '<div class="flex items-center justify-between text-sm mb-2">';
-    html += '<span class="text-secondary dark:text-secondary font-medium">' + escapeHtml(currentStep) + '</span>';
-    html += '<span class="font-bold text-primary dark:text-primary">' + progressPercent + '%</span>';
+    html += '<span class="text-secondary font-medium">' + escapeHtml(currentStep) + '</span>';
+    html += '<span class="font-bold text-primary">' + progressPercent + '%</span>';
     html += '</div>';
-    html += '<div class="relative w-full h-3 bg-tertiary dark:bg-tertiary rounded-full overflow-hidden">';
+    html += '<div class="relative w-full h-3 bg-tertiary rounded-full overflow-hidden">';
     html += '<div class="h-full rounded-full bg-gradient-to-r from-amber-500 to-red-500" style="width: ' + progressPercent + '%"></div>';
     html += '</div>';
     html += '</div>';
@@ -1368,7 +1368,7 @@ function createStuckPlanCard(plan) {
         html += '<svg class="h-5 w-5 text-red-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
         html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>';
         html += '</svg>';
-        html += '<span class="text-red-600 dark:text-red-400">' + escapeHtml(plan.last_error) + '</span>';
+        html += '<span class="text-red-600">' + escapeHtml(plan.last_error) + '</span>';
         html += '</div>';
         html += '</div>';
     }
@@ -1390,7 +1390,7 @@ function createStuckPlanCard(plan) {
     html += '</svg>';
     html += 'Restart';
     html += '</button>';
-    html += '<button type="button" class="cancel-btn btn btn-sm text-red-600 hover:bg-red-100 dark:hover:bg-red-900/20" data-plan-id="' + escapeHtml(plan.plan_id) + '" title="Cancel build">';
+    html += '<button type="button" class="cancel-btn btn btn-sm text-red-600 hover:bg-red-100" data-plan-id="' + escapeHtml(plan.plan_id) + '" title="Cancel build">';
     html += '<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">';
     html += '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>';
     html += '</svg>';

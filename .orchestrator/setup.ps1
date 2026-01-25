@@ -81,13 +81,35 @@ if (-not (Get-Command "uv" -ErrorAction SilentlyContinue)) {
     Write-Success "UV is installed"
 }
 
-# Check Python
-if (-not (Get-Command "python" -ErrorAction SilentlyContinue)) {
+# Check Python (try py launcher first on Windows, then python)
+$pythonCmd = $null
+$pythonVersion = $null
+
+# Try py launcher first (more reliable on Windows)
+try {
+    $testVer = & py --version 2>&1
+    if ($LASTEXITCODE -eq 0 -and $testVer -match "Python") {
+        $pythonCmd = "py"
+        $pythonVersion = $testVer
+    }
+} catch {}
+
+# Fallback to python command
+if (-not $pythonCmd) {
+    try {
+        $testVer = & python --version 2>&1
+        if ($LASTEXITCODE -eq 0 -and $testVer -match "Python") {
+            $pythonCmd = "python"
+            $pythonVersion = $testVer
+        }
+    } catch {}
+}
+
+if (-not $pythonCmd) {
     Write-Fail "Python not found!"
     Write-Info "Please install Python 3.11+ from: https://python.org/"
     exit 1
 } else {
-    $pythonVersion = python --version 2>&1
     Write-Success "Python: $pythonVersion"
 }
 
@@ -244,6 +266,27 @@ if ($installSuccess) {
         Write-Fail "Package installation failed"
         Write-Info "You can still use: uv run python cli.py"
     }
+}
+
+# Install portal dependencies globally (required when orch is installed via pip)
+Write-Info "Installing portal dependencies..."
+$portalDeps = @(
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "asyncpg",
+    "sqlalchemy",
+    "aiofiles",
+    "python-multipart",
+    "blinker",
+    "websockets"
+)
+$pipCmd = if ($pythonCmd -eq "py") { "py -m pip" } else { "python -m pip" }
+$null = Invoke-Expression "$pipCmd install $($portalDeps -join ' ') --quiet" 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Success "Portal dependencies installed"
+} else {
+    Write-Warn "Some portal dependencies may be missing"
 }
 
 # Verify installation works

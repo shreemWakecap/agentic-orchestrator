@@ -75,7 +75,7 @@
                         </svg>
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold text-primary dark:text-primary">{{ run.workflow|title }} Run</h1>
+                        <h1 class="text-2xl font-bold text-primary">{{ run.workflow|title }} Run</h1>
                         <p class="mt-1 text-sm text-tertiary font-mono">{{ run.id }}</p>
                     </div>
                 </div>
@@ -118,14 +118,14 @@
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <!-- Run Info Card -->
         <div class="glass-card overflow-hidden animate-fade-in-up" style="animation-delay: 0.1s;">
-            <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-secondary-50 to-transparent dark:from-secondary-800/30">
+            <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-secondary-50 to-transparent">
                 <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-semibold text-primary dark:text-primary">Run Details</h3>
+                    <h3 class="text-lg font-semibold text-primary">Run Details</h3>
                 </div>
             </div>
             <div class="divide-y divide-light">
@@ -136,7 +136,7 @@
                         </svg>
                         Workflow
                     </dt>
-                    <dd class="text-sm font-semibold text-primary dark:text-primary">{{ run.workflow|title }}</dd>
+                    <dd class="text-sm font-semibold text-primary">{{ run.workflow|title }}</dd>
                 </div>
                 <div class="px-6 py-4 flex items-center justify-between hover:bg-tertiary transition-colors">
                     <dt class="text-sm font-medium text-tertiary flex items-center">
@@ -145,7 +145,7 @@
                         </svg>
                         Started
                     </dt>
-                    <dd class="text-sm font-mono text-primary dark:text-primary">{{ run.started_at[:19] }}</dd>
+                    <dd class="text-sm font-mono text-primary">{{ run.started_at[:19] }}</dd>
                 </div>
                 {% if run.completed_at %}
                 <div class="px-6 py-4 flex items-center justify-between hover:bg-tertiary transition-colors">
@@ -155,7 +155,7 @@
                         </svg>
                         Completed
                     </dt>
-                    <dd class="text-sm font-mono text-primary dark:text-primary">{{ run.completed_at[:19] }}</dd>
+                    <dd class="text-sm font-mono text-primary">{{ run.completed_at[:19] }}</dd>
                 </div>
                 {% endif %}
                 {% if run.description %}
@@ -166,7 +166,7 @@
                         </svg>
                         Description
                     </dt>
-                    <dd class="text-sm text-primary dark:text-primary pl-6">{{ run.description }}</dd>
+                    <dd class="text-sm text-primary pl-6">{{ run.description }}</dd>
                 </div>
                 {% endif %}
                 {% if run.output_file %}
@@ -177,18 +177,18 @@
                         </svg>
                         Output
                     </dt>
-                    <dd class="text-sm font-mono text-primary dark:text-primary pl-6 break-all">{{ run.output_file }}</dd>
+                    <dd class="text-sm font-mono text-primary pl-6 break-all">{{ run.output_file }}</dd>
                 </div>
                 {% endif %}
                 {% if run.error %}
-                <div class="px-6 py-4 bg-danger-50 dark:bg-danger-900/20">
-                    <dt class="text-sm font-medium text-danger-600 dark:text-danger-400 flex items-center mb-2">
+                <div class="px-6 py-4 bg-danger-50">
+                    <dt class="text-sm font-medium text-danger-600 flex items-center mb-2">
                         <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                         </svg>
                         Error
                     </dt>
-                    <dd class="text-sm text-danger-700 dark:text-danger-300 pl-6">{{ run.error }}</dd>
+                    <dd class="text-sm text-danger-700 pl-6">{{ run.error }}</dd>
                 </div>
                 {% endif %}
             </div>
@@ -196,14 +196,14 @@
 
         <!-- Progress Card -->
         <div class="glass-card overflow-hidden animate-fade-in-up" style="animation-delay: 0.2s;">
-            <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-primary-50 to-transparent dark:from-primary-900/20">
+            <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-primary-50 to-transparent">
                 <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-semibold text-primary dark:text-primary">Progress</h3>
+                    <h3 class="text-lg font-semibold text-primary">Progress</h3>
                 </div>
             </div>
             <div class="px-6 py-6">
@@ -217,7 +217,7 @@
 
                 <!-- Animated Progress Bar -->
                 <div class="relative mb-6">
-                    <div class="w-full bg-secondary-200 dark:bg-secondary-700 rounded-full h-4 overflow-hidden">
+                    <div class="w-full bg-secondary-200 rounded-full h-4 overflow-hidden">
                         <div id="progress-bar"
                              class="h-4 rounded-full transition-all duration-500 ease-out gradient-primary progress-bar-animated {% if run.status == 'running' %}progress-glow{% endif %}"
                              style="width: {{ run.progress }}%">
@@ -234,18 +234,18 @@
                 </div>
 
                 {% if run.current_step %}
-                <div class="p-4 rounded-xl bg-secondary-50 dark:bg-secondary-800/50 border border-light">
+                <div class="p-4 rounded-xl bg-secondary-50 border border-light">
                     <div class="flex items-center space-x-3">
                         <div class="flex-shrink-0">
-                            <div class="w-10 h-10 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                                <svg class="w-5 h-5 text-primary-600 dark:text-primary-400 {% if run.status == 'running' %}animate-pulse{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+                                <svg class="w-5 h-5 text-primary-600 {% if run.status == 'running' %}animate-pulse{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                                 </svg>
                             </div>
                         </div>
                         <div>
                             <p class="text-xs font-medium text-tertiary uppercase tracking-wide">Current Step</p>
-                            <p id="current-step" class="text-sm font-semibold text-primary dark:text-primary">{{ run.current_step }}</p>
+                            <p id="current-step" class="text-sm font-semibold text-primary">{{ run.current_step }}</p>
                         </div>
                     </div>
                 </div>
@@ -256,17 +256,17 @@
 
     <!-- Events Log Card -->
     <div class="mt-6 glass-card overflow-hidden animate-fade-in-up" style="animation-delay: 0.3s;">
-        <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-secondary-50 to-transparent dark:from-secondary-800/30">
+        <div class="px-6 py-4 border-b border-light bg-gradient-to-r from-secondary-50 to-transparent">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 rounded-lg bg-secondary-100 dark:bg-secondary-700 flex items-center justify-center">
-                        <svg class="w-4 h-4 text-secondary-600 dark:text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="w-8 h-8 rounded-lg bg-secondary-100 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-secondary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
                         </svg>
                     </div>
-                    <h3 class="text-lg font-semibold text-primary dark:text-primary">Event Log</h3>
+                    <h3 class="text-lg font-semibold text-primary">Event Log</h3>
                 </div>
-                <span class="text-xs font-medium text-tertiary px-3 py-1 rounded-full bg-secondary-100 dark:bg-secondary-700">
+                <span class="text-xs font-medium text-tertiary px-3 py-1 rounded-full bg-secondary-100">
                     {{ run.events|length }} events
                 </span>
             </div>
@@ -278,32 +278,32 @@
                     <!-- Event Type Icon -->
                     <div class="flex-shrink-0 mt-0.5">
                         {% if event.type == 'error' %}
-                        <div class="w-8 h-8 rounded-lg bg-danger-100 dark:bg-danger-900/30 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-danger-600 dark:text-danger-400" fill="currentColor" viewBox="0 0 20 20">
+                        <div class="w-8 h-8 rounded-lg bg-danger-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-danger-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                             </svg>
                         </div>
                         {% elif event.type == 'complete' or event.type == 'completed' %}
-                        <div class="w-8 h-8 rounded-lg bg-success-100 dark:bg-success-900/30 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-success-600 dark:text-success-400" fill="currentColor" viewBox="0 0 20 20">
+                        <div class="w-8 h-8 rounded-lg bg-success-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-success-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
                             </svg>
                         </div>
                         {% elif event.type == 'warning' %}
-                        <div class="w-8 h-8 rounded-lg bg-warning-100 dark:bg-warning-900/30 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-warning-600 dark:text-warning-400" fill="currentColor" viewBox="0 0 20 20">
+                        <div class="w-8 h-8 rounded-lg bg-warning-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-warning-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
                             </svg>
                         </div>
                         {% elif event.type == 'start' or event.type == 'started' %}
-                        <div class="w-8 h-8 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-primary-600 dark:text-primary-400" fill="currentColor" viewBox="0 0 20 20">
+                        <div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-primary-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
                             </svg>
                         </div>
                         {% else %}
-                        <div class="w-8 h-8 rounded-lg bg-secondary-100 dark:bg-secondary-700 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-secondary-600 dark:text-secondary-400" fill="currentColor" viewBox="0 0 20 20">
+                        <div class="w-8 h-8 rounded-lg bg-secondary-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-secondary-600" fill="currentColor" viewBox="0 0 20 20">
                                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
                             </svg>
                         </div>
@@ -331,7 +331,7 @@
                         </div>
 
                         {% if event.message %}
-                        <p class="text-sm text-primary dark:text-primary">{{ event.message }}</p>
+                        <p class="text-sm text-primary">{{ event.message }}</p>
                         {% endif %}
                     </div>
 
@@ -345,12 +345,12 @@
             </div>
             {% else %}
             <div class="px-6 py-12 text-center">
-                <div class="w-16 h-16 mx-auto rounded-full bg-secondary-100 dark:bg-secondary-700 flex items-center justify-center mb-4">
+                <div class="w-16 h-16 mx-auto rounded-full bg-secondary-100 flex items-center justify-center mb-4">
                     <svg class="w-8 h-8 text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                     </svg>
                 </div>
-                <p class="text-secondary-500 dark:text-secondary-400">No events recorded yet</p>
+                <p class="text-secondary-500">No events recorded yet</p>
             </div>
             {% endfor %}
         </div>

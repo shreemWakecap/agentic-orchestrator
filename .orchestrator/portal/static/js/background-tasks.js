@@ -102,21 +102,21 @@ const BackgroundTasksIndicator = (function() {
 
         // Populate the container with UI content
         container.innerHTML = `
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden min-w-[280px] max-w-[400px]">
+            <div class="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden min-w-[280px] max-w-[400px]">
                 <!-- Header/Toggle Bar -->
                 <div id="background-tasks-header"
-                     class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                     class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
                      onclick="BackgroundTasksIndicator.toggle()">
                     <div class="flex items-center space-x-3">
                         <div id="background-tasks-pulse" class="relative">
                             <div class="h-3 w-3 rounded-full bg-blue-500"></div>
                             <div class="absolute inset-0 h-3 w-3 rounded-full bg-blue-500 animate-ping opacity-75"></div>
                         </div>
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">
+                        <span class="text-sm font-medium text-gray-700">
                             Background Tasks
                         </span>
                         <span id="background-tasks-count"
-                              class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                              class="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                             0
                         </span>
                     </div>
@@ -128,11 +128,11 @@ const BackgroundTasksIndicator = (function() {
                 </div>
 
                 <!-- Expandable Task List -->
-                <div id="background-tasks-list" class="hidden border-t border-gray-200 dark:border-gray-700 max-h-[300px] overflow-y-auto">
-                    <div id="background-tasks-empty" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <div id="background-tasks-list" class="hidden border-t border-gray-200 max-h-[300px] overflow-y-auto">
+                    <div id="background-tasks-empty" class="px-4 py-6 text-center text-sm text-gray-500">
                         No active background tasks
                     </div>
-                    <ul id="background-tasks-items" class="divide-y divide-gray-100 dark:divide-gray-700"></ul>
+                    <ul id="background-tasks-items" class="divide-y divide-gray-100"></ul>
                 </div>
             </div>
         </div>
@@ -311,13 +311,13 @@ const BackgroundTasksIndicator = (function() {
             <li class="px-4 py-3 ${itemClass}">
                 <div class="flex items-center justify-between mb-1">
                     <div class="flex items-center space-x-2">
-                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200">${escapeHtml(typeLabel)}</span>
+                        <span class="text-sm font-medium text-gray-700">${escapeHtml(typeLabel)}</span>
                         <span class="text-xs ${statusClasses} px-1.5 py-0.5 rounded">${escapeHtml(task.status)}</span>
                     </div>
                     <span class="text-xs text-gray-400">${elapsed}</span>
                 </div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 mb-2 truncate">${escapeHtml(task.message)}</div>
-                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+                <div class="text-xs text-gray-500 mb-2 truncate">${escapeHtml(task.message)}</div>
+                <div class="w-full bg-gray-200 rounded-full h-1.5">
                     <div class="task-progress-bar h-1.5 rounded-full ${getProgressBarClass(task.status)}"
                          style="width: ${task.progress}%"></div>
                 </div>
@@ -330,10 +330,10 @@ const BackgroundTasksIndicator = (function() {
      */
     function getTaskStatusClasses(status) {
         const classMap = {
-            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-            running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-            completed: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
-            failed: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+            pending: 'bg-yellow-100 text-yellow-800',
+            running: 'bg-blue-100 text-blue-800',
+            completed: 'bg-green-100 text-green-800',
+            failed: 'bg-red-100 text-red-800'
         };
         return classMap[status] || 'bg-gray-100 text-gray-800';
     }

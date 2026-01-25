@@ -107,13 +107,11 @@ const TaskActivityPanel = (function() {
             '.task-log-line.success { color: #6EE7B7; }',
             '.task-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem; cursor: pointer; }',
             '.task-header:hover { background: rgba(0,0,0,0.02); }',
-            '.dark .task-header:hover { background: rgba(255,255,255,0.02); }',
             '.task-expand-icon { transition: transform 0.2s ease; }',
             '.task-expand-icon.expanded { transform: rotate(180deg); }',
             '.task-progress-phases { display: flex; align-items: center; gap: 0.5rem; padding: 0 1rem 0.75rem; }',
             '.task-no-tasks { text-align: center; padding: 2rem; color: #6B7280; }',
             '.planning-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.8); border-radius: 0.75rem; }',
-            '.dark .planning-overlay { background: rgba(31,41,55,0.8); }',
             '.planning-spinner { animation: spin 1s linear infinite; }',
             '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'
         ].join('\n');
@@ -128,7 +126,7 @@ const TaskActivityPanel = (function() {
 
         state.container.innerHTML = [
             '<div class="glass rounded-2xl overflow-hidden">',
-            '  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">',
+            '  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">',
             '    <div class="flex items-center">',
             '      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-3 shadow-md">',
             '        <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
@@ -136,20 +134,20 @@ const TaskActivityPanel = (function() {
             '        </svg>',
             '      </div>',
             '      <div>',
-            '        <h3 class="text-lg font-semibold text-primary dark:text-primary">Active Tasks</h3>',
-            '        <p class="text-xs text-tertiary dark:text-tertiary">Real-time task execution status</p>',
+            '        <h3 class="text-lg font-semibold text-primary">Active Tasks</h3>',
+            '        <p class="text-xs text-tertiary">Real-time task execution status</p>',
             '      </div>',
             '    </div>',
             '    <div class="flex items-center space-x-2">',
-            '      <span id="task-activity-count" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">0</span>',
-            '      <button id="task-activity-refresh" type="button" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" title="Refresh">',
+            '      <span id="task-activity-count" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">0</span>',
+            '      <button id="task-activity-refresh" type="button" class="p-2 rounded-lg hover:bg-gray-100 transition-colors" title="Refresh">',
             '        <svg class="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>',
             '        </svg>',
             '      </button>',
             '    </div>',
             '  </div>',
-            '  <div id="task-activity-list" class="divide-y divide-gray-100 dark:divide-gray-700">',
+            '  <div id="task-activity-list" class="divide-y divide-gray-100">',
             '    <div id="task-activity-empty" class="task-no-tasks">',
             '      <svg class="h-12 w-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>',
@@ -367,7 +365,7 @@ const TaskActivityPanel = (function() {
     function createTaskCard(task) {
         var card = document.createElement('div');
         card.id = 'task-card-' + task.id;
-        card.className = 'task-card border-b border-gray-100 dark:border-gray-700';
+        card.className = 'task-card border-b border-gray-100';
 
         if (task.status === TaskStatus.PLANNING) {
             card.classList.add('planning');
@@ -388,10 +386,10 @@ const TaskActivityPanel = (function() {
             '      </div>',
             '      <div class="min-w-0">',
             '        <div class="flex items-center">',
-            '          <span class="text-sm font-medium text-primary dark:text-primary truncate">' + escapeHtml(task.name) + '</span>',
+            '          <span class="text-sm font-medium text-primary truncate">' + escapeHtml(task.name) + '</span>',
             '          ' + (task.planId ? '<a href="/plans/' + escapeHtml(task.planId) + '" class="ml-2 text-xs text-blue-600 hover:text-blue-800" onclick="event.stopPropagation()">View Plan</a>' : ''),
             '        </div>',
-            '        <div class="text-xs text-tertiary dark:text-tertiary truncate">' + escapeHtml(task.currentStep || 'Initializing...') + '</div>',
+            '        <div class="text-xs text-tertiary truncate">' + escapeHtml(task.currentStep || 'Initializing...') + '</div>',
             '      </div>',
             '    </div>',
             '    <div class="flex items-center space-x-3">',
@@ -408,9 +406,9 @@ const TaskActivityPanel = (function() {
             '  <div class="px-4 pb-3">',
             '    <div class="flex items-center justify-between text-xs mb-1">',
             '      <span class="text-tertiary">' + (task.totalSteps > 0 ? 'Step ' + task.currentStepNum + ' of ' + task.totalSteps : 'Progress') + '</span>',
-            '      <span class="font-medium text-primary dark:text-primary">' + task.progress + '%</span>',
+            '      <span class="font-medium text-primary">' + task.progress + '%</span>',
             '    </div>',
-            '    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">',
+            '    <div class="w-full bg-gray-200 rounded-full h-2">',
             '      <div class="task-progress-bar h-2 rounded-full ' + getProgressBarClass(task.status) + ' transition-all duration-300" style="width: ' + task.progress + '%"></div>',
             '    </div>',
             '  </div>',
@@ -505,7 +503,7 @@ const TaskActivityPanel = (function() {
                 '<div class="' + dotClass + '"></div>' +
                 '<span class="text-xs text-tertiary">' + phase.label + '</span>' +
                 '</div>';
-        }).join('<div class="flex-1 h-px bg-gray-200 dark:bg-gray-600"></div>');
+        }).join('<div class="flex-1 h-px bg-gray-200"></div>');
     }
 
     /**
@@ -556,11 +554,11 @@ const TaskActivityPanel = (function() {
      */
     function getStatusBadgeClass(status) {
         var classMap = {
-            planning: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300',
-            pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300',
-            running: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300',
-            completed: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300',
-            failed: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+            planning: 'bg-gray-100 text-gray-800',
+            pending: 'bg-yellow-100 text-yellow-800',
+            running: 'bg-blue-100 text-blue-800',
+            completed: 'bg-green-100 text-green-800',
+            failed: 'bg-red-100 text-red-800'
         };
         return classMap[status] || 'bg-gray-100 text-gray-800';
     }

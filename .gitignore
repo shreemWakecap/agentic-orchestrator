@@ -45,3 +45,6 @@ uv.lock
 
 # Future requirements (local planning file)
 node_modules
+
+# Improvement plans (local only)
+improvements_plans/

@@ -126,15 +126,15 @@ const StuckDetection = (function() {
 
             // Add warning class if elapsed time is high
             if (elapsed > CONFIG.stuckThresholdMs) {
-                el.classList.add('text-red-500', 'dark:text-red-400');
-                el.classList.remove('text-yellow-600', 'dark:text-yellow-400');
+                el.classList.add('text-red-500');
+                el.classList.remove('text-yellow-600');
             } else if (elapsed > CONFIG.warningThresholdMs) {
-                el.classList.add('text-yellow-600', 'dark:text-yellow-400');
-                el.classList.remove('text-red-500', 'dark:text-red-400');
+                el.classList.add('text-yellow-600');
+                el.classList.remove('text-red-500');
             } else {
                 el.classList.remove(
-                    'text-red-500', 'dark:text-red-400',
-                    'text-yellow-600', 'dark:text-yellow-400'
+                    'text-red-500',
+                    'text-yellow-600'
                 );
             }
         });

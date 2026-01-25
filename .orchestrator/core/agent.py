@@ -315,6 +315,9 @@ class Agent:
         """
         Load an agent from .orchestrator/agents/<name>.md
 
+        Looks in the project's agents directory first, then falls back to the
+        orchestrator's built-in agents directory for system agents like 'scout'.
+
         Args:
             name: Agent name (e.g., "scout" loads .orchestrator/agents/scout.md)
             project_root: Project root directory
@@ -322,10 +325,17 @@ class Agent:
         Returns:
             Agent instance with loaded system prompt
         """
+        from config import ORCHESTRATOR_DIR
+
+        # Try project's agents directory first
         agent_file = project_root / ".orchestrator" / "agents" / f"{name}.md"
 
+        # Fall back to orchestrator's built-in agents directory
         if not agent_file.exists():
-            raise FileNotFoundError(f"Agent not found: {agent_file}")
+            agent_file = ORCHESTRATOR_DIR / "agents" / f"{name}.md"
+
+        if not agent_file.exists():
+            raise FileNotFoundError(f"Agent not found: {name}.md (searched in project and orchestrator agents directories)")
 
         content = agent_file.read_text(encoding="utf-8")
 

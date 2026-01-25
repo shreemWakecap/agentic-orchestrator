@@ -18,6 +18,9 @@ from .chat import router as chat_router
 from .token_analytics import router as token_analytics_router
 from .experts import router as experts_router
 from .projects import router as projects_router
+from .agent_definitions import router as agent_definitions_router
+from .expert_definitions import router as expert_definitions_router
+from .orchestrator_config import router as orchestrator_config_router
 
 __all__ = [
     "plans_router",
@@ -35,4 +38,7 @@ __all__ = [
     "token_analytics_router",
     "experts_router",
     "projects_router",
+    "agent_definitions_router",
+    "expert_definitions_router",
+    "orchestrator_config_router",
 ]

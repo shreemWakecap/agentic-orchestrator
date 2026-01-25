@@ -190,6 +190,8 @@ async def knowledge_page(
     knowledge_repo: KnowledgeRepository = Depends(get_knowledge_repo),
 ):
     """Render knowledge management page."""
+    import json
+
     # Get knowledge data transformed for template
     knowledge = await knowledge_service.get_knowledge_for_template()
 
@@ -215,6 +217,36 @@ async def knowledge_page(
     # Get coding rules for display
     coding_rules = knowledge_repo.get_coding_rules()
 
+    # Get agent definitions from database
+    from db.repositories.agent_definition import get_agent_definition_repository
+    agent_repo = get_agent_definition_repository()
+    agents_raw = agent_repo.list_all()
+    agents_data = [
+        {
+            "name": a.name,
+            "description": a.description,
+            "is_agentic": a.is_agentic,
+            "model": a.model,
+            "tools": json.loads(a.tools_json or "[]"),
+        }
+        for a in agents_raw
+    ]
+
+    # Get expert definitions from database
+    from db.repositories.expert_definition import get_expert_definition_repository
+    expert_def_repo = get_expert_definition_repository()
+    experts_raw = expert_def_repo.list_all()
+    expert_defs_data = [
+        {
+            "name": e.name,
+            "description": e.description,
+            "expert_type": e.expert_type,
+            "category": e.category,
+            "domain_keywords": json.loads(e.domain_keywords_json or "[]"),
+        }
+        for e in experts_raw
+    ]
+
     return templates.TemplateResponse(
         request,
         "knowledge.html",
@@ -224,6 +256,8 @@ async def knowledge_page(
             "expert_count": expert_count,
             "staleness": staleness,
             "coding_rules": coding_rules,
+            "agents": agents_data,
+            "expert_definitions": expert_defs_data,
         },
     )
 

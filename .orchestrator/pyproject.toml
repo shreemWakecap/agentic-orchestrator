@@ -55,6 +55,44 @@ exclude = ["node_modules*", "tests*", "__pycache__*", "*.egg-info*", ".venv*"]
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.json", "*.ini", "*.html", "*.css", "*.js"]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "slow: Slow running tests",
+]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "*/__pycache__/*",
+    "*.egg-info/*",
+    ".venv/*",
+]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+show_missing = true
+precision = 2
+
 [project.optional-dependencies]
 web = [
     "fastapi>=0.109.0",

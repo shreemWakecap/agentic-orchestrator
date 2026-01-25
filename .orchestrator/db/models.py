@@ -617,6 +617,93 @@ class FileScanHistory(Base):
 
 
 # =============================================================================
+# AGENT AND EXPERT DEFINITIONS (Global - not project-specific)
+# =============================================================================
+
+class AgentDefinition(Base):
+    """
+    Stores agent system prompts and metadata.
+    Replaces: .orchestrator/agents/*.md files
+    """
+    __tablename__ = "agent_definitions"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, unique=True, index=True)  # scout, builder, planner
+    version = Column(String(20), default="1.0")
+
+    # Metadata (from YAML frontmatter)
+    description = Column(Text)
+    tools_json = Column(Text, default="[]")  # ["Read", "Glob", "Grep", "Bash"]
+    model = Column(String(50))  # sonnet, opus, etc.
+
+    # System prompt content (markdown body)
+    system_prompt = Column(Text, nullable=False)
+
+    # Behavior settings
+    is_agentic = Column(Boolean, default=False)  # Can write files
+    output_markers_json = Column(Text, default="[]")  # Expected output markers
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ExpertDefinition(Base):
+    """
+    Stores expert prompts and trigger conditions.
+    Replaces: .orchestrator/agents/experts/*.md files
+    """
+    __tablename__ = "expert_definitions"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), nullable=False, unique=True, index=True)  # python, fastapi
+    version = Column(String(20), default="1.0")
+
+    # Metadata (from YAML frontmatter)
+    description = Column(Text)
+    expert_type = Column(String(20), default="tech", index=True)  # tech, domain, module
+    category = Column(String(50))  # language, framework, tool, general
+
+    # Domain/Module specific
+    module_path = Column(Text)  # For MODULE type experts
+    domain_keywords_json = Column(Text, default="[]")  # ["auth", "login", "jwt"]
+
+    # System prompt content
+    system_prompt = Column(Text, nullable=False)
+
+    # Triggering conditions
+    weight = Column(Float, default=1.0)  # Priority weight
+    trigger_keywords_json = Column(Text, default="[]")
+    trigger_paths_json = Column(Text, default="[]")
+    trigger_topics_json = Column(Text, default="[]")
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class OrchestratorConfig(Base):
+    """
+    Stores orchestrator configuration as JSON.
+    Replaces: .orchestrator/config/agent.json, budget.json
+    """
+    __tablename__ = "orchestrator_config"
+
+    id = Column(Integer, primary_key=True)
+    config_type = Column(String(50), nullable=False, unique=True, index=True)  # agent, budget
+
+    # JSON configuration data
+    config_data_json = Column(Text, nullable=False)
+
+    # Version for tracking changes
+    version = Column(Integer, default=1)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+# =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
 

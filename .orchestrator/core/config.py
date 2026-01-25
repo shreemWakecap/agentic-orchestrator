@@ -1,10 +1,9 @@
 """
 Configuration loader for orchestrator settings.
 
-Loads configuration from .orchestrator/config/*.json files.
-Provides typed access with sensible defaults if files are missing.
+Loads configuration from database (single source of truth).
+Provides typed access with sensible defaults if not configured.
 """
-import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -80,50 +79,37 @@ class BudgetConfig:
 
 class ConfigLoader:
     """
-    Loads and caches configuration from .orchestrator/config/.
+    Loads and caches configuration from database.
+
+    Configuration is global (not per-project) and cached for performance.
 
     Usage:
         config = ConfigLoader.get_agent_config(project_root)
         timeout = config.timeouts.print_mode
     """
 
-    _agent_cache: dict[Path, AgentConfig] = {}
-    _budget_cache: dict[Path, BudgetConfig] = {}
+    _agent_cache: Optional[AgentConfig] = None
+    _budget_cache: Optional[BudgetConfig] = None
 
     @classmethod
-    def _load_json(cls, path: Path) -> dict:
-        """Load JSON file, returning empty dict if missing or invalid."""
-        if not path.exists():
-            logger.debug(f"Config file not found: {path}")
-            return {}
-        try:
-            return json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as e:
-            logger.warning(f"Invalid JSON in {path}: {e}")
-            return {}
-        except Exception as e:
-            logger.warning(f"Error reading {path}: {e}")
-            return {}
-
-    @classmethod
-    def get_agent_config(cls, project_root: Path, use_cache: bool = True) -> AgentConfig:
+    def get_agent_config(cls, project_root: Path = None, use_cache: bool = True) -> AgentConfig:
         """
-        Load agent configuration from .orchestrator/config/agent.json.
+        Load agent configuration from database.
 
         Args:
-            project_root: Project root directory
+            project_root: Project root directory (kept for backward compatibility, ignored)
             use_cache: Whether to use cached config (default True)
 
         Returns:
             AgentConfig with loaded or default values
         """
-        resolved = project_root.resolve()
+        if use_cache and cls._agent_cache is not None:
+            return cls._agent_cache
 
-        if use_cache and resolved in cls._agent_cache:
-            return cls._agent_cache[resolved]
+        from db.repositories.config_repository import get_config_repository
 
-        config_path = resolved / ".orchestrator" / "config" / "agent.json"
-        data = cls._load_json(config_path)
+        repo = get_config_repository()
+        data = repo.get_agent_config()
 
         timeouts_data = data.get("timeouts", {})
         retry_data = data.get("retry", {})
@@ -165,29 +151,29 @@ class ConfigLoader:
         )
 
         if use_cache:
-            cls._agent_cache[resolved] = config
+            cls._agent_cache = config
 
         return config
 
     @classmethod
-    def get_budget_config(cls, project_root: Path, use_cache: bool = True) -> BudgetConfig:
+    def get_budget_config(cls, project_root: Path = None, use_cache: bool = True) -> BudgetConfig:
         """
-        Load budget configuration from .orchestrator/config/budget.json.
+        Load budget configuration from database.
 
         Args:
-            project_root: Project root directory
+            project_root: Project root directory (kept for backward compatibility, ignored)
             use_cache: Whether to use cached config (default True)
 
         Returns:
             BudgetConfig with loaded or default values
         """
-        resolved = project_root.resolve()
+        if use_cache and cls._budget_cache is not None:
+            return cls._budget_cache
 
-        if use_cache and resolved in cls._budget_cache:
-            return cls._budget_cache[resolved]
+        from db.repositories.config_repository import get_config_repository
 
-        config_path = resolved / ".orchestrator" / "config" / "budget.json"
-        data = cls._load_json(config_path)
+        repo = get_config_repository()
+        data = repo.get_budget_config()
 
         config = BudgetConfig(
             daily_limit=data.get("daily_limit", 5.0),
@@ -198,25 +184,23 @@ class ConfigLoader:
         )
 
         if use_cache:
-            cls._budget_cache[resolved] = config
+            cls._budget_cache = config
 
         return config
 
     @classmethod
     def clear_cache(cls) -> None:
         """Clear all cached configurations."""
-        cls._agent_cache.clear()
-        cls._budget_cache.clear()
+        cls._agent_cache = None
+        cls._budget_cache = None
 
     @classmethod
-    def reload(cls, project_root: Path) -> tuple[AgentConfig, BudgetConfig]:
-        """Force reload all configurations for a project."""
-        resolved = project_root.resolve()
-        cls._agent_cache.pop(resolved, None)
-        cls._budget_cache.pop(resolved, None)
+    def reload(cls, project_root: Path = None) -> tuple[AgentConfig, BudgetConfig]:
+        """Force reload all configurations."""
+        cls.clear_cache()
         return (
-            cls.get_agent_config(project_root),
-            cls.get_budget_config(project_root),
+            cls.get_agent_config(use_cache=False),
+            cls.get_budget_config(use_cache=False),
         )
 
 

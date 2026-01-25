@@ -449,3 +449,122 @@ def mock_cli_output():
         '{"type":"progress","phase":"generating","percent":75,"ts":"2025-01-19T10:31:00Z"}',
         '{"type":"complete","exit_code":0,"result":{"files":10},"ts":"2025-01-19T10:33:00Z"}',
     ]
+
+
+# ============================================================================
+# Workflow Testing Fixtures (Step 14)
+# ============================================================================
+
+from unittest.mock import Mock, patch, MagicMock
+import tempfile
+import shutil
+
+
+@pytest.fixture
+def mock_agent():
+    """Create a mock Agent for workflow testing.
+
+    Returns a mock Agent class that can be used to patch 'workflows.*.Agent'.
+    The mock has common methods like load() and run() pre-configured.
+    """
+    mock = MagicMock()
+    mock.load.return_value = MagicMock()
+    mock.load.return_value.run = MagicMock(return_value="Mock agent response")
+    return mock
+
+
+@pytest.fixture
+def mock_workflow_deps():
+    """Create mocked dependencies for workflow testing.
+
+    Provides patches for common workflow dependencies:
+    - Agent
+    - KnowledgeStore
+    - get_knowledge_repository
+    - get_agent_config
+
+    Usage:
+        def test_something(mock_workflow_deps):
+            with mock_workflow_deps('workflows.planning'):
+                # Your test code here
+                pass
+    """
+    def _create_patches(workflow_module: str):
+        """Create a context manager that patches common workflow dependencies.
+
+        Args:
+            workflow_module: The module path to patch (e.g., 'workflows.planning')
+
+        Returns:
+            A context manager that yields a dict of the mocked objects.
+        """
+        class WorkflowDepsPatcher:
+            def __init__(self, module: str):
+                self.module = module
+                self.patches = []
+                self.mocks = {}
+
+            def __enter__(self):
+                # Create and start patches
+                agent_patch = patch(f'{self.module}.Agent')
+                ks_patch = patch(f'{self.module}.KnowledgeStore')
+                kr_patch = patch(f'{self.module}.get_knowledge_repository')
+                config_patch = patch(f'{self.module}.get_agent_config')
+
+                self.patches = [agent_patch, ks_patch, kr_patch, config_patch]
+
+                mock_agent = agent_patch.start()
+                mock_ks = ks_patch.start()
+                mock_kr = kr_patch.start()
+                mock_config = config_patch.start()
+
+                # Configure default behaviors
+                mock_config.return_value = {}
+                mock_ks.return_value = Mock()
+                mock_ks.return_value.exists.return_value = True
+                mock_kr.return_value = Mock()
+                mock_kr.return_value.get_scan_metadata.return_value = None
+                mock_agent.load.return_value = Mock()
+                mock_agent.load.return_value.run = Mock(return_value="Mock response")
+
+                self.mocks = {
+                    'agent': mock_agent,
+                    'knowledge_store': mock_ks,
+                    'knowledge_repo': mock_kr,
+                    'config': mock_config,
+                }
+                return self.mocks
+
+            def __exit__(self, exc_type, exc_val, exc_tb):
+                for p in self.patches:
+                    p.stop()
+                return False
+
+        return WorkflowDepsPatcher(workflow_module)
+
+    return _create_patches
+
+
+@pytest.fixture
+def workflow_test_dir(tmp_path):
+    """Create a temporary directory for workflow testing.
+
+    Provides a clean temporary directory that mimics a project structure.
+    The directory is automatically cleaned up after the test.
+
+    Returns:
+        Path: A temporary directory path for test files.
+    """
+    test_dir = tmp_path / "test_project"
+    test_dir.mkdir(parents=True, exist_ok=True)
+
+    # Create basic project structure
+    (test_dir / "src").mkdir(exist_ok=True)
+    (test_dir / "tests").mkdir(exist_ok=True)
+
+    # Create a sample source file
+    (test_dir / "src" / "main.py").write_text('"""Main module."""\n\ndef main():\n    pass\n')
+
+    yield test_dir
+
+    # Cleanup is handled automatically by tmp_path fixture

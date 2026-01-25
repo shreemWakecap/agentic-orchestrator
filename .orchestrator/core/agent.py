@@ -313,43 +313,30 @@ class Agent:
     @classmethod
     def load(cls, name: str, project_root: Path) -> "Agent":
         """
-        Load an agent from .orchestrator/agents/<name>.md
-
-        Looks in the project's agents directory first, then falls back to the
-        orchestrator's built-in agents directory for system agents like 'scout'.
+        Load an agent from database.
 
         Args:
-            name: Agent name (e.g., "scout" loads .orchestrator/agents/scout.md)
-            project_root: Project root directory
+            name: Agent name (e.g., "scout", "builder", "planner")
+            project_root: Project root directory (used for cwd)
 
         Returns:
             Agent instance with loaded system prompt
+
+        Raises:
+            ValueError: If agent not found in database
         """
-        from config import ORCHESTRATOR_DIR
+        from db.repositories.agent_definition import get_agent_definition_repository
 
-        # Try project's agents directory first
-        agent_file = project_root / ".orchestrator" / "agents" / f"{name}.md"
+        repo = get_agent_definition_repository()
+        agent_def = repo.get_by_name(name)
 
-        # Fall back to orchestrator's built-in agents directory
-        if not agent_file.exists():
-            agent_file = ORCHESTRATOR_DIR / "agents" / f"{name}.md"
+        if not agent_def:
+            raise ValueError(
+                f"Agent '{name}' not found in database. "
+                f"Run 'orch migrate-to-db' to migrate agents from files."
+            )
 
-        if not agent_file.exists():
-            raise FileNotFoundError(f"Agent not found: {name}.md (searched in project and orchestrator agents directories)")
-
-        content = agent_file.read_text(encoding="utf-8")
-
-        # Parse frontmatter and extract body as system prompt
-        if content.startswith("---"):
-            parts = content.split("---", 2)
-            if len(parts) >= 3:
-                system_prompt = parts[2].strip()
-            else:
-                system_prompt = content
-        else:
-            system_prompt = content
-
-        return cls(name=name, system_prompt=system_prompt, cwd=project_root)
+        return cls(name=name, system_prompt=agent_def.system_prompt, cwd=project_root)
 
     def _build_enhanced_system_prompt(self, is_retry: bool = False) -> str:
         """

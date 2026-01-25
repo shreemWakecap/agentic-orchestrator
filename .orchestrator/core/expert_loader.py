@@ -1,17 +1,16 @@
 """
 Expert Loader: Manages tech-specific, domain, and module expert agents.
 
-Loads experts from .orchestrator/agents/experts/ directory:
+Loads experts from database (single source of truth):
 - Discovers available experts (tech, domain, module types)
 - Matches experts to detected tech stack
-- Can trigger meta-expert to create new experts
 - Provides domain experts for planning workflow consultation
 """
 import json
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from rich.console import Console
 
@@ -30,7 +29,6 @@ class ExpertInfo:
     """Information about an expert agent."""
     name: str
     description: str
-    file_path: Path
     category: str = "general"  # language, framework, tool, general (for TECH type)
     expert_type: ExpertType = ExpertType.TECH
     module_path: Optional[str] = None  # For MODULE type: path to source
@@ -41,11 +39,7 @@ class ExpertLoader:
     """
     Manages tech-specific, domain, and module expert agents.
 
-    Multi-Project Support:
-        In multi-project mode, experts are loaded in priority order:
-        1. Project-specific experts: $SDLC_ORCHESTRATOR_HOME/projects/{slug}/experts/
-        2. Shared experts: {project_root}/.orchestrator/agents/experts/
-        3. Built-in experts: {orchestrator_dir}/agents/experts/
+    Loads experts from database (single source of truth).
 
     Usage:
         loader = ExpertLoader(project_root)
@@ -56,194 +50,87 @@ class ExpertLoader:
         # Domain experts (for planning)
         domain_experts = loader.get_all_domain_experts()
 
-        # Find missing experts
-        gaps = loader.find_missing_experts()
-
-        # Create new experts
-        loader.create_expert("auth", expert_type=ExpertType.DOMAIN,
-                            domain_keywords=["auth", "login", "jwt"])
+        # Find experts by keywords
+        matched = loader.find_by_keywords(["auth", "jwt"])
     """
 
     def __init__(self, project_root: Path, project_slug: str = None):
         self.project_root = project_root
         self.project_slug = project_slug
         self.console = Console()
+        self._repo = None
 
-        # Primary experts directory (local to project)
-        self.experts_dir = project_root / ".orchestrator" / "agents" / "experts"
+    @property
+    def repo(self):
+        """Lazy-load expert repository."""
+        if self._repo is None:
+            from db.repositories.expert_definition import get_expert_definition_repository
+            self._repo = get_expert_definition_repository()
+        return self._repo
 
-        # Additional experts directories (for multi-project mode)
-        self._project_experts_dir = None
-        self._shared_experts_dir = None
-
-        # Try to get project-specific paths from orchestrator home
-        self._init_multi_project_paths()
-
-        # Ensure primary directory exists
-        self.experts_dir.mkdir(parents=True, exist_ok=True)
-
-    def _init_multi_project_paths(self):
-        """Initialize paths for multi-project mode."""
-        try:
-            from config import get_config
-
-            config = get_config()
-            if not config.is_multi_project_mode:
-                return
-
-            # Get project slug from context if not provided
-            slug = self.project_slug
-            if not slug:
-                from db.project_context import get_optional_project_id
-                # We need the slug, not ID, so try to get from database
-                project_id = get_optional_project_id()
-                if project_id:
-                    try:
-                        from db.repositories.project import get_project_repository
-                        repo = get_project_repository()
-                        project = repo.get_by_id(project_id)
-                        if project:
-                            slug = project.slug
-                    except Exception:
-                        pass
-
-            if slug and config.orchestrator_home.projects_dir:
-                self._project_experts_dir = config.orchestrator_home.projects_dir / slug / "experts"
-                self._project_experts_dir.mkdir(parents=True, exist_ok=True)
-
-            # Shared experts from orchestrator home
-            if config.orchestrator_home.home_path:
-                self._shared_experts_dir = config.orchestrator_home.home_path / "agents" / "experts"
-                if self._shared_experts_dir.exists():
-                    pass  # Use it
-                else:
-                    self._shared_experts_dir = None
-
-        except Exception:
-            pass  # Fall back to single-project mode
-
-    def _get_all_expert_dirs(self) -> list[Path]:
-        """Get all expert directories in priority order."""
-        dirs = []
-
-        # 1. Project-specific (highest priority)
-        if self._project_experts_dir and self._project_experts_dir.exists():
-            dirs.append(self._project_experts_dir)
-
-        # 2. Local project directory
-        if self.experts_dir.exists():
-            dirs.append(self.experts_dir)
-
-        # 3. Shared experts from orchestrator home
-        if self._shared_experts_dir and self._shared_experts_dir.exists():
-            dirs.append(self._shared_experts_dir)
-
-        return dirs
-
-    def discover_experts(self) -> list[ExpertInfo]:
+    def discover_experts(self) -> List[ExpertInfo]:
         """
-        Discover all available expert agents.
+        Discover all available expert agents from database.
 
-        In multi-project mode, searches:
-        1. Project-specific experts (highest priority)
-        2. Local project experts
-        3. Shared experts (lowest priority)
-
-        Experts with the same name are not duplicated (first found wins).
+        Returns:
+            List of ExpertInfo objects
         """
         experts = []
-        seen_names = set()
+        db_experts = self.repo.list_all()
 
-        # Search all directories in priority order
-        for experts_dir in self._get_all_expert_dirs():
-            for file_path in experts_dir.glob("*.md"):
-                if file_path.name.startswith("_"):
-                    continue  # Skip meta files
+        for db_expert in db_experts:
+            try:
+                expert_type = ExpertType(db_expert.expert_type or "tech")
+            except ValueError:
+                expert_type = ExpertType.TECH
 
-                # Skip if already found with this name
-                if file_path.stem in seen_names:
-                    continue
-
-                try:
-                    content = file_path.read_text(encoding="utf-8")
-
-                    # Parse frontmatter
-                    name = file_path.stem
-                    description = ""
-                    expert_type = ExpertType.TECH
-                    module_path = None
-                    domain_keywords = []
-
-                    if content.startswith("---"):
-                        parts = content.split("---", 2)
-                        if len(parts) >= 3:
-                            frontmatter = parts[1]
-                            for line in frontmatter.split("\n"):
-                                line = line.strip()
-                                if line.startswith("name:"):
-                                    name = line.split(":", 1)[1].strip()
-                                elif line.startswith("description:"):
-                                    description = line.split(":", 1)[1].strip()
-                                elif line.startswith("expert_type:"):
-                                    type_str = line.split(":", 1)[1].strip()
-                                    if type_str in [e.value for e in ExpertType]:
-                                        expert_type = ExpertType(type_str)
-                                elif line.startswith("module_path:"):
-                                    module_path = line.split(":", 1)[1].strip()
-                                elif line.startswith("domain_keywords:"):
-                                    # Parse YAML-style list: [auth, login, jwt]
-                                    kw_str = line.split(":", 1)[1].strip()
-                                    if kw_str.startswith("[") and kw_str.endswith("]"):
-                                        domain_keywords = [k.strip() for k in kw_str[1:-1].split(",")]
-
-                    # Determine category (for TECH type)
-                    category = self._categorize_expert(name, content)
-
-                    experts.append(ExpertInfo(
-                        name=name,
-                        description=description,
-                        file_path=file_path,
-                        category=category,
-                        expert_type=expert_type,
-                        module_path=module_path,
-                        domain_keywords=domain_keywords
-                    ))
-                    seen_names.add(file_path.stem)
-
-                except Exception as e:
-                    self.console.print(f"[yellow]Warning: Could not load expert {file_path.name}: {e}[/yellow]")
+            experts.append(ExpertInfo(
+                name=db_expert.name,
+                description=db_expert.description or "",
+                category=db_expert.category or "general",
+                expert_type=expert_type,
+                domain_keywords=json.loads(db_expert.domain_keywords_json or "[]"),
+                module_path=db_expert.module_path,
+            ))
 
         return experts
 
-    def _categorize_expert(self, name: str, content: str) -> str:
-        """Categorize an expert by type (for TECH experts)."""
-        languages = ["python", "typescript", "javascript", "go", "rust", "java", "ruby"]
-        frameworks = ["react", "vue", "angular", "fastapi", "django", "express", "next"]
-        tools = ["docker", "kubernetes", "github-actions", "terraform"]
-
-        name_lower = name.lower()
-
-        if any(lang in name_lower for lang in languages):
-            return "language"
-        elif any(fw in name_lower for fw in frameworks):
-            return "framework"
-        elif any(tool in name_lower for tool in tools):
-            return "tool"
-        else:
-            return "general"
-
     def get_expert(self, name: str) -> Optional[Agent]:
-        """Load a specific expert agent."""
-        expert_file = self.experts_dir / f"{name}.md"
-        if not expert_file.exists():
+        """
+        Load a specific expert agent from database.
+
+        Args:
+            name: Expert name (e.g., "python", "fastapi")
+
+        Returns:
+            Agent instance or None if not found
+        """
+        expert_def = self.repo.get_by_name(name)
+        if not expert_def:
             return None
 
-        try:
-            return Agent.load(f"experts/{name}", self.project_root)
-        except FileNotFoundError:
-            return None
+        return Agent(
+            name=f"expert-{name}",
+            system_prompt=expert_def.system_prompt,
+            cwd=self.project_root,
+        )
 
-    def get_experts_for_stack(self, techs: list[str]) -> list[Agent]:
+    def get_expert_content(self, name: str) -> Optional[str]:
+        """
+        Get raw expert system prompt content.
+
+        Args:
+            name: Expert name
+
+        Returns:
+            System prompt string or None
+        """
+        expert_def = self.repo.get_by_name(name)
+        if not expert_def:
+            return None
+        return expert_def.system_prompt
+
+    def get_experts_for_stack(self, techs: List[str]) -> List[Agent]:
         """
         Get expert agents for a list of technologies.
 
@@ -283,7 +170,7 @@ class ExpertLoader:
 
         return matched_experts
 
-    def get_all_domain_experts(self) -> list[Agent]:
+    def get_all_domain_experts(self) -> List[Agent]:
         """
         Get all domain and module experts (for planning workflow).
 
@@ -301,9 +188,45 @@ class ExpertLoader:
 
         return domain_experts
 
-    def get_experts_by_type(self, expert_type: ExpertType) -> list[ExpertInfo]:
+    def get_experts_by_type(self, expert_type: ExpertType) -> List[ExpertInfo]:
         """Get all experts of a specific type."""
-        return [e for e in self.discover_experts() if e.expert_type == expert_type]
+        db_experts = self.repo.list_by_type(expert_type.value)
+
+        return [
+            ExpertInfo(
+                name=e.name,
+                description=e.description or "",
+                category=e.category or "general",
+                expert_type=expert_type,
+                domain_keywords=json.loads(e.domain_keywords_json or "[]"),
+                module_path=e.module_path,
+            )
+            for e in db_experts
+        ]
+
+    def find_by_keywords(self, keywords: List[str]) -> List[ExpertInfo]:
+        """
+        Find experts matching keywords.
+
+        Args:
+            keywords: List of keywords to match
+
+        Returns:
+            List of matching ExpertInfo objects
+        """
+        db_experts = self.repo.find_by_keywords(keywords)
+
+        return [
+            ExpertInfo(
+                name=e.name,
+                description=e.description or "",
+                category=e.category or "general",
+                expert_type=ExpertType(e.expert_type or "tech"),
+                domain_keywords=json.loads(e.domain_keywords_json or "[]"),
+                module_path=e.module_path,
+            )
+            for e in db_experts
+        ]
 
     def list_experts(self) -> dict:
         """List all available experts grouped by type and category."""
@@ -322,7 +245,8 @@ class ExpertLoader:
 
         for expert in experts:
             if expert.expert_type == ExpertType.TECH:
-                result["tech"][expert.category].append({
+                category = expert.category if expert.category in result["tech"] else "general"
+                result["tech"][category].append({
                     "name": expert.name,
                     "description": expert.description
                 })
@@ -341,7 +265,7 @@ class ExpertLoader:
 
         return result
 
-    def find_missing_experts(self) -> list[dict]:
+    def find_missing_experts(self) -> List[dict]:
         """
         Find technologies without expert coverage.
 
@@ -353,189 +277,7 @@ class ExpertLoader:
         existing_names = [e.name for e in self.discover_experts()]
         return find_missing_experts(self.project_root, existing_names)
 
-    def create_expert(
-        self,
-        name: str,
-        expert_type: ExpertType = ExpertType.TECH,
-        based_on: str = "python",
-        focus: str = "",
-        module_path: Optional[str] = None,
-        domain_keywords: Optional[list[str]] = None,
-        use_ultra_think: bool = True
-    ) -> bool:
-        """
-        Create a new expert using the meta-expert.
-
-        Args:
-            name: Expert name (e.g., "auth-expert", "payments")
-            expert_type: TECH, DOMAIN, or MODULE
-            based_on: Base technology (for TECH) or source context
-            focus: Specific focus area
-            module_path: Path to module code (for MODULE type)
-            domain_keywords: Keywords for domain matching (for DOMAIN type)
-            use_ultra_think: Use deep reasoning mode (default: True)
-
-        Returns:
-            True if expert was created successfully
-        """
-        meta_expert = self.experts_dir / "_meta.md"
-        if not meta_expert.exists():
-            self.console.print("[red]Meta-expert not found[/red]")
-            return False
-
-        # Build context based on expert type
-        context_parts = []
-
-        # Add ultra think trigger
-        if use_ultra_think:
-            context_parts.append("[ULTRA_THINK]")
-            context_parts.append("")
-
-        context_parts.append(f"Expert Type: {expert_type.value}")
-
-        if expert_type == ExpertType.TECH:
-            context_parts.append(f"Based on: {based_on}")
-            context_parts.append(f"Focus: {focus or 'General best practices'}")
-
-        elif expert_type == ExpertType.DOMAIN:
-            context_parts.append(f"Domain: {name}")
-            context_parts.append(f"Focus: {focus or 'Domain-specific patterns and business logic'}")
-            if domain_keywords:
-                context_parts.append(f"Keywords: {', '.join(domain_keywords)}")
-            # Add code context from project
-            code_context = self._gather_domain_code_context(name, domain_keywords or [])
-            if code_context:
-                context_parts.append(f"\n## Existing Code Patterns\n{code_context}")
-
-        elif expert_type == ExpertType.MODULE:
-            context_parts.append(f"Module: {name}")
-            if module_path:
-                context_parts.append(f"Module Path: {module_path}")
-                # Read actual module code
-                code_context = self._gather_module_code_context(module_path)
-                if code_context:
-                    context_parts.append(f"\n## Module Code\n{code_context}")
-            context_parts.append(f"Focus: {focus or 'Module-specific patterns and APIs'}")
-
-        # Load docs context
-        try:
-            from .docs_loader import DocsLoader
-            docs_loader = DocsLoader(self.project_root)
-            docs = docs_loader.load_docs()
-            if docs and docs.docs:
-                docs_context = docs.get_context_string(max_chars=6000)
-                context_parts.append(f"\n## Project Documentation\n{docs_context}")
-        except Exception:
-            pass  # Docs loading is optional
-
-        try:
-            meta = Agent.load("experts/_meta", self.project_root)
-
-            result = meta.run(
-                f"Create a new {expert_type.value} expert agent for: {name}",
-                context="\n".join(context_parts)
-            )
-
-            if result.success and result.content:
-                # Build frontmatter with type info
-                frontmatter_lines = [
-                    "---",
-                    f"name: {name}",
-                    f"description: Expert in {name} {'patterns' if expert_type != ExpertType.TECH else 'best practices'}",
-                    f"expert_type: {expert_type.value}"
-                ]
-                if domain_keywords:
-                    frontmatter_lines.append(f"domain_keywords: [{', '.join(domain_keywords)}]")
-                if module_path:
-                    frontmatter_lines.append(f"module_path: {module_path}")
-                frontmatter_lines.append("---\n\n")
-                frontmatter = "\n".join(frontmatter_lines)
-
-                # Check if result already has frontmatter
-                content = result.content
-                if content.startswith("---"):
-                    # Replace existing frontmatter
-                    parts = content.split("---", 2)
-                    if len(parts) >= 3:
-                        content = parts[2].strip()
-
-                new_expert_file = self.experts_dir / f"{name}.md"
-                new_expert_file.write_text(frontmatter + content, encoding="utf-8")
-                self.console.print(f"[green]Created {expert_type.value} expert: {name}[/green]")
-                return True
-
-        except Exception as e:
-            self.console.print(f"[red]Error creating expert: {e}[/red]")
-
-        return False
-
-    def _gather_domain_code_context(self, domain: str, keywords: list[str]) -> str:
-        """Gather code samples related to a domain."""
-        if not keywords:
-            keywords = [domain]
-
-        samples = []
-        total_chars = 0
-        max_chars = 8000
-
-        # Search for relevant files
-        for ext in [".py", ".ts", ".js"]:
-            for file_path in self.project_root.rglob(f"*{ext}"):
-                if any(skip in str(file_path) for skip in [".venv", "node_modules", "__pycache__", ".git"]):
-                    continue
-
-                try:
-                    content = file_path.read_text(encoding="utf-8", errors="ignore")
-                    content_lower = content.lower()
-
-                    # Check if file contains domain keywords
-                    if any(kw.lower() in content_lower for kw in keywords):
-                        rel_path = file_path.relative_to(self.project_root)
-                        sample = f"### {rel_path}\n```{ext[1:]}\n{content[:2000]}\n```"
-
-                        if total_chars + len(sample) > max_chars:
-                            break
-
-                        samples.append(sample)
-                        total_chars += len(sample)
-                except Exception:
-                    continue
-
-        return "\n\n".join(samples) if samples else ""
-
-    def _gather_module_code_context(self, module_path: str) -> str:
-        """Read code from a specific module path."""
-        full_path = self.project_root / module_path
-
-        if not full_path.exists():
-            return ""
-
-        samples = []
-        total_chars = 0
-        max_chars = 12000
-
-        if full_path.is_file():
-            files = [full_path]
-        else:
-            files = list(full_path.rglob("*.py")) + list(full_path.rglob("*.ts")) + list(full_path.rglob("*.js"))
-
-        for file_path in files[:10]:  # Limit files
-            try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                rel_path = file_path.relative_to(self.project_root)
-                sample = f"### {rel_path}\n```{file_path.suffix[1:]}\n{content[:3000]}\n```"
-
-                if total_chars + len(sample) > max_chars:
-                    break
-
-                samples.append(sample)
-                total_chars += len(sample)
-            except Exception:
-                continue
-
-        return "\n\n".join(samples)
-
-    def get_recommended_experts(self, project_root: Path) -> list[str]:
+    def get_recommended_experts(self, project_root: Path) -> List[str]:
         """
         Analyze project and recommend experts.
 

@@ -1001,6 +1001,81 @@ def run_knowledge(args=None) -> int:
     return 0
 
 
+def run_migrate_to_db(args=None) -> int:
+    """Migrate agents, experts, and config from files to database.
+
+    This command seeds data from the filesystem (.md and .json files)
+    into the PostgreSQL database. Use --dry-run to preview changes.
+    """
+    parser = argparse.ArgumentParser(
+        prog="orch migrate-to-db",
+        description="Migrate agents, experts, and config from files to database"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be done without making changes"
+    )
+    parsed = parser.parse_args(args or [])
+
+    from db.migrations.seed_from_files import (
+        seed_agent_definitions,
+        seed_expert_definitions,
+        seed_config,
+    )
+
+    print("Migrating to database...")
+    if parsed.dry_run:
+        print("[DRY RUN - No changes will be made]\n")
+
+    agents = seed_agent_definitions(ORCHESTRATOR_DIR, dry_run=parsed.dry_run)
+    experts = seed_expert_definitions(ORCHESTRATOR_DIR, dry_run=parsed.dry_run)
+    configs = seed_config(ORCHESTRATOR_DIR, dry_run=parsed.dry_run)
+
+    print(f"\nMigration complete!")
+    print(f"  Agents: {len(agents)}")
+    print(f"  Experts: {len(experts)}")
+    print(f"  Configs: {len(configs)}")
+
+    if parsed.dry_run:
+        print("\nRe-run without --dry-run to apply changes")
+
+    return 0
+
+
+def run_cleanup_files(args=None) -> int:
+    """Remove old agent/expert/config files after database migration.
+
+    This command deletes the filesystem files that were migrated to the database.
+    Use --dry-run to preview what would be deleted.
+
+    Files deleted:
+    - .orchestrator/agents/*.md (agent definitions)
+    - .orchestrator/agents/experts/*.md (except _meta.md)
+    - .orchestrator/config/agent.json, budget.json
+    """
+    parser = argparse.ArgumentParser(
+        prog="orch cleanup-files",
+        description="Remove old agent/expert/config files after DB migration"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be deleted without deleting"
+    )
+    parsed = parser.parse_args(args or [])
+
+    from db.migrations.cleanup_files import run_cleanup
+
+    print("Cleaning up old files after database migration...")
+    if parsed.dry_run:
+        print("[DRY RUN - No files will be deleted]\n")
+
+    agents, experts, configs = run_cleanup(ORCHESTRATOR_DIR, dry_run=parsed.dry_run)
+
+    return 0
+
+
 def run_git_status(args=None) -> int:
     """Display git statistics using git commands only (no AI dependencies).
 

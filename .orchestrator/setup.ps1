@@ -61,6 +61,7 @@ Write-Host "    - Install required tools (UV, Node.js, Claude CLI)" -ForegroundC
 Write-Host "    - Load database config from .env (must exist)" -ForegroundColor Gray
 Write-Host "    - Install 'orch' command globally" -ForegroundColor Gray
 Write-Host "    - Initialize the orchestrator database" -ForegroundColor Gray
+Write-Host "    - Migrate agents/experts/config to database" -ForegroundColor Gray
 Write-Host "    - Register this project as 'self'" -ForegroundColor Gray
 Write-Host ""
 
@@ -385,6 +386,24 @@ if ($orchExe) {
 } else {
     Write-Info "Running initialization via uv..."
     uv run python cli.py init 2>&1
+}
+
+# Migrate agents, experts, and config from files to database
+Write-Info "Migrating agents/experts/config to database..."
+try {
+    if ($orchExe) {
+        & $orchExe migrate-to-db 2>&1
+    } else {
+        uv run python cli.py migrate-to-db 2>&1
+    }
+    if ($LASTEXITCODE -eq 0) {
+        Write-Success "Migration completed"
+    } else {
+        Write-Warn "Migration returned non-zero exit code"
+    }
+} catch {
+    Write-Warn "Could not run migration: $_"
+    Write-Info "You can run manually later: orch migrate-to-db"
 }
 
 Pop-Location

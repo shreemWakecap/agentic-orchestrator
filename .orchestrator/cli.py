@@ -47,6 +47,8 @@ COMMANDS = {
     'git-status': 'run_git_status',
     'init': 'run_init',
     'project': 'run_project',
+    'migrate-to-db': 'run_migrate_to_db',
+    'cleanup-files': 'run_cleanup_files',
 }
 
 
@@ -88,6 +90,8 @@ def _print_help():
     print("  experts            Manage expert agents")
     print("  knowledge          View knowledge store status")
     print("  git-status         Show git statistics")
+    print("  migrate-to-db      Migrate agents/experts/config from files to DB")
+    print("  cleanup-files      Remove old files after DB migration")
     print()
 
     print("Options:")

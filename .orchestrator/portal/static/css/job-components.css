@@ -468,42 +468,6 @@
 }
 
 /* ==========================================================================
-   Dark Theme Support
-   ========================================================================== */
-
-@media (prefers-color-scheme: dark) {
-    .job-status {
-        background: var(--bg-secondary, #2d2d2d);
-        border-color: var(--border-color, #444);
-    }
-
-    .job-list {
-        background: var(--bg-primary, #1e1e1e);
-        border-color: var(--border-color, #444);
-    }
-
-    .job-list-filters {
-        background: var(--bg-secondary, #2d2d2d);
-    }
-
-    .filter-group select {
-        background: var(--bg-primary, #1e1e1e);
-        border-color: var(--border-color, #444);
-        color: var(--text-primary, #e0e0e0);
-    }
-
-    .job-list-item:hover {
-        background: var(--bg-secondary, #2d2d2d);
-    }
-
-    .job-error {
-        background: #4a1c1c;
-        border-color: #5c2c2c;
-        color: #ff8080;
-    }
-}
-
-/* ==========================================================================
    Responsive Adjustments
    ========================================================================== */
 

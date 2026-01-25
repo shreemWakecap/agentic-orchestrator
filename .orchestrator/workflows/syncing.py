@@ -559,7 +559,6 @@ def run(args=None) -> int:
     config = get_config()
 
     project_id = None
-    project_slug = None
 
     if config.is_multi_project_mode:
         from db.repositories.project import get_project_repository
@@ -570,21 +569,22 @@ def run(args=None) -> int:
             return 1
         project_root = Path(active['path'])
         project_id = active['id']
-        project_slug = active['slug']
         print(f"Project: {active['name']} ({active['slug']})")
     else:
         project_root = Path(__file__).parent.parent.parent
 
     auto_merge = not parsed_args.no_merge
 
-    workflow = SyncingWorkflow(project_root=project_root, auto_merge=auto_merge)
-
-    # Set project context for multi-project mode
+    # Set project context for multi-project mode and run workflow
     if project_id:
-        workflow._project_id = project_id
-        workflow._project_slug = project_slug
+        from db.project_context import project_context
+        with project_context.set_project(project_id):
+            workflow = SyncingWorkflow(project_root=project_root, auto_merge=auto_merge)
+            result = workflow.run("")
+    else:
+        workflow = SyncingWorkflow(project_root=project_root, auto_merge=auto_merge)
+        result = workflow.run("")
 
-    result = workflow.run("")
     if result.success:
         print(f"\nPR: {result.data.get('pr_url')}")
         if not auto_merge:

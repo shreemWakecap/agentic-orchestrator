@@ -12,21 +12,11 @@
 {% endblock %}
 
 {% block content %}
-<div class="px-4 py-6 sm:px-0">
-    <!-- Page Header -->
-    <div class="mb-8 flex justify-between items-center">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                </div>
-                Plans
-            </h1>
-            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">All implementation plans ({{ plans|length }} total)</p>
-        </div>
-    </div>
+<div class="px-4 py-8 sm:px-0">
+    {# Page Header - Using shared partial for consistency #}
+    {% set title = 'Plans' %}
+    {% set subtitle = 'All implementation plans (' ~ (plans|length) ~ ' total)' %}
+    {% include 'partials/_page_header.html' %}
 
     <!-- Create New Plan Section - Unified Component -->
     <div class="mb-8">
@@ -54,12 +44,12 @@
 
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-3">
-                                <p class="text-base font-semibold text-gray-900 dark:text-white truncate">
+                                <p class="text-base font-semibold text-gray-900 truncate">
                                     {{ plan.name }}
                                 </p>
                             </div>
                             {% if plan.request %}
-                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 truncate max-w-lg">{{ plan.request }}</p>
+                            <p class="text-sm text-gray-500 mt-1 truncate max-w-lg">{{ plan.request }}</p>
                             {% endif %}
                         </div>
                     </div>
@@ -173,7 +163,7 @@
 
             <!-- Expandable Files Section -->
             <div id="files-{{ plan.id }}" class="expand-content">
-                <div class="px-6 py-5 border-t border-gray-100 dark:border-gray-700">
+                <div class="px-6 py-5 border-t border-gray-100">
                     <!-- Build Status Badge -->
                     <div class="mb-5">
                         {% if plan.state == 'completed' %}
@@ -208,7 +198,7 @@
                     </div>
 
                     <!-- Plan Files -->
-                    <h4 id="plan-files-{{ plan.id }}" class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                    <h4 id="plan-files-{{ plan.id }}" class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                         </svg>
@@ -230,7 +220,7 @@
                                         {% endif %}
                                     </svg>
                                 </div>
-                                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ file }}</span>
+                                <span class="text-sm font-medium text-gray-700">{{ file }}</span>
                             </div>
                             <svg class="h-4 w-4 text-gray-400 group-hover:text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
@@ -240,11 +230,11 @@
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p class="text-sm text-gray-500 dark:text-gray-400 py-3">No files in this plan</p>
+                    <p class="text-sm text-gray-500 py-3">No files in this plan</p>
                     {% endif %}
 
                     <!-- Quick Actions -->
-                    <div class="mt-5 pt-5 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-3">
+                    <div class="mt-5 pt-5 border-t border-gray-200 flex flex-wrap gap-3">
                         <a href="/plans/{{ plan.id }}"
                            onclick="event.stopPropagation()"
                            class="action-btn action-btn-primary">
@@ -299,8 +289,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
         </div>
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No plans yet</h3>
-        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 max-w-sm mx-auto">Get started by creating a new plan from the dashboard.</p>
+        <h3 class="text-lg font-semibold text-gray-900">No plans yet</h3>
+        <p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto">Get started by creating a new plan from the dashboard.</p>
         <div class="mt-6">
             <a href="/" class="action-btn action-btn-primary">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

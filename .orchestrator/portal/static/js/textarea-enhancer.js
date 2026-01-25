@@ -193,18 +193,17 @@ const TextareaEnhancer = (function() {
         // Update colors
         element.classList.remove(
             'text-green-600', 'text-yellow-600', 'text-red-600',
-            'dark:text-green-400', 'dark:text-yellow-400', 'dark:text-red-400',
-            'text-gray-500', 'dark:text-gray-400'
+            'text-gray-500'
         );
 
         if (status === 'error') {
-            element.classList.add('text-red-600', 'dark:text-red-400');
+            element.classList.add('text-red-600');
         } else if (status === 'warn') {
-            element.classList.add('text-yellow-600', 'dark:text-yellow-400');
+            element.classList.add('text-yellow-600');
         } else if (count > 0 && config.minChars > 0 && count >= config.minChars) {
-            element.classList.add('text-green-600', 'dark:text-green-400');
+            element.classList.add('text-green-600');
         } else {
-            element.classList.add('text-gray-500', 'dark:text-gray-400');
+            element.classList.add('text-gray-500');
         }
 
         // Add pulse animation for error state
@@ -223,7 +222,7 @@ const TextareaEnhancer = (function() {
      */
     function createCharCountElement(textarea, config) {
         var countEl = document.createElement('div');
-        countEl.className = 'textarea-char-count text-xs text-gray-500 dark:text-gray-400 mt-1 text-right transition-colors duration-200';
+        countEl.className = 'textarea-char-count text-xs text-gray-500 mt-1 text-right transition-colors duration-200';
         countEl.setAttribute('aria-live', 'polite');
         countEl.setAttribute('aria-atomic', 'true');
 

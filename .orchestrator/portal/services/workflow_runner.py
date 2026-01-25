@@ -23,6 +23,58 @@ PROJECT_ROOT = ORCHESTRATOR_DIR.parent
 
 logger = logging.getLogger(__name__)
 
+
+def _get_project_path(project_id: Optional[str]) -> Path:
+    """Resolve project path from project_id.
+
+    Args:
+        project_id: The project ID to resolve. If None, returns PROJECT_ROOT
+                   (legacy single-project mode).
+
+    Returns:
+        Path to the project directory.
+
+    Raises:
+        ProjectNotFoundError: If project_id is provided but project not found.
+        ProjectPathError: If project exists but path is invalid.
+    """
+    from core.exceptions import ProjectNotFoundError, ProjectPathError
+
+    if not project_id:
+        # Legacy mode: no project context, use default
+        logger.warning("No project_id provided, using PROJECT_ROOT (legacy mode)")
+        return PROJECT_ROOT
+
+    from db.repositories.project import get_project_repository
+    repo = get_project_repository()
+    # Use as_dict=True to avoid DetachedInstanceError
+    project = repo.get_by_slug_or_id(project_id, as_dict=True)
+
+    if not project:
+        raise ProjectNotFoundError(project_id)
+
+    path_str = project.get("path")
+    if not path_str:
+        raise ProjectPathError(project_id, reason="Project has no path configured")
+
+    project_path = Path(path_str)
+    if not project_path.exists():
+        raise ProjectPathError(
+            project_id,
+            path=path_str,
+            reason="Path does not exist on filesystem"
+        )
+
+    if not project_path.is_dir():
+        raise ProjectPathError(
+            project_id,
+            path=path_str,
+            reason="Path is not a directory"
+        )
+
+    return project_path
+
+
 # =============================================================================
 # Workflow Phase Constants
 # =============================================================================
@@ -319,6 +371,51 @@ def _add_activity_log(run_id: str, activity: str, details: Dict = None):
     })
 
 
+def _fail_run_with_validation_error(
+    run_id: str,
+    error: Exception,
+    error_code: str,
+    plan_id: str = None,
+):
+    """Mark run as failed due to project validation error.
+
+    Provides structured error information for UI display.
+
+    Args:
+        run_id: The run ID to mark as failed
+        error: The validation exception
+        error_code: Error code for categorization (PROJECT_NOT_FOUND, PROJECT_ARCHIVED, etc.)
+        plan_id: Optional plan ID to also mark as failed
+    """
+    run_repo = _get_run_repo()
+
+    run_repo.update(
+        run_id,
+        status="failed",
+        completed_at=datetime.now().isoformat(),
+        error=str(error),
+        data={
+            "error_code": error_code,
+            "error_type": type(error).__name__,
+            "error_message": str(error),
+        }
+    )
+
+    _add_event(run_id, "error", {
+        "code": error_code,
+        "type": type(error).__name__,
+        "message": str(error),
+    })
+
+    _add_activity_log(run_id, f"Validation failed: {error_code}", {
+        "error": str(error),
+    })
+
+    # Also update plan status if provided
+    if plan_id:
+        _sync_plan_status(plan_id, "failed", str(error))
+
+
 def run_planning_workflow(run_id: str, description: str, project_id: Optional[str] = None):
     """Execute planning workflow in background thread.
 
@@ -338,6 +435,12 @@ def run_planning_workflow(run_id: str, description: str, project_id: Optional[st
     """
     from workflows.planning import PlanningWorkflow
     from db.project_context import project_context
+    from core.project_validation import (
+        validate_for_workflow_type,
+        ProjectNotFoundError,
+        ProjectPathError,
+        ProjectArchivedError,
+    )
 
     run_repo = _get_run_repo()
 
@@ -349,6 +452,28 @@ def run_planning_workflow(run_id: str, description: str, project_id: Optional[st
         logger.debug(f"Set project context for planning workflow: {project_id}")
 
     try:
+        # VALIDATION PHASE - Validate project before any work
+        project_path = PROJECT_ROOT  # Default for legacy mode
+
+        if project_id:
+            try:
+                validated = validate_for_workflow_type(project_id, "planning")
+                project_path = validated.path
+                logger.info(f"Validated project for planning: {validated.name}")
+            except ProjectNotFoundError as e:
+                logger.error(f"Project not found: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_NOT_FOUND")
+                return
+            except ProjectArchivedError as e:
+                logger.error(f"Project archived: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_ARCHIVED")
+                return
+            except ProjectPathError as e:
+                logger.error(f"Project path error: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_PATH_ERROR")
+                return
+
+        # EXECUTION PHASE - Project validated
         run_repo.update(run_id, status="running")
         _add_event(run_id, "start", {"workflow": "planning", "project_id": project_id})
         _add_activity_log(run_id, "Workflow started", {"workflow_type": "planning", "project_id": project_id})
@@ -358,7 +483,7 @@ def run_planning_workflow(run_id: str, description: str, project_id: Optional[st
             _emit_phase_event(run_id, "analyzing", 5, "Initializing planning workflow")
             _add_activity_log(run_id, "Parsing request description")
 
-            workflow = PlanningWorkflow(project_root=PROJECT_ROOT)
+            workflow = PlanningWorkflow(project_root=project_path)
 
             _emit_phase_event(run_id, "analyzing", 15, "Analyzing codebase and request")
             _add_activity_log(run_id, "Analyzing codebase context", {"description_length": len(description)})
@@ -448,6 +573,12 @@ def run_building_workflow(run_id: str, plan_id: str, project_id: Optional[str] =
     """
     from workflows.building import BuildingWorkflow
     from db.project_context import project_context
+    from core.project_validation import (
+        validate_for_workflow_type,
+        ProjectNotFoundError,
+        ProjectPathError,
+        ProjectArchivedError,
+    )
 
     run_repo = _get_run_repo()
 
@@ -458,11 +589,33 @@ def run_building_workflow(run_id: str, plan_id: str, project_id: Optional[str] =
         logger.debug(f"Set project context for building workflow: {project_id}")
 
     try:
+        # VALIDATION PHASE - Validate project before any work
+        project_path = PROJECT_ROOT  # Default for legacy mode
+
+        if project_id:
+            try:
+                validated = validate_for_workflow_type(project_id, "building")
+                project_path = validated.path
+                logger.info(f"Validated project for building: {validated.name}")
+            except ProjectNotFoundError as e:
+                logger.error(f"Project not found: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_NOT_FOUND", plan_id)
+                return
+            except ProjectArchivedError as e:
+                logger.error(f"Project archived: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_ARCHIVED", plan_id)
+                return
+            except ProjectPathError as e:
+                logger.error(f"Project path error: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_PATH_ERROR", plan_id)
+                return
+
+        # EXECUTION PHASE - Project validated
         run_repo.update(run_id, status="running")
         _add_event(run_id, "start", {"workflow": "building", "plan_id": plan_id, "project_id": project_id})
 
         try:
-            workflow = BuildingWorkflow(project_root=PROJECT_ROOT)
+            workflow = BuildingWorkflow(project_root=project_path)
             result = workflow.run(plan_id)
 
             status = "completed" if result.success else "failed"
@@ -516,6 +669,12 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
     """
     from workflows.building import BuildingWorkflow
     from db.project_context import project_context
+    from core.project_validation import (
+        validate_for_workflow_type,
+        ProjectNotFoundError,
+        ProjectPathError,
+        ProjectArchivedError,
+    )
 
     run_repo = _get_run_repo()
 
@@ -526,6 +685,28 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
         logger.debug(f"Set project context for building workflow resume: {project_id}")
 
     try:
+        # VALIDATION PHASE - Validate project before any work
+        project_path = PROJECT_ROOT  # Default for legacy mode
+
+        if project_id:
+            try:
+                validated = validate_for_workflow_type(project_id, "building")
+                project_path = validated.path
+                logger.info(f"Validated project for building resume: {validated.name}")
+            except ProjectNotFoundError as e:
+                logger.error(f"Project not found: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_NOT_FOUND", plan_id)
+                return
+            except ProjectArchivedError as e:
+                logger.error(f"Project archived: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_ARCHIVED", plan_id)
+                return
+            except ProjectPathError as e:
+                logger.error(f"Project path error: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_PATH_ERROR", plan_id)
+                return
+
+        # EXECUTION PHASE - Project validated
         run_repo.update(run_id, status="running")
         _add_event(run_id, "start", {
             "workflow": "building",
@@ -538,7 +719,7 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
         try:
             # BuildingWorkflow automatically resumes from existing state in DB
             # No need for resume=True flag - execute() loads state and continues
-            workflow = BuildingWorkflow(project_root=PROJECT_ROOT)
+            workflow = BuildingWorkflow(project_root=project_path)
             result = workflow.run(plan_id)
 
             status = "completed" if result.success else "failed"
@@ -578,7 +759,7 @@ def run_building_workflow_resume(run_id: str, plan_id: str, from_step: Optional[
         _cleanup_thread_local()
 
 
-def run_syncing_workflow(run_id: str, auto_merge: bool = True):
+def run_syncing_workflow(run_id: str, auto_merge: bool = True, project_id: Optional[str] = None):
     """Execute syncing workflow to commit changes and create PR.
 
     This function runs in a ThreadPoolExecutor worker thread.
@@ -587,17 +768,58 @@ def run_syncing_workflow(run_id: str, auto_merge: bool = True):
     Args:
         run_id: Unique identifier for this run
         auto_merge: Whether to auto-merge the PR after creation (default: True)
+        project_id: Optional project ID for scoping git operations
     """
     from workflows.syncing import SyncingWorkflow
+    from db.project_context import project_context
+    from core.project_validation import (
+        validate_for_workflow_type,
+        ProjectNotFoundError,
+        ProjectPathError,
+        ProjectArchivedError,
+    )
 
     run_repo = _get_run_repo()
 
+    # Set project context for this thread if provided
+    context_token = None
+    if project_id:
+        context_token = project_context.set_project_sync(project_id)
+        logger.debug(f"Set project context for syncing workflow: {project_id}")
+
     try:
+        # VALIDATION PHASE - Validate project before any work
+        # Syncing requires git repository
+        project_path = PROJECT_ROOT  # Default for legacy mode
+
+        if project_id:
+            try:
+                validated = validate_for_workflow_type(project_id, "syncing")
+                project_path = validated.path
+                logger.info(f"Validated project for syncing: {validated.name}")
+            except ProjectNotFoundError as e:
+                logger.error(f"Project not found: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_NOT_FOUND")
+                return
+            except ProjectArchivedError as e:
+                logger.error(f"Project archived: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_ARCHIVED")
+                return
+            except ProjectPathError as e:
+                logger.error(f"Project path error: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_PATH_ERROR")
+                return
+
+        # EXECUTION PHASE - Project validated
         run_repo.update(run_id, status="running")
-        _add_event(run_id, "start", {"workflow": "syncing", "auto_merge": auto_merge})
+        _add_event(run_id, "start", {
+            "workflow": "syncing",
+            "auto_merge": auto_merge,
+            "project_id": project_id,
+        })
 
         try:
-            workflow = SyncingWorkflow(project_root=PROJECT_ROOT, auto_merge=auto_merge)
+            workflow = SyncingWorkflow(project_root=project_path, auto_merge=auto_merge)
             result = workflow.run("")  # Pass empty string as request
 
             status = "completed" if result.success else "failed"
@@ -623,6 +845,9 @@ def run_syncing_workflow(run_id: str, auto_merge: bool = True):
             _mark_run_failed(run_id, e)
 
     finally:
+        # Reset project context if it was set
+        if context_token:
+            project_context.reset_project(context_token)
         _cleanup_thread_local()
 
 
@@ -651,6 +876,12 @@ def run_scouting_workflow(
     """
     from workflows.scouting import ScoutingWorkflow
     from db.project_context import project_context
+    from core.project_validation import (
+        validate_for_workflow_type,
+        ProjectNotFoundError,
+        ProjectPathError,
+        ProjectArchivedError,
+    )
 
     run_repo = _get_run_repo()
 
@@ -661,6 +892,28 @@ def run_scouting_workflow(
         logger.debug(f"Set project context for scouting workflow: {project_id}")
 
     try:
+        # VALIDATION PHASE - Validate project before any work
+        project_path = PROJECT_ROOT  # Default for legacy mode
+
+        if project_id:
+            try:
+                validated = validate_for_workflow_type(project_id, "scouting")
+                project_path = validated.path
+                logger.info(f"Validated project for scouting: {validated.name}")
+            except ProjectNotFoundError as e:
+                logger.error(f"Project not found: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_NOT_FOUND")
+                return
+            except ProjectArchivedError as e:
+                logger.error(f"Project archived: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_ARCHIVED")
+                return
+            except ProjectPathError as e:
+                logger.error(f"Project path error: {e}")
+                _fail_run_with_validation_error(run_id, e, "PROJECT_PATH_ERROR")
+                return
+
+        # EXECUTION PHASE - Project validated
         run_repo.update(run_id, status="running")
         _add_event(
             run_id,
@@ -678,7 +931,7 @@ def run_scouting_workflow(
 
         try:
             workflow = ScoutingWorkflow(
-                project_root=PROJECT_ROOT,
+                project_root=project_path,
                 scan_type=scan_type,
                 generate_experts=generate_experts,
             )

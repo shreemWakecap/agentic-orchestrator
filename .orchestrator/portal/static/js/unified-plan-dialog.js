@@ -378,7 +378,7 @@ const UnifiedPlanDialog = (function() {
 
         return [
             // Header with gradient
-            '<div class="relative px-6 py-4 border-b border-primary/10 dark:border-primary/10">',
+            '<div class="relative px-6 py-4 border-b border-primary/10">',
             '  <div class="absolute inset-0 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-indigo-500/10"></div>',
             '  <div class="relative flex items-center justify-between">',
             '    <div class="flex items-center">',
@@ -389,7 +389,7 @@ const UnifiedPlanDialog = (function() {
             '      </div>',
             '      <div>',
             '        <h2 id="unified-header-title" class="text-xl font-bold text-gradient-primary">AI-Enhanced Plan Creation</h2>',
-            '        <p id="unified-header-subtitle" class="text-xs text-tertiary dark:text-tertiary">Improving your request with AI...</p>',
+            '        <p id="unified-header-subtitle" class="text-xs text-tertiary">Improving your request with AI...</p>',
             '      </div>',
             '    </div>',
             '    <button id="unified-close-btn" type="button" class="p-2 text-tertiary hover:text-primary transition-colors rounded-lg hover:bg-tertiary/50">',
@@ -411,11 +411,11 @@ const UnifiedPlanDialog = (function() {
             '        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>',
             '      </svg>',
             '    </div>',
-            '    <p class="text-lg font-medium text-violet-600 dark:text-violet-400 mb-2">Enhancing Your Request</p>',
-            '    <p class="text-sm text-tertiary dark:text-tertiary">AI is analyzing and improving your plan description...</p>',
+            '    <p class="text-lg font-medium text-violet-600 mb-2">Enhancing Your Request</p>',
+            '    <p class="text-sm text-tertiary">AI is analyzing and improving your plan description...</p>',
             '    <div class="mt-6 glass rounded-xl p-4 max-w-lg">',
-            '      <p class="text-xs text-tertiary dark:text-tertiary uppercase tracking-wide mb-2">Your Draft</p>',
-            '      <p class="text-sm text-secondary dark:text-secondary font-mono whitespace-pre-wrap opacity-75">' + nl2br(escapedDraft) + '</p>',
+            '      <p class="text-xs text-tertiary uppercase tracking-wide mb-2">Your Draft</p>',
+            '      <p class="text-sm text-secondary font-mono whitespace-pre-wrap opacity-75">' + nl2br(escapedDraft) + '</p>',
             '    </div>',
             '  </div>',
 
@@ -432,8 +432,8 @@ const UnifiedPlanDialog = (function() {
             '        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>',
             '      </svg>',
             '    </div>',
-            '    <p class="text-lg font-medium text-violet-600 dark:text-violet-400">Creating Your Plan</p>',
-            '    <p class="text-sm text-tertiary dark:text-tertiary mt-2">Setting everything up...</p>',
+            '    <p class="text-lg font-medium text-violet-600">Creating Your Plan</p>',
+            '    <p class="text-sm text-tertiary mt-2">Setting everything up...</p>',
             '  </div>',
 
             // Success state
@@ -443,8 +443,8 @@ const UnifiedPlanDialog = (function() {
             '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>',
             '      </svg>',
             '    </div>',
-            '    <p class="text-lg font-medium text-green-600 dark:text-green-400">Plan Created Successfully!</p>',
-            '    <p class="text-sm text-tertiary dark:text-tertiary mt-2">Redirecting to your plan...</p>',
+            '    <p class="text-lg font-medium text-green-600">Plan Created Successfully!</p>',
+            '    <p class="text-sm text-tertiary mt-2">Redirecting to your plan...</p>',
             '  </div>',
 
             // Error state
@@ -454,8 +454,8 @@ const UnifiedPlanDialog = (function() {
             '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>',
             '      </svg>',
             '    </div>',
-            '    <p class="text-lg font-medium text-red-600 dark:text-red-400">Creation Failed</p>',
-            '    <p id="unified-error-message" class="text-sm text-tertiary dark:text-tertiary mt-2">An error occurred while creating your plan.</p>',
+            '    <p class="text-lg font-medium text-red-600">Creation Failed</p>',
+            '    <p id="unified-error-message" class="text-sm text-tertiary mt-2">An error occurred while creating your plan.</p>',
             '    <button id="unified-retry-btn" type="button" class="mt-6 btn btn-modern bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white">',
             '      Try Again',
             '    </button>',
@@ -464,7 +464,7 @@ const UnifiedPlanDialog = (function() {
             '</div>',
 
             // Footer with actions
-            '<div id="unified-footer-actions" class="hidden px-6 py-4 border-t border-primary/10 dark:border-primary/10 bg-tertiary/30 dark:bg-tertiary/30">',
+            '<div id="unified-footer-actions" class="hidden px-6 py-4 border-t border-primary/10 bg-tertiary/30">',
             '  <div class="flex items-center justify-end gap-3">',
             '    <button id="unified-keep-original-btn" type="button" class="hidden btn btn-secondary btn-modern">',
             '      Keep Original',
@@ -500,27 +500,27 @@ const UnifiedPlanDialog = (function() {
 
             // Original draft (left)
             '  <div class="space-y-2">',
-            '    <div class="flex items-center text-sm font-medium text-tertiary dark:text-tertiary">',
+            '    <div class="flex items-center text-sm font-medium text-tertiary">',
             '      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
             '      </svg>',
             '      YOUR DRAFT',
             '    </div>',
-            '    <div class="glass rounded-xl p-4 min-h-[200px] max-h-[300px] overflow-y-auto bg-tertiary/30 dark:bg-tertiary/30">',
-            '      <p class="text-sm text-secondary dark:text-secondary font-mono whitespace-pre-wrap opacity-75">' + nl2br(escapedDraft) + '</p>',
+            '    <div class="glass rounded-xl p-4 min-h-[200px] max-h-[300px] overflow-y-auto bg-tertiary/30">',
+            '      <p class="text-sm text-secondary font-mono whitespace-pre-wrap opacity-75">' + nl2br(escapedDraft) + '</p>',
             '    </div>',
             '  </div>',
 
             // Improved version (right)
             '  <div class="space-y-2">',
-            '    <div class="flex items-center text-sm font-medium text-violet-600 dark:text-violet-400">',
+            '    <div class="flex items-center text-sm font-medium text-violet-600">',
             '      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>',
             '      </svg>',
             '      AI IMPROVED',
             '    </div>',
-            '    <div class="glass rounded-xl p-4 min-h-[200px] max-h-[300px] overflow-y-auto border-2 border-violet-400 dark:border-violet-600 bg-gradient-to-br from-violet-50/50 to-purple-50/50 dark:from-violet-950/30 dark:to-purple-950/30">',
-            '      <p id="unified-improved-text" class="text-sm text-primary dark:text-primary font-mono whitespace-pre-wrap"></p>',
+            '    <div class="glass rounded-xl p-4 min-h-[200px] max-h-[300px] overflow-y-auto border-2 border-violet-400 bg-gradient-to-br from-violet-50/50 to-purple-50/50">',
+            '      <p id="unified-improved-text" class="text-sm text-primary font-mono whitespace-pre-wrap"></p>',
             '    </div>',
             '  </div>',
 
@@ -531,13 +531,13 @@ const UnifiedPlanDialog = (function() {
     function buildEditModeHTML(currentText) {
         return [
             '<div class="space-y-4">',
-            '  <div class="flex items-center text-sm font-medium text-violet-600 dark:text-violet-400">',
+            '  <div class="flex items-center text-sm font-medium text-violet-600">',
             '    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
             '    </svg>',
             '    EDIT YOUR REQUEST',
             '  </div>',
-            '  <textarea id="unified-edit-textarea" class="w-full h-64 p-4 font-mono text-sm rounded-xl border-2 border-violet-400 dark:border-violet-600 bg-tertiary/30 dark:bg-tertiary/30 text-primary dark:text-primary focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none">' + escapeHtml(currentText) + '</textarea>',
+            '  <textarea id="unified-edit-textarea" class="w-full h-64 p-4 font-mono text-sm rounded-xl border-2 border-violet-400 bg-tertiary/30 text-primary focus:ring-2 focus:ring-violet-500 focus:border-transparent resize-none">' + escapeHtml(currentText) + '</textarea>',
             '  <div class="flex justify-end gap-3">',
             '    <button id="unified-cancel-edit-btn" type="button" class="btn btn-secondary btn-modern">',
             '      Cancel',

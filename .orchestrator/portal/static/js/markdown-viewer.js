@@ -72,7 +72,7 @@ const MarkdownViewer = {
      */
     _buildHeader(title, tokenCount) {
         const tokenBadge = tokenCount !== null
-            ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 ml-3">
+            ? `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 ml-3">
                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"></path>
                    </svg>
@@ -81,12 +81,12 @@ const MarkdownViewer = {
             : '';
 
         return `
-            <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
                 <div class="flex items-center">
-                    <svg class="w-5 h-5 text-gray-500 dark:text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-5 h-5 text-gray-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                     </svg>
-                    <span class="text-sm font-medium text-gray-600 dark:text-gray-300">Content Preview</span>
+                    <span class="text-sm font-medium text-gray-600">Content Preview</span>
                     ${tokenBadge}
                 </div>
             </div>
@@ -117,7 +117,7 @@ const MarkdownViewer = {
      */
     _renderMarkdown(markdown) {
         if (!markdown) {
-            return '<p class="text-gray-500 dark:text-gray-400 italic">No content available</p>';
+            return '<p class="text-gray-500 italic">No content available</p>';
         }
 
         // Escape HTML first to prevent XSS
@@ -129,12 +129,12 @@ const MarkdownViewer = {
         });
 
         // Process inline code
-        html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800 dark:text-gray-200">$1</code>');
+        html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">$1</code>');
 
         // Process headers (must be at line start)
-        html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mt-4 mb-2">$1</h3>');
-        html = html.replace(/^## (.+)$/gm, '<h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mt-5 mb-3">$1</h2>');
-        html = html.replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 mt-6 mb-4">$1</h1>');
+        html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-gray-900 mt-4 mb-2">$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2 class="text-xl font-semibold text-gray-900 mt-5 mb-3">$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold text-gray-900 mt-6 mb-4">$1</h1>');
 
         // Process bold and italic
         html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
@@ -145,28 +145,28 @@ const MarkdownViewer = {
         html = html.replace(/_(.+?)_/g, '<em>$1</em>');
 
         // Process horizontal rules
-        html = html.replace(/^---$/gm, '<hr class="my-6 border-gray-300 dark:border-gray-600">');
-        html = html.replace(/^\*\*\*$/gm, '<hr class="my-6 border-gray-300 dark:border-gray-600">');
+        html = html.replace(/^---$/gm, '<hr class="my-6 border-gray-300">');
+        html = html.replace(/^\*\*\*$/gm, '<hr class="my-6 border-gray-300">');
 
         // Process unordered lists
         html = html.replace(/^(\s*)[-*+] (.+)$/gm, (match, indent, content) => {
             const level = Math.floor(indent.length / 2);
             const paddingClass = level > 0 ? `ml-${level * 4}` : '';
-            return `<li class="list-disc list-inside ${paddingClass} my-1 text-gray-700 dark:text-gray-300">${content}</li>`;
+            return `<li class="list-disc list-inside ${paddingClass} my-1 text-gray-700">${content}</li>`;
         });
 
         // Process ordered lists
         html = html.replace(/^(\s*)\d+\. (.+)$/gm, (match, indent, content) => {
             const level = Math.floor(indent.length / 2);
             const paddingClass = level > 0 ? `ml-${level * 4}` : '';
-            return `<li class="list-decimal list-inside ${paddingClass} my-1 text-gray-700 dark:text-gray-300">${content}</li>`;
+            return `<li class="list-decimal list-inside ${paddingClass} my-1 text-gray-700">${content}</li>`;
         });
 
         // Process blockquotes
-        html = html.replace(/^&gt; (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 dark:border-gray-600 pl-4 py-1 my-2 text-gray-600 dark:text-gray-400 italic">$1</blockquote>');
+        html = html.replace(/^&gt; (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 pl-4 py-1 my-2 text-gray-600 italic">$1</blockquote>');
 
         // Process links
-        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary-600 dark:text-primary-400 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary-600 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
 
         // Process line breaks and paragraphs
         // Split by double newlines to create paragraphs
@@ -183,7 +183,7 @@ const MarkdownViewer = {
             }
             // Wrap plain text in paragraphs
             if (trimmed) {
-                return `<p class="my-2 text-gray-700 dark:text-gray-300">${trimmed.replace(/\n/g, '<br>')}</p>`;
+                return `<p class="my-2 text-gray-700">${trimmed.replace(/\n/g, '<br>')}</p>`;
             }
             return '';
         }).join('\n');

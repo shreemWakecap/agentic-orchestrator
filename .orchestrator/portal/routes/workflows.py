@@ -80,6 +80,7 @@ async def start_build(
 async def sync_remote(
     run_repo: RunRepository = Depends(get_run_repo),
     task_manager: TaskManager = Depends(get_task_manager),
+    context_provider: IProjectContextProvider = Depends(get_project_context_provider),
     request: SyncRemoteRequest = None,
 ) -> WorkflowStartResponse:
     """Start a sync-remote workflow to commit changes and create PR."""
@@ -87,18 +88,20 @@ async def sync_remote(
 
     run_id = str(uuid.uuid4())[:8]
     auto_merge = request.auto_merge if request else True
+    project_id = context_provider.get_project_id()
 
     # Create run entry in database (triggered by user via portal)
     run_repo.create(run_id, workflow="syncing", triggered_by="manual")
 
     # Submit to TaskManager for background execution
+    # Pass project_id to ensure git operations run in correct project directory
     task_manager.submit_task(
         func=run_syncing_workflow_sync,
-        args=(run_id, auto_merge),
+        args=(run_id, auto_merge, project_id),
         name="Sync Remote",
         task_id=run_id,
         task_type="sync",
-        metadata={"run_id": run_id, "auto_merge": auto_merge},
+        metadata={"run_id": run_id, "auto_merge": auto_merge, "project_id": project_id},
     )
 
     return WorkflowStartResponse(run_id=run_id, status="started")

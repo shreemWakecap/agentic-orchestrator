@@ -10,30 +10,19 @@
         align-items: center;
         gap: 0.5rem;
         padding: 0.5rem 0.875rem;
-        background: white;
-        border: 1px solid #E5E7EB;
+        background: var(--surface-primary);
+        border: 1px solid var(--border-subtle);
         border-radius: 0.625rem;
         font-size: 0.8125rem;
         font-weight: 500;
-        color: #374151;
+        color: var(--text-primary);
         transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .tech-tag:hover {
-        background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 100%);
-        border-color: #93C5FD;
+        background: var(--surface-primary-subtle);
+        border-color: var(--color-primary-300);
         transform: translateY(-2px);
-    }
-
-    .dark .tech-tag {
-        background: #1E293B;
-        border-color: #334155;
-        color: #E2E8F0;
-    }
-
-    .dark .tech-tag:hover {
-        background: linear-gradient(135deg, #1E3A5F 0%, #1E40AF20 100%);
-        border-color: #3B82F6;
     }
 
     /* Confidence Badge Styles */
@@ -47,9 +36,18 @@
         font-weight: 600;
     }
 
-    .confidence-high { background: #D1FAE5; color: #065F46; }
-    .confidence-medium { background: #FEF3C7; color: #92400E; }
-    .confidence-low { background: #FEE2E2; color: #991B1B; }
+    .confidence-high {
+        background: var(--surface-success-muted);
+        color: var(--text-success);
+    }
+    .confidence-medium {
+        background: var(--surface-warning-muted);
+        color: var(--text-warning);
+    }
+    .confidence-low {
+        background: var(--surface-error-muted);
+        color: var(--text-error);
+    }
 
     /* Module/Domain Item Styles */
     .item-card {
@@ -57,53 +55,34 @@
         align-items: flex-start;
         gap: 1rem;
         padding: 1rem;
-        background: white;
-        border: 1px solid #E5E7EB;
+        background: var(--surface-primary);
+        border: 1px solid var(--border-subtle);
         border-radius: 0.75rem;
         transition: all 0.2s;
     }
 
     .item-card:hover {
-        background: #F9FAFB;
+        background: var(--surface-secondary);
         transform: translateX(4px);
-    }
-
-    .dark .item-card {
-        background: #1E293B;
-        border-color: #334155;
-    }
-
-    .dark .item-card:hover {
-        background: #334155;
     }
 
     /* Keyword Tag */
     .keyword-tag {
         display: inline-block;
         padding: 0.25rem 0.5rem;
-        background: #F3F4F6;
+        background: var(--surface-tertiary);
         border-radius: 0.375rem;
         font-size: 0.75rem;
-        color: #6B7280;
-    }
-
-    .dark .keyword-tag {
-        background: #334155;
-        color: #94A3B8;
+        color: var(--text-tertiary);
     }
 
     /* Empty State */
     .empty-state-card {
         text-align: center;
         padding: 3rem 2rem;
-        background: linear-gradient(135deg, #F9FAFB 0%, #F3F4F6 100%);
+        background: var(--gradient-primary-subtle);
         border-radius: 0.75rem;
-        border: 2px dashed #E5E7EB;
-    }
-
-    .dark .empty-state-card {
-        background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
-        border-color: #334155;
+        border: 2px dashed var(--border-subtle);
     }
 
     /* Staleness Badge */
@@ -118,20 +97,18 @@
     }
 
     .staleness-fresh {
-        background: #D1FAE5;
-        color: #065F46;
+        background: var(--surface-success-muted);
+        color: var(--text-success);
     }
 
     .staleness-stale {
-        background: #FEF3C7;
-        color: #92400E;
+        background: var(--surface-warning-muted);
+        color: var(--text-warning);
     }
 
     /* Gradient mesh background */
     .gradient-mesh {
-        background: radial-gradient(at 40% 20%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
-                    radial-gradient(at 80% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
-                    radial-gradient(at 0% 50%, rgba(236, 72, 153, 0.05) 0px, transparent 50%);
+        background: var(--gradient-mesh-brand);
     }
 </style>
 {% endblock %}
@@ -143,10 +120,10 @@
         <div class="absolute inset-0 gradient-mesh opacity-50"></div>
         <div class="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-                <h1 class="text-4xl font-bold text-primary dark:text-primary">
+                <h1 class="text-4xl font-bold text-primary">
                     <span class="text-gradient-primary">Knowledge Base</span>
                 </h1>
-                <p class="mt-3 text-lg text-secondary dark:text-secondary">Project intelligence and codebase insights</p>
+                <p class="mt-3 text-lg text-secondary">Project intelligence and codebase insights</p>
             </div>
             <div class="flex items-center gap-3">
                 <!-- Staleness Status -->
@@ -195,8 +172,8 @@
                 </svg>
             </div>
             <div class="ml-4">
-                <h3 class="text-lg font-semibold text-primary dark:text-primary">Technologies</h3>
-                <p class="text-xs text-secondary dark:text-secondary">Languages, frameworks, and tools</p>
+                <h3 class="text-lg font-semibold text-primary">Technologies</h3>
+                <p class="text-xs text-secondary">Languages, frameworks, and tools</p>
             </div>
         </div>
 
@@ -204,7 +181,7 @@
             <!-- Languages -->
             {% if knowledge.languages %}
             <div>
-                <h4 class="text-xs font-semibold text-secondary dark:text-secondary uppercase tracking-wider mb-2">Languages</h4>
+                <h4 class="text-xs font-semibold text-secondary uppercase tracking-wider mb-2">Languages</h4>
                 <div class="flex flex-wrap gap-2">
                     {% for lang in knowledge.languages %}
                     <div class="tech-tag">
@@ -221,7 +198,7 @@
             <!-- Frameworks -->
             {% if knowledge.frameworks %}
             <div>
-                <h4 class="text-xs font-semibold text-secondary dark:text-secondary uppercase tracking-wider mb-2">Frameworks</h4>
+                <h4 class="text-xs font-semibold text-secondary uppercase tracking-wider mb-2">Frameworks</h4>
                 <div class="flex flex-wrap gap-2">
                     {% for fw in knowledge.frameworks %}
                     <div class="tech-tag">
@@ -238,7 +215,7 @@
             <!-- Tools -->
             {% if knowledge.tools %}
             <div>
-                <h4 class="text-xs font-semibold text-secondary dark:text-secondary uppercase tracking-wider mb-2">Tools</h4>
+                <h4 class="text-xs font-semibold text-secondary uppercase tracking-wider mb-2">Tools</h4>
                 <div class="flex flex-wrap gap-2">
                     {% for tool in knowledge.tools %}
                     <div class="tech-tag">
@@ -265,8 +242,8 @@
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-primary dark:text-primary">Architecture</h3>
-                    <p class="text-xs text-secondary dark:text-secondary">{{ knowledge.architecture_pattern or 'Not detected' }}</p>
+                    <h3 class="text-lg font-semibold text-primary">Architecture</h3>
+                    <p class="text-xs text-secondary">{{ knowledge.architecture_pattern or 'Not detected' }}</p>
                 </div>
             </div>
 
@@ -274,25 +251,25 @@
             <div class="space-y-2 max-h-64 overflow-y-auto">
                 {% for module in knowledge.modules[:6] %}
                 <div class="item-card">
-                    <div class="flex-shrink-0 w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded flex items-center justify-center">
-                        <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div class="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded flex items-center justify-center">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
                         </svg>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="font-medium text-sm text-primary dark:text-primary">{{ module.name }}</div>
-                        <div class="text-xs text-tertiary dark:text-tertiary font-mono truncate">{{ module.path }}</div>
+                        <div class="font-medium text-sm text-primary">{{ module.name }}</div>
+                        <div class="text-xs text-tertiary font-mono truncate">{{ module.path }}</div>
                     </div>
                 </div>
                 {% endfor %}
                 {% if knowledge.modules|length > 6 %}
-                <p class="text-xs text-secondary dark:text-secondary text-center pt-2">
+                <p class="text-xs text-secondary text-center pt-2">
                     +{{ knowledge.modules|length - 6 }} more modules
                 </p>
                 {% endif %}
             </div>
             {% else %}
-            <p class="text-sm text-tertiary dark:text-tertiary">No modules detected</p>
+            <p class="text-sm text-tertiary">No modules detected</p>
             {% endif %}
         </div>
 
@@ -305,8 +282,8 @@
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <h3 class="text-lg font-semibold text-primary dark:text-primary">Domains</h3>
-                    <p class="text-xs text-secondary dark:text-secondary">Business domains identified</p>
+                    <h3 class="text-lg font-semibold text-primary">Domains</h3>
+                    <p class="text-xs text-secondary">Business domains identified</p>
                 </div>
             </div>
 
@@ -316,9 +293,9 @@
                 <div class="item-card">
                     <div class="flex-1">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="font-medium text-sm text-primary dark:text-primary">{{ domain.name }}</span>
+                            <span class="font-medium text-sm text-primary">{{ domain.name }}</span>
                             {% if domain.file_count %}
-                            <span class="text-xs text-tertiary dark:text-tertiary">{{ domain.file_count }} files</span>
+                            <span class="text-xs text-tertiary">{{ domain.file_count }} files</span>
                             {% endif %}
                         </div>
                         {% if domain.keywords %}
@@ -332,13 +309,13 @@
                 </div>
                 {% endfor %}
                 {% if knowledge.domains|length > 6 %}
-                <p class="text-xs text-secondary dark:text-secondary text-center pt-2">
+                <p class="text-xs text-secondary text-center pt-2">
                     +{{ knowledge.domains|length - 6 }} more domains
                 </p>
                 {% endif %}
             </div>
             {% else %}
-            <p class="text-sm text-tertiary dark:text-tertiary">No domains detected</p>
+            <p class="text-sm text-tertiary">No domains detected</p>
             {% endif %}
         </div>
     </div>
@@ -353,23 +330,23 @@
                 </svg>
             </div>
             <div class="ml-4">
-                <h3 class="text-lg font-semibold text-primary dark:text-primary">Experts</h3>
-                <p class="text-xs text-secondary dark:text-secondary">{{ knowledge.experts|length }} AI assistants configured</p>
+                <h3 class="text-lg font-semibold text-primary">Experts</h3>
+                <p class="text-xs text-secondary">{{ knowledge.experts|length }} AI assistants configured</p>
             </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {% for expert in knowledge.experts[:9] %}
             <div class="item-card cursor-pointer" onclick="viewExpert('{{ expert.name }}')" data-expert-name="{{ expert.name }}">
-                <div class="w-8 h-8 bg-pink-100 dark:bg-pink-900 rounded flex items-center justify-center flex-shrink-0">
-                    <svg class="w-4 h-4 text-pink-600 dark:text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-8 h-8 bg-pink-100 rounded flex items-center justify-center flex-shrink-0">
+                    <svg class="w-4 h-4 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                     </svg>
                 </div>
                 <div class="flex-1 min-w-0">
-                    <div class="font-medium text-sm text-primary dark:text-primary">{{ expert.name }}</div>
+                    <div class="font-medium text-sm text-primary">{{ expert.name }}</div>
                     {% if expert.triggers %}
-                    <div class="text-xs text-tertiary dark:text-tertiary truncate">
+                    <div class="text-xs text-tertiary truncate">
                         {{ expert.triggers[:2]|join(', ') }}{% if expert.triggers|length > 2 %}...{% endif %}
                     </div>
                     {% endif %}
@@ -378,7 +355,7 @@
             {% endfor %}
         </div>
         {% if knowledge.experts|length > 9 %}
-        <p class="text-xs text-secondary dark:text-secondary text-center mt-3">
+        <p class="text-xs text-secondary text-center mt-3">
             +{{ knowledge.experts|length - 9 }} more experts
         </p>
         {% endif %}
@@ -395,8 +372,8 @@
                     </svg>
                 </div>
                 <div class="ml-4">
-                    <div class="font-medium text-primary dark:text-primary">Clear Knowledge Base</div>
-                    <div class="text-xs text-tertiary dark:text-tertiary">Remove all scouted knowledge. This cannot be undone.</div>
+                    <div class="font-medium text-primary">Clear Knowledge Base</div>
+                    <div class="text-xs text-tertiary">Remove all scouted knowledge. This cannot be undone.</div>
                 </div>
             </div>
             <button id="clear-knowledge-btn" type="button" class="btn btn-danger btn-sm group">
@@ -411,13 +388,13 @@
     {% else %}
     <!-- Empty State -->
     <div class="empty-state-card">
-        <div class="w-20 h-20 mx-auto bg-gradient-to-br from-violet-100 to-purple-200 dark:from-violet-900 dark:to-purple-800 rounded-2xl flex items-center justify-center mb-5 shadow-lg">
-            <svg class="h-10 w-10 text-violet-600 dark:text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="w-20 h-20 mx-auto bg-gradient-to-br from-violet-100 to-purple-200 rounded-2xl flex items-center justify-center mb-5 shadow-lg">
+            <svg class="h-10 w-10 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
             </svg>
         </div>
-        <h3 class="text-xl font-semibold text-primary dark:text-primary mb-2">No Knowledge Yet</h3>
-        <p class="text-secondary dark:text-secondary mb-6 max-w-md mx-auto">
+        <h3 class="text-xl font-semibold text-primary mb-2">No Knowledge Yet</h3>
+        <p class="text-secondary mb-6 max-w-md mx-auto">
             Run the scout to analyze your project and build a knowledge base with technologies, architecture, domains, and coding rules.
         </p>
         <button id="scan-now-empty-btn" type="button" class="btn btn-primary btn-lg group">

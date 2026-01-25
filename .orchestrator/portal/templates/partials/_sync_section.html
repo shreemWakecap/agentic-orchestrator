@@ -39,7 +39,7 @@
 <!-- Collapsible Sync Section -->
 <div class="glass-card mb-8" id="sync-section">
     <!-- Collapsible Header -->
-    <button type="button" id="sync-section-header" class="sync-section-header w-full px-8 py-5 flex items-center justify-between cursor-pointer hover:bg-tertiary/30 dark:hover:bg-tertiary/20 transition-colors rounded-t-xl" onclick="toggleSyncSection()">
+    <button type="button" id="sync-section-header" class="sync-section-header w-full px-8 py-5 flex items-center justify-between cursor-pointer hover:bg-tertiary/30 transition-colors rounded-t-xl" onclick="toggleSyncSection()">
         <div class="flex items-center">
             <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mr-4 shadow-lg">
                 <svg class="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,18 +47,18 @@
                 </svg>
             </div>
             <div class="text-left">
-                <h2 class="text-lg font-semibold text-primary dark:text-primary">Sync to Remote</h2>
-                <p class="text-sm text-tertiary dark:text-tertiary">Commit local changes and create a pull request</p>
+                <h2 class="text-lg font-semibold text-primary">Sync to Remote</h2>
+                <p class="text-sm text-tertiary">Commit local changes and create a pull request</p>
             </div>
         </div>
-        <svg id="sync-section-chevron" class="h-5 w-5 text-tertiary dark:text-tertiary transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg id="sync-section-chevron" class="h-5 w-5 text-tertiary transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
         </svg>
     </button>
 
     <!-- Collapsible Content -->
     <div id="sync-section-content" class="sync-section-content">
-        <div class="px-8 pb-8 pt-4 border-t border-primary/10 dark:border-primary/10">
+        <div class="px-8 pb-8 pt-4 border-t border-primary/10">
             <div class="flex items-center justify-end mb-4">
                 <button type="button" id="sync-refresh-btn" class="btn btn-sm btn-secondary btn-modern group" title="Refresh sync status">
                     <svg class="h-4 w-4 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -70,7 +70,7 @@
 
             <!-- Loading State -->
             <div id="sync-status-loading" class="glass rounded-xl p-4 mb-5">
-                <div class="flex items-center justify-center text-sm text-secondary dark:text-secondary">
+                <div class="flex items-center justify-center text-sm text-secondary">
                     <svg class="animate-spin h-5 w-5 mr-3 text-violet-500" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -83,19 +83,19 @@
             <div id="sync-status-content" class="hidden">
                 <!-- Branch Info -->
                 <div class="glass rounded-xl p-4 mb-4">
-                    <div class="flex items-center text-sm text-secondary dark:text-secondary">
+                    <div class="flex items-center text-sm text-secondary">
                         <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                         </svg>
                         <span class="font-medium mr-2">Branch:</span>
-                        <span id="sync-branch" class="font-mono text-primary dark:text-primary bg-tertiary dark:bg-tertiary px-2 py-0.5 rounded">--</span>
+                        <span id="sync-branch" class="font-mono text-primary bg-tertiary px-2 py-0.5 rounded">--</span>
                     </div>
                 </div>
 
                 <!-- File Count Badge and Status -->
                 <div class="glass rounded-xl p-4 mb-4">
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center text-sm text-secondary dark:text-secondary">
+                        <div class="flex items-center text-sm text-secondary">
                             <svg class="h-5 w-5 mr-3 text-violet-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
@@ -104,21 +104,21 @@
                         <span id="sync-file-count" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-violet-500 to-purple-500 text-white shadow-sm">0</span>
                     </div>
                     <!-- Staged/Unstaged counts -->
-                    <div class="mt-3 flex items-center gap-4 text-xs text-tertiary dark:text-tertiary">
+                    <div class="mt-3 flex items-center gap-4 text-xs text-tertiary">
                         <div class="flex items-center">
                             <span class="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></span>
-                            <span>Staged: <span id="sync-staged-count" class="font-semibold text-emerald-600 dark:text-emerald-400">0</span></span>
+                            <span>Staged: <span id="sync-staged-count" class="font-semibold text-emerald-600">0</span></span>
                         </div>
                         <div class="flex items-center">
                             <span class="w-2 h-2 rounded-full bg-amber-500 mr-1.5"></span>
-                            <span>Unstaged: <span id="sync-unstaged-count" class="font-semibold text-amber-600 dark:text-amber-400">0</span></span>
+                            <span>Unstaged: <span id="sync-unstaged-count" class="font-semibold text-amber-600">0</span></span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Expandable File List -->
                 <div class="glass rounded-xl mb-5 overflow-hidden">
-                    <button type="button" id="sync-file-list-toggle" class="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-secondary dark:text-secondary hover:bg-tertiary/50 dark:hover:bg-tertiary/50 transition-colors">
+                    <button type="button" id="sync-file-list-toggle" class="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-secondary hover:bg-tertiary/50 transition-colors">
                         <span class="flex items-center">
                             <svg class="h-4 w-4 mr-2 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
@@ -129,11 +129,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                         </svg>
                     </button>
-                    <div id="sync-file-list" class="hidden border-t border-primary/10 dark:border-primary/10 max-h-48 overflow-y-auto">
-                        <ul class="divide-y divide-primary/5 dark:divide-primary/5 text-sm font-mono">
+                    <div id="sync-file-list" class="hidden border-t border-primary/10 max-h-48 overflow-y-auto">
+                        <ul class="divide-y divide-primary/5 text-sm font-mono">
                             <!-- Files populated by JS -->
                         </ul>
-                        <div id="sync-file-list-empty" class="px-4 py-3 text-center text-tertiary dark:text-tertiary text-sm">
+                        <div id="sync-file-list-empty" class="px-4 py-3 text-center text-tertiary text-sm">
                             No files to sync
                         </div>
                     </div>
@@ -145,8 +145,8 @@
                 <svg class="h-10 w-10 mx-auto mb-3 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
-                <p class="text-sm font-medium text-secondary dark:text-secondary">All changes synced</p>
-                <p class="text-xs text-tertiary dark:text-tertiary mt-1">No pending changes to push to remote</p>
+                <p class="text-sm font-medium text-secondary">All changes synced</p>
+                <p class="text-xs text-tertiary mt-1">No pending changes to push to remote</p>
             </div>
 
             <!-- Auto-merge Option -->
@@ -157,13 +157,13 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                         </svg>
                         <div>
-                            <span class="text-sm font-medium text-secondary dark:text-secondary">Auto-merge PR</span>
-                            <p class="text-xs text-tertiary dark:text-tertiary">Automatically merge and pull changes after PR creation</p>
+                            <span class="text-sm font-medium text-secondary">Auto-merge PR</span>
+                            <p class="text-xs text-tertiary">Automatically merge and pull changes after PR creation</p>
                         </div>
                     </div>
                     <div class="relative">
                         <input type="checkbox" id="sync-auto-merge" class="sr-only peer" checked>
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 dark:peer-focus:ring-violet-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-violet-600"></div>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-violet-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
                     </div>
                 </label>
             </div>
@@ -185,32 +185,32 @@
 
             <!-- Open PRs Section (hidden initially) -->
             <div id="sync-open-prs" class="hidden glass rounded-xl mb-5 overflow-hidden">
-                <div class="px-4 py-3 border-b border-primary/10 dark:border-primary/10 flex items-center justify-between">
-                    <div class="flex items-center text-sm font-medium text-secondary dark:text-secondary">
+                <div class="px-4 py-3 border-b border-primary/10 flex items-center justify-between">
+                    <div class="flex items-center text-sm font-medium text-secondary">
                         <svg class="h-4 w-4 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
                         </svg>
                         Open Pull Requests
                     </div>
-                    <span id="sync-pr-count" class="text-xs font-bold text-amber-600 dark:text-amber-400">0</span>
+                    <span id="sync-pr-count" class="text-xs font-bold text-amber-600">0</span>
                 </div>
-                <ul id="sync-pr-list" class="divide-y divide-primary/5 dark:divide-primary/5 max-h-40 overflow-y-auto">
+                <ul id="sync-pr-list" class="divide-y divide-primary/5 max-h-40 overflow-y-auto">
                     <!-- PRs populated by JS -->
                 </ul>
             </div>
 
             <!-- Local Sync Branches Section (hidden initially) -->
             <div id="sync-local-branches" class="hidden glass rounded-xl overflow-hidden">
-                <div class="px-4 py-3 border-b border-primary/10 dark:border-primary/10 flex items-center justify-between">
-                    <div class="flex items-center text-sm font-medium text-secondary dark:text-secondary">
+                <div class="px-4 py-3 border-b border-primary/10 flex items-center justify-between">
+                    <div class="flex items-center text-sm font-medium text-secondary">
                         <svg class="h-4 w-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                         </svg>
                         Local Sync Branches
                     </div>
-                    <span id="sync-branch-count" class="text-xs font-bold text-blue-600 dark:text-blue-400">0</span>
+                    <span id="sync-branch-count" class="text-xs font-bold text-blue-600">0</span>
                 </div>
-                <ul id="sync-branch-list" class="divide-y divide-primary/5 dark:divide-primary/5 max-h-40 overflow-y-auto">
+                <ul id="sync-branch-list" class="divide-y divide-primary/5 max-h-40 overflow-y-auto">
                     <!-- Branches populated by JS -->
                 </ul>
             </div>

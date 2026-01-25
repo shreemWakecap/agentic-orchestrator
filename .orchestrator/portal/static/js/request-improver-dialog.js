@@ -247,7 +247,7 @@ const RequestImproverDialog = (function() {
 
         return [
             // Header with gradient
-            '<div class="relative px-6 py-4 border-b border-primary/10 dark:border-primary/10">',
+            '<div class="relative px-6 py-4 border-b border-primary/10">',
             '  <div class="absolute inset-0 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-indigo-500/10"></div>',
             '  <div class="relative flex items-center justify-between">',
             '    <div class="flex items-center">',
@@ -258,7 +258,7 @@ const RequestImproverDialog = (function() {
             '      </div>',
             '      <div>',
             '        <h2 class="text-xl font-bold text-gradient-primary">AI Request Improvement</h2>',
-            '        <p class="text-xs text-tertiary dark:text-tertiary">Enhancing your request with AI</p>',
+            '        <p class="text-xs text-tertiary">Enhancing your request with AI</p>',
             '      </div>',
             '    </div>',
             '    <button id="improve-close-btn" type="button" class="p-2 text-tertiary hover:text-primary transition-colors rounded-lg hover:bg-tertiary/50">',
@@ -275,14 +275,14 @@ const RequestImproverDialog = (function() {
 
             // Original draft (left)
             '    <div class="space-y-2">',
-            '      <div class="flex items-center text-sm font-medium text-tertiary dark:text-tertiary">',
+            '      <div class="flex items-center text-sm font-medium text-tertiary">',
             '        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>',
             '        </svg>',
             '        YOUR DRAFT',
             '      </div>',
-            '      <div class="glass rounded-xl p-4 min-h-[200px] max-h-[300px] overflow-y-auto bg-tertiary/30 dark:bg-tertiary/30">',
-            '        <p class="text-sm text-secondary dark:text-secondary font-mono whitespace-pre-wrap opacity-75">' + nl2br(escapedDraft) + '</p>',
+            '      <div class="glass rounded-xl p-4 min-h-[200px] max-h-[300px] overflow-y-auto bg-tertiary/30">',
+            '        <p class="text-sm text-secondary font-mono whitespace-pre-wrap opacity-75">' + nl2br(escapedDraft) + '</p>',
             '      </div>',
             '    </div>',
 
@@ -297,7 +297,7 @@ const RequestImproverDialog = (function() {
 
             // Improved version (right)
             '    <div class="space-y-2">',
-            '      <div class="flex items-center text-sm font-medium text-violet-600 dark:text-violet-400">',
+            '      <div class="flex items-center text-sm font-medium text-violet-600">',
             '        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path>',
             '        </svg>',
@@ -305,28 +305,28 @@ const RequestImproverDialog = (function() {
             '      </div>',
 
             // Loading state
-            '      <div id="improve-loading" class="glass rounded-xl p-4 min-h-[200px] border-2 border-dashed border-violet-300 dark:border-violet-700 flex flex-col items-center justify-center">',
+            '      <div id="improve-loading" class="glass rounded-xl p-4 min-h-[200px] border-2 border-dashed border-violet-300 flex flex-col items-center justify-center">',
             '        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mb-4 animate-pulse">',
             '          <svg class="w-6 h-6 text-white animate-spin" fill="none" viewBox="0 0 24 24">',
             '            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>',
             '            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>',
             '          </svg>',
             '        </div>',
-            '        <p class="text-sm font-medium text-violet-600 dark:text-violet-400">Enhancing your request...</p>',
-            '        <p class="text-xs text-tertiary dark:text-tertiary mt-1">AI is analyzing and improving</p>',
+            '        <p class="text-sm font-medium text-violet-600">Enhancing your request...</p>',
+            '        <p class="text-xs text-tertiary mt-1">AI is analyzing and improving</p>',
             '      </div>',
 
             // Result state
-            '      <div id="improve-result" class="hidden glass rounded-xl p-4 min-h-[200px] max-h-[300px] overflow-y-auto border-2 border-violet-400 dark:border-violet-600 bg-gradient-to-br from-violet-50/50 to-purple-50/50 dark:from-violet-950/30 dark:to-purple-950/30">',
-            '        <p id="improved-text" class="text-sm text-primary dark:text-primary font-mono whitespace-pre-wrap"></p>',
+            '      <div id="improve-result" class="hidden glass rounded-xl p-4 min-h-[200px] max-h-[300px] overflow-y-auto border-2 border-violet-400 bg-gradient-to-br from-violet-50/50 to-purple-50/50">',
+            '        <p id="improved-text" class="text-sm text-primary font-mono whitespace-pre-wrap"></p>',
             '      </div>',
 
             // Error state
-            '      <div id="improve-error" class="hidden glass rounded-xl p-4 min-h-[200px] border-2 border-amber-300 dark:border-amber-700 flex flex-col items-center justify-center bg-amber-50/50 dark:bg-amber-950/30">',
+            '      <div id="improve-error" class="hidden glass rounded-xl p-4 min-h-[200px] border-2 border-amber-300 flex flex-col items-center justify-center bg-amber-50/50">',
             '        <svg class="w-10 h-10 text-amber-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">',
             '          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>',
             '        </svg>',
-            '        <p class="text-sm text-amber-700 dark:text-amber-300 text-center">Could not improve the request at this time.</p>',
+            '        <p class="text-sm text-amber-700 text-center">Could not improve the request at this time.</p>',
             '      </div>',
 
             '    </div>',
@@ -334,7 +334,7 @@ const RequestImproverDialog = (function() {
             '</div>',
 
             // Footer with actions
-            '<div class="px-6 py-4 border-t border-primary/10 dark:border-primary/10 bg-tertiary/30 dark:bg-tertiary/30">',
+            '<div class="px-6 py-4 border-t border-primary/10 bg-tertiary/30">',
             '  <div class="flex items-center justify-end gap-3">',
             '    <button id="keep-original-btn" type="button" class="btn btn-secondary btn-modern">',
             '      Keep Original',

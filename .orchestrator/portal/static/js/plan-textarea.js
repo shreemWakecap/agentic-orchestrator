@@ -116,28 +116,7 @@ const PlanTextarea = (function() {
         var textarea = document.createElement('textarea');
         textarea.id = id;
         textarea.name = 'plan-content';
-        textarea.className = [
-            'plan-textarea',
-            'w-full',
-            'px-4',
-            'py-3',
-            'border',
-            'border-gray-300',
-            'dark:border-gray-600',
-            'rounded-lg',
-            'bg-white',
-            'dark:bg-gray-800',
-            'text-gray-900',
-            'dark:text-gray-100',
-            'placeholder-gray-400',
-            'dark:placeholder-gray-500',
-            'focus:outline-none',
-            'focus:ring-2',
-            'focus:ring-blue-500',
-            'focus:border-transparent',
-            'transition-all',
-            'duration-200'
-        ].join(' ');
+        textarea.className = 'plan-textarea w-full';
         textarea.placeholder = config.placeholder || PLAN_DEFAULTS.placeholder;
         textarea.setAttribute('aria-label', config.ariaLabel || PLAN_DEFAULTS.ariaLabel);
 
@@ -166,18 +145,18 @@ const PlanTextarea = (function() {
 
         // Clear previous classes
         element.classList.remove(
-            'text-red-600', 'dark:text-red-400',
-            'text-yellow-600', 'dark:text-yellow-400',
-            'text-green-600', 'dark:text-green-400',
+            'text-red-600',
+            'text-yellow-600',
+            'text-green-600',
             'hidden'
         );
 
         if (validationResult.errors.length > 0) {
             element.textContent = validationResult.errors[0];
-            element.classList.add('text-red-600', 'dark:text-red-400');
+            element.classList.add('text-red-600');
         } else if (validationResult.warnings.length > 0) {
             element.textContent = validationResult.warnings[0];
-            element.classList.add('text-yellow-600', 'dark:text-yellow-400');
+            element.classList.add('text-yellow-600');
         } else {
             element.classList.add('hidden');
         }

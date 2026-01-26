@@ -125,16 +125,16 @@ const MarkdownViewer = {
 
         // Process code blocks first (before other transformations)
         html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
-            return `<pre class="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4"><code class="language-${lang || 'text'}">${code.trim()}</code></pre>`;
+            return `<pre class="md-code-block my-4"><code class="language-${lang || 'text'}">${code.trim()}</code></pre>`;
         });
 
         // Process inline code
-        html = html.replace(/`([^`]+)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800">$1</code>');
+        html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
 
         // Process headers (must be at line start)
-        html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-gray-900 mt-4 mb-2">$1</h3>');
-        html = html.replace(/^## (.+)$/gm, '<h2 class="text-xl font-semibold text-gray-900 mt-5 mb-3">$1</h2>');
-        html = html.replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold text-gray-900 mt-6 mb-4">$1</h1>');
+        html = html.replace(/^### (.+)$/gm, '<h3 class="md-heading text-lg font-semibold mt-4 mb-2">$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2 class="md-heading text-xl font-semibold mt-5 mb-3">$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1 class="md-heading text-2xl font-bold mt-6 mb-4">$1</h1>');
 
         // Process bold and italic
         html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
@@ -145,25 +145,25 @@ const MarkdownViewer = {
         html = html.replace(/_(.+?)_/g, '<em>$1</em>');
 
         // Process horizontal rules
-        html = html.replace(/^---$/gm, '<hr class="my-6 border-gray-300">');
-        html = html.replace(/^\*\*\*$/gm, '<hr class="my-6 border-gray-300">');
+        html = html.replace(/^---$/gm, '<hr class="md-hr my-6">');
+        html = html.replace(/^\*\*\*$/gm, '<hr class="md-hr my-6">');
 
         // Process unordered lists
         html = html.replace(/^(\s*)[-*+] (.+)$/gm, (match, indent, content) => {
             const level = Math.floor(indent.length / 2);
             const paddingClass = level > 0 ? `ml-${level * 4}` : '';
-            return `<li class="list-disc list-inside ${paddingClass} my-1 text-gray-700">${content}</li>`;
+            return `<li class="md-text list-disc list-inside ${paddingClass} my-1">${content}</li>`;
         });
 
         // Process ordered lists
         html = html.replace(/^(\s*)\d+\. (.+)$/gm, (match, indent, content) => {
             const level = Math.floor(indent.length / 2);
             const paddingClass = level > 0 ? `ml-${level * 4}` : '';
-            return `<li class="list-decimal list-inside ${paddingClass} my-1 text-gray-700">${content}</li>`;
+            return `<li class="md-text list-decimal list-inside ${paddingClass} my-1">${content}</li>`;
         });
 
         // Process blockquotes
-        html = html.replace(/^&gt; (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 pl-4 py-1 my-2 text-gray-600 italic">$1</blockquote>');
+        html = html.replace(/^&gt; (.+)$/gm, '<blockquote class="md-blockquote">$1</blockquote>');
 
         // Process links
         html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-primary-600 hover:underline" target="_blank" rel="noopener noreferrer">$1</a>');
@@ -183,7 +183,7 @@ const MarkdownViewer = {
             }
             // Wrap plain text in paragraphs
             if (trimmed) {
-                return `<p class="my-2 text-gray-700">${trimmed.replace(/\n/g, '<br>')}</p>`;
+                return `<p class="md-text my-2">${trimmed.replace(/\n/g, '<br>')}</p>`;
             }
             return '';
         }).join('\n');

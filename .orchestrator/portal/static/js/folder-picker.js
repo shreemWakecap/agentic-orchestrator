@@ -129,7 +129,20 @@ const FolderPicker = (function() {
         feedbackElement = getElement(options.feedback);
 
         // Create debounced validation function
-        debouncedValidate = OrchestratorUtils.debounce(function(path) {
+        // Use OrchestratorUtils.debounce if available, fall back to CoreUtils.debounce, or inline fallback
+        var debounceFunc = (typeof OrchestratorUtils !== 'undefined' && OrchestratorUtils.debounce)
+            ? OrchestratorUtils.debounce
+            : (typeof CoreUtils !== 'undefined' && CoreUtils.debounce)
+                ? CoreUtils.debounce
+                : function(fn, delay) {
+                    var timeout;
+                    return function() {
+                        var context = this, args = arguments;
+                        clearTimeout(timeout);
+                        timeout = setTimeout(function() { fn.apply(context, args); }, delay);
+                    };
+                };
+        debouncedValidate = debounceFunc(function(path) {
             validatePath(path);
         }, config.debounceDelay);
 
@@ -496,11 +509,21 @@ const FolderPicker = (function() {
                 break;
             case 'valid':
                 feedbackElement.classList.add('text-green-600');
-                feedbackElement.innerHTML = '<span>&#10003; ' + OrchestratorUtils.escapeHtml(message || 'Valid path') + '</span>';
+                var escapeHtmlFunc = (typeof OrchestratorUtils !== 'undefined' && OrchestratorUtils.escapeHtml)
+                    ? OrchestratorUtils.escapeHtml
+                    : (typeof CoreUtils !== 'undefined' && CoreUtils.escapeHtml)
+                        ? CoreUtils.escapeHtml
+                        : function(str) { return String(str).replace(/[&<>"']/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); };
+                feedbackElement.innerHTML = '<span>&#10003; ' + escapeHtmlFunc(message || 'Valid path') + '</span>';
                 break;
             case 'invalid':
                 feedbackElement.classList.add('text-red-600');
-                feedbackElement.innerHTML = '<span>&#10007; ' + OrchestratorUtils.escapeHtml(message || 'Invalid path') + '</span>';
+                var escapeHtmlFn = (typeof OrchestratorUtils !== 'undefined' && OrchestratorUtils.escapeHtml)
+                    ? OrchestratorUtils.escapeHtml
+                    : (typeof CoreUtils !== 'undefined' && CoreUtils.escapeHtml)
+                        ? CoreUtils.escapeHtml
+                        : function(str) { return String(str).replace(/[&<>"']/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); };
+                feedbackElement.innerHTML = '<span>&#10007; ' + escapeHtmlFn(message || 'Invalid path') + '</span>';
                 break;
             default:
                 // Clear state

@@ -58,6 +58,227 @@
     .event-item:nth-child(3) { animation-delay: 0.15s; }
     .event-item:nth-child(4) { animation-delay: 0.2s; }
     .event-item:nth-child(5) { animation-delay: 0.25s; }
+
+    /* Force Stop Button Styles */
+    .btn-danger {
+        background-color: var(--color-danger-600, #e11d48);
+        color: white;
+    }
+    .btn-danger:hover:not(:disabled) {
+        background-color: var(--color-danger-700, #be123c);
+    }
+    .btn-danger:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Force Stop Modal Styles */
+    .force-stop-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        animation: fadeIn 0.2s ease-out;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    .force-stop-modal {
+        background: var(--bg-primary, white);
+        border-radius: 1rem;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        max-width: 28rem;
+        width: calc(100% - 2rem);
+        overflow: hidden;
+        animation: slideUp 0.3s ease-out;
+    }
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+    .force-stop-input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border: 2px solid var(--color-danger-200, #fecdd3);
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        font-family: ui-monospace, monospace;
+        transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .force-stop-input:focus {
+        outline: none;
+        border-color: var(--color-danger-500, #f43f5e);
+        box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.2);
+    }
+    .force-stop-input.valid {
+        border-color: var(--color-success-500, #10b981);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+    }
+
+    /* Danger Modal Overlay */
+    .danger-modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+        animation: dangerFadeIn 0.25s ease-out;
+    }
+    @keyframes dangerFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* Danger Modal Content Card */
+    .danger-modal-content {
+        background: var(--bg-primary, white);
+        border-radius: 1rem;
+        border: 2px solid var(--color-danger-500, #f43f5e);
+        box-shadow: 0 25px 50px -12px rgba(244, 63, 94, 0.35),
+                    0 0 0 1px rgba(244, 63, 94, 0.1);
+        max-width: 32rem;
+        width: calc(100% - 2rem);
+        overflow: hidden;
+        animation: dangerSlideUp 0.3s ease-out;
+    }
+    @keyframes dangerSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    /* Danger Warning Icon */
+    .danger-warning-icon {
+        width: 4rem;
+        height: 4rem;
+        border-radius: 50%;
+        background: linear-gradient(135deg, var(--color-danger-500, #f43f5e), var(--color-danger-600, #e11d48));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: dangerIconPulse 1.5s ease-in-out infinite;
+        box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+    }
+    @keyframes dangerIconPulse {
+        0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+        }
+        50% {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(244, 63, 94, 0.6);
+        }
+    }
+    .danger-warning-icon svg {
+        width: 2rem;
+        height: 2rem;
+        color: white;
+        animation: dangerIconShake 0.5s ease-in-out;
+    }
+    @keyframes dangerIconShake {
+        0%, 100% { transform: rotate(0deg); }
+        25% { transform: rotate(-5deg); }
+        75% { transform: rotate(5deg); }
+    }
+
+    /* Danger Confirm Input Validation Styling */
+    .danger-confirm-input {
+        width: 100%;
+        padding: 0.875rem 1rem;
+        border: 2px solid var(--color-danger-200, #fecdd3);
+        border-radius: 0.5rem;
+        font-size: 0.9375rem;
+        font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+        background: var(--bg-primary, white);
+        color: var(--text-primary, #111827);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+    .danger-confirm-input::placeholder {
+        color: var(--color-danger-300, #fda4af);
+    }
+    .danger-confirm-input:focus {
+        outline: none;
+        border-color: var(--color-danger-500, #f43f5e);
+        box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.15);
+        background: var(--bg-primary, white);
+    }
+    .danger-confirm-input.input-valid {
+        border-color: var(--color-success-500, #10b981);
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.15);
+        background: rgba(16, 185, 129, 0.05);
+    }
+    .danger-confirm-input.input-invalid {
+        border-color: var(--color-danger-500, #f43f5e);
+        box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.15);
+        background: rgba(244, 63, 94, 0.05);
+    }
+
+    /* Danger Submit Button States */
+    .danger-submit-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        border-radius: 0.5rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background: linear-gradient(135deg, var(--color-danger-500, #f43f5e), var(--color-danger-600, #e11d48));
+        color: white;
+        box-shadow: 0 2px 4px rgba(244, 63, 94, 0.3);
+    }
+    .danger-submit-btn:hover:not(:disabled) {
+        background: linear-gradient(135deg, var(--color-danger-600, #e11d48), var(--color-danger-700, #be123c));
+        box-shadow: 0 4px 8px rgba(244, 63, 94, 0.4);
+        transform: translateY(-1px);
+    }
+    .danger-submit-btn:active:not(:disabled) {
+        transform: translateY(0);
+        box-shadow: 0 1px 2px rgba(244, 63, 94, 0.3);
+    }
+    .danger-submit-btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.3);
+    }
+    .danger-submit-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        background: var(--color-danger-300, #fda4af);
+        box-shadow: none;
+        transform: none;
+    }
+    .danger-submit-btn.loading {
+        pointer-events: none;
+    }
+    .danger-submit-btn.loading svg {
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
 </style>
 {% endblock %}
 
@@ -80,6 +301,17 @@
                     </div>
                 </div>
                 <div class="flex items-center space-x-3">
+                    {% if run.status == 'running' or run.status == 'pending' %}
+                    <button id="force-stop-btn"
+                            class="btn btn-danger inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white bg-danger-600 hover:bg-danger-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger-500 transition-colors"
+                            onclick="ForceStopDialog.show()">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>
+                        </svg>
+                        Force Stop
+                    </button>
+                    {% endif %}
                     <span id="status-badge" class="status-badge lg shadow-soft
                         {% if run.status == 'completed' %}status-badge-completed
                         {% elif run.status == 'running' %}status-badge-running
@@ -372,4 +604,256 @@
 <script src="/static/js/common.js"></script>
 <script src="/static/js/logs.js"></script>
 <script src="/static/js/build-progress.js"></script>
+<script src="/static/js/toast.js"></script>
+<script>
+/**
+ * Force Stop Dialog Module
+ *
+ * Provides a dangerous action confirmation dialog for force-stopping stuck workflow runs.
+ * Requires the user to type "I understand" to enable the confirm button.
+ */
+const ForceStopDialog = (function() {
+    'use strict';
+
+    const CONFIRMATION_TEXT = 'I understand';
+    let overlay = null;
+
+    /**
+     * Escape HTML to prevent XSS
+     */
+    function escapeHtml(text) {
+        if (typeof OrchestratorUtils !== 'undefined' && OrchestratorUtils.escapeHtml) {
+            return OrchestratorUtils.escapeHtml(text);
+        }
+        var div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    /**
+     * Get the run ID from the page data attribute
+     */
+    function getRunId() {
+        var page = document.getElementById('run-detail-page');
+        return page ? page.dataset.runId : null;
+    }
+
+    /**
+     * Create and show the confirmation dialog
+     */
+    function show() {
+        var runId = getRunId();
+        if (!runId) {
+            if (typeof Toast !== 'undefined') {
+                Toast.error('Unable to determine run ID');
+            }
+            return;
+        }
+
+        // Create modal overlay
+        overlay = document.createElement('div');
+        overlay.className = 'force-stop-overlay';
+        overlay.id = 'force-stop-dialog-overlay';
+
+        overlay.innerHTML =
+            '<div class="force-stop-modal">' +
+                // Header with warning icon
+                '<div class="px-6 py-4 border-b border-danger-200 bg-danger-50">' +
+                    '<div class="flex items-center space-x-3">' +
+                        '<div class="w-12 h-12 rounded-full bg-danger-100 flex items-center justify-center flex-shrink-0">' +
+                            '<svg class="w-6 h-6 text-danger-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>' +
+                            '</svg>' +
+                        '</div>' +
+                        '<div class="flex-1">' +
+                            '<h3 class="text-lg font-bold text-danger-800">Force Stop Workflow</h3>' +
+                            '<p class="text-sm text-danger-600 font-mono">' + escapeHtml(runId) + '</p>' +
+                        '</div>' +
+                        '<button id="force-stop-close-btn" class="text-danger-400 hover:text-danger-600 transition-colors p-1">' +
+                            '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                                '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>' +
+                            '</svg>' +
+                        '</button>' +
+                    '</div>' +
+                '</div>' +
+                // Content
+                '<div class="px-6 py-5">' +
+                    '<div class="mb-4 p-4 rounded-lg bg-danger-50 border border-danger-200">' +
+                        '<p class="text-danger-800 font-medium mb-2">Warning: This action cannot be undone!</p>' +
+                        '<ul class="space-y-2 text-sm text-danger-700">' +
+                            '<li class="flex items-start space-x-2">' +
+                                '<svg class="w-4 h-4 text-danger-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">' +
+                                    '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' +
+                                '</svg>' +
+                                '<span>The workflow run will be immediately terminated</span>' +
+                            '</li>' +
+                            '<li class="flex items-start space-x-2">' +
+                                '<svg class="w-4 h-4 text-danger-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">' +
+                                    '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' +
+                                '</svg>' +
+                                '<span>Any unsaved progress will be lost permanently</span>' +
+                            '</li>' +
+                            '<li class="flex items-start space-x-2">' +
+                                '<svg class="w-4 h-4 text-danger-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">' +
+                                    '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>' +
+                                '</svg>' +
+                                '<span>You take full responsibility for stopping this task</span>' +
+                            '</li>' +
+                        '</ul>' +
+                    '</div>' +
+                    '<div class="mb-4">' +
+                        '<label for="force-stop-confirm-input" class="block text-sm font-medium text-tertiary mb-2">' +
+                            'Type <code class="px-2 py-1 bg-secondary-100 rounded text-danger-600 font-mono">' + escapeHtml(CONFIRMATION_TEXT) + '</code> to confirm:' +
+                        '</label>' +
+                        '<input type="text" id="force-stop-confirm-input" class="force-stop-input" placeholder="Type here..." autocomplete="off">' +
+                    '</div>' +
+                '</div>' +
+                // Footer
+                '<div class="px-6 py-4 bg-secondary-50 border-t border-light flex justify-end space-x-3">' +
+                    '<button id="force-stop-cancel-btn" class="px-4 py-2 text-secondary-700 bg-white border border-secondary-300 rounded-lg hover:bg-secondary-50 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary-500">' +
+                        'Cancel' +
+                    '</button>' +
+                    '<button id="force-stop-confirm-btn" disabled class="px-4 py-2 text-white bg-danger-600 rounded-lg transition-colors font-medium flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-danger-500 disabled:opacity-50 disabled:cursor-not-allowed">' +
+                        '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">' +
+                            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>' +
+                            '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"></path>' +
+                        '</svg>' +
+                        '<span>Force Stop</span>' +
+                    '</button>' +
+                '</div>' +
+            '</div>';
+
+        document.body.appendChild(overlay);
+
+        // Get element references
+        var confirmInput = document.getElementById('force-stop-confirm-input');
+        var confirmBtn = document.getElementById('force-stop-confirm-btn');
+        var cancelBtn = document.getElementById('force-stop-cancel-btn');
+        var closeBtn = document.getElementById('force-stop-close-btn');
+
+        // Input validation handler
+        confirmInput.addEventListener('input', function() {
+            var isValid = confirmInput.value.trim().toLowerCase() === CONFIRMATION_TEXT.toLowerCase();
+            confirmBtn.disabled = !isValid;
+            if (isValid) {
+                confirmInput.classList.add('valid');
+            } else {
+                confirmInput.classList.remove('valid');
+            }
+        });
+
+        // Confirm button handler
+        confirmBtn.addEventListener('click', function() {
+            if (!confirmBtn.disabled) {
+                executeForceStop(runId);
+            }
+        });
+
+        // Cancel/close handlers
+        cancelBtn.addEventListener('click', hide);
+        closeBtn.addEventListener('click', hide);
+
+        // Click outside to close
+        overlay.addEventListener('click', function(e) {
+            if (e.target === overlay) {
+                hide();
+            }
+        });
+
+        // ESC key to close
+        document.addEventListener('keydown', handleKeyDown);
+
+        // Focus the input field
+        confirmInput.focus();
+    }
+
+    /**
+     * Handle keydown events for the dialog
+     */
+    function handleKeyDown(e) {
+        if (e.key === 'Escape') {
+            hide();
+        } else if (e.key === 'Enter') {
+            var confirmBtn = document.getElementById('force-stop-confirm-btn');
+            if (confirmBtn && !confirmBtn.disabled) {
+                var runId = getRunId();
+                if (runId) {
+                    executeForceStop(runId);
+                }
+            }
+        }
+    }
+
+    /**
+     * Execute the force stop API call
+     */
+    function executeForceStop(runId) {
+        var confirmBtn = document.getElementById('force-stop-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.disabled = true;
+            confirmBtn.innerHTML =
+                '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">' +
+                    '<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>' +
+                    '<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>' +
+                '</svg>' +
+                '<span>Stopping...</span>';
+        }
+
+        fetch('/api/runs/' + encodeURIComponent(runId) + '/force-stop', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                confirmation_text: CONFIRMATION_TEXT
+            })
+        })
+        .then(function(response) {
+            if (!response.ok) {
+                return response.json().then(function(data) {
+                    throw new Error(data.detail || 'Failed to force stop the run');
+                });
+            }
+            return response.json();
+        })
+        .then(function(data) {
+            hide();
+            if (typeof Toast !== 'undefined') {
+                Toast.success('Workflow run has been force stopped');
+            }
+            // Reload page after short delay to show updated status
+            setTimeout(function() {
+                window.location.reload();
+            }, 1000);
+        })
+        .catch(function(error) {
+            hide();
+            if (typeof Toast !== 'undefined') {
+                Toast.error(error.message || 'Failed to force stop the run');
+            } else {
+                alert('Error: ' + (error.message || 'Failed to force stop the run'));
+            }
+        });
+    }
+
+    /**
+     * Hide and cleanup the dialog
+     */
+    function hide() {
+        document.removeEventListener('keydown', handleKeyDown);
+        if (overlay && overlay.parentNode) {
+            overlay.remove();
+        }
+        overlay = null;
+    }
+
+    return {
+        show: show,
+        hide: hide
+    };
+})();
+
+// Expose globally
+window.ForceStopDialog = ForceStopDialog;
+</script>
 {% endblock %}

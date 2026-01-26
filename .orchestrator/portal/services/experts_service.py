@@ -48,17 +48,16 @@ class ExpertsService:
         expert_info: Optional[ExpertInfo] = None
 
         for expert in experts:
-            if expert.name.lower() == name.lower() or expert.file_path.stem.lower() == name.lower():
+            if expert.name.lower() == name.lower():
                 expert_info = expert
                 break
 
         if not expert_info:
             return None
 
-        # Read the expert file content
-        try:
-            content = expert_info.file_path.read_text(encoding="utf-8")
-        except Exception:
+        # Read the expert content from database
+        content = self.expert_loader.get_expert_content(expert_info.name)
+        if not content:
             return None
 
         # Estimate tokens for the content
@@ -105,7 +104,7 @@ class ExpertsService:
                 "description": expert.description,
                 "expert_type": expert.expert_type.value,
                 "category": expert.category,
-                "file_name": expert.file_path.stem,
+                "file_name": expert.name,
             }
             for expert in experts
         ]

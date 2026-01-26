@@ -1,6 +1,6 @@
 """Pydantic request models for API endpoints."""
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PlanRequest(BaseModel):
@@ -105,5 +105,53 @@ class RecoverPlanRequest(BaseModel):
         None,
         description="Step ID to resume from (only used when action is 'resume'). If not provided, resumes from last incomplete step."
     )
+
+
+class ForceStopRunRequest(BaseModel):
+    """Request to force-stop a stuck workflow run.
+
+    Requires explicit user confirmation to proceed with this dangerous action.
+    The confirmation_text must be exactly 'I understand' to acknowledge the risks.
+    """
+    confirmation_text: str = Field(
+        ...,
+        description="Must be exactly 'I understand' to confirm the dangerous action"
+    )
+
+    @field_validator('confirmation_text')
+    @classmethod
+    def validate_confirmation(cls, v: str) -> str:
+        """Validate that confirmation text is exactly 'I understand'."""
+        if v != "I understand":
+            raise ValueError("confirmation_text must be exactly 'I understand' to proceed with force-stop")
+        return v
+
+
+class ForceStopRunResponse(BaseModel):
+    """Response after force-stopping a workflow run."""
+    status: str = Field(..., description="Result status: 'stopped', 'deleted', or 'failed'")
+    run_id: str = Field(..., description="ID of the run that was force-stopped")
+    previous_status: str = Field(..., description="Status of the run before force-stop")
+    message: str = Field(..., description="Human-readable message describing the result")
+
+
+class StuckRunInfo(BaseModel):
+    """Information about a single stuck workflow run."""
+    run_id: str = Field(..., description="Unique identifier for the run")
+    workflow: str = Field(..., description="Type of workflow: plan, build, scout, sync")
+    status: str = Field(..., description="Current status: in_progress, running")
+    started_at: Optional[str] = Field(None, description="ISO timestamp when run started")
+    minutes_stuck: float = Field(..., description="Minutes since last activity")
+    progress: int = Field(0, description="Last known progress percentage (0-100)")
+    current_phase: Optional[str] = Field(None, description="Last known phase name")
+    error: Optional[str] = Field(None, description="Last error message if any")
+    data: Optional[dict] = Field(None, description="Additional run data/context")
+
+
+class StuckRunsResponse(BaseModel):
+    """Response for listing stuck workflow runs."""
+    runs: List[StuckRunInfo] = Field(default_factory=list, description="List of stuck runs")
+    count: int = Field(0, description="Total number of stuck runs")
+    threshold_minutes: float = Field(30.0, description="Minutes threshold used to determine stuck status")
 
 

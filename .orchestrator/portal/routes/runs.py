@@ -7,7 +7,15 @@ from fastapi.responses import StreamingResponse
 
 from db import RunRepository
 from portal.dependencies import get_run_repo
-from portal.schemas.responses import RunResponse, RunListResponse
+from portal.schemas.requests import ForceStopRunRequest
+from portal.schemas.responses import (
+    RunResponse,
+    RunListResponse,
+    ForceStopRunResponse,
+    StuckRunsResponse,
+    StuckRunInfo,
+)
+from portal.services.run_management_service import get_run_management_service
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
@@ -111,6 +119,45 @@ def _enrich_run_response(run: dict, run_repo: RunRepository) -> dict:
     return enriched
 
 
+@router.get("/stuck", response_model=StuckRunsResponse)
+async def list_stuck_runs(
+    stale_minutes: int = 30,
+    run_repo: RunRepository = Depends(get_run_repo),
+) -> StuckRunsResponse:
+    """List workflow runs that appear to be stuck.
+
+    Returns runs that have been in 'running' or 'pending' status
+    for longer than the specified threshold.
+
+    Args:
+        stale_minutes: Minutes threshold to consider a run stuck (default 30)
+
+    Returns:
+        List of stuck runs with metadata
+    """
+    service = get_run_management_service()
+    stuck_runs = service.get_stuck_runs(stale_minutes=stale_minutes)
+
+    # Convert to response format
+    runs_info = []
+    for run in stuck_runs:
+        run_data = run.get("data") or {}
+        runs_info.append(
+            StuckRunInfo(
+                run_id=run.get("run_id", ""),
+                workflow=run.get("workflow", "unknown"),
+                status=run.get("status", "unknown"),
+                started_at=run.get("started_at"),
+                minutes_stuck=run.get("stuck_duration_minutes", 0.0),
+            )
+        )
+
+    return StuckRunsResponse(
+        runs=runs_info,
+        count=len(runs_info),
+    )
+
+
 @router.get("", response_model=RunListResponse)
 async def list_runs(
     status: Optional[str] = None,
@@ -151,6 +198,66 @@ async def get_run(
     # Enrich with phase info and activity log
     enriched_run = _enrich_run_response(run, run_repo)
     return RunResponse(**enriched_run)
+
+
+@router.post("/{run_id}/force-stop", response_model=ForceStopRunResponse)
+async def force_stop_run(
+    run_id: str,
+    request: ForceStopRunRequest,
+    run_repo: RunRepository = Depends(get_run_repo),
+) -> ForceStopRunResponse:
+    """Force stop a stuck workflow run.
+
+    This is a dangerous action that forcefully terminates a workflow run.
+    Requires explicit confirmation by providing confirmation_text="I understand".
+
+    WARNING: This action cannot be undone. The user takes full responsibility
+    for stopping the task.
+
+    Args:
+        run_id: The run ID to force stop
+        request: Request containing confirmation_text
+
+    Returns:
+        ForceStopRunResponse with result details
+
+    Raises:
+        HTTPException 404: If run not found
+        HTTPException 400: If confirmation invalid or run cannot be stopped
+    """
+    # Validate confirmation text (Pydantic validator handles this, but double-check)
+    if request.confirmation_text != "I understand":
+        raise HTTPException(
+            status_code=400,
+            detail="confirmation_text must be exactly 'I understand' to proceed with force-stop",
+        )
+
+    # Verify run exists
+    run = run_repo.get(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    previous_status = run.get("status", "unknown")
+
+    # Use the service to force stop
+    service = get_run_management_service()
+    result = service.force_stop_run(run_id)
+
+    if not result.get("success"):
+        # Determine appropriate error code
+        error_msg = result.get("error", "Unknown error")
+        if "not found" in error_msg.lower():
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=400, detail=error_msg)
+
+    return ForceStopRunResponse(
+        status="stopped",
+        run_id=run_id,
+        previous_status=previous_status,
+        new_status=result.get("new_status", "force_stopped"),
+        message=result.get("message", "Run has been force stopped."),
+    )
 
 
 @router.get("/{run_id}/events")

@@ -8,12 +8,15 @@ Detects if codebase knowledge is stale based on:
 
 Used to auto-trigger scout before planning or alert users.
 """
+import logging
 import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
 from db import get_knowledge_repository
+
+logger = logging.getLogger(__name__)
 
 
 class StalenessChecker:
@@ -60,8 +63,10 @@ class StalenessChecker:
 
         # Get last scan metadata
         last_scan = self._knowledge_repo.get_scan_metadata()
+        logger.debug(f"Staleness check - scan metadata: {last_scan}")
 
         if not last_scan:
+            logger.info("Staleness result: is_stale=True, reason=No previous scan found")
             return True, "No previous scan found"
 
         # Check 1: Time-based staleness
@@ -71,7 +76,9 @@ class StalenessChecker:
                 scan_time = datetime.fromisoformat(scan_time_str)
                 hours_since = (datetime.now() - scan_time).total_seconds() / 3600
                 if hours_since > max_age:
-                    return True, f"Last scan was {int(hours_since)} hours ago (threshold: {max_age})"
+                    reason = f"Last scan was {int(hours_since)} hours ago (threshold: {max_age})"
+                    logger.info(f"Staleness result: is_stale=True, reason={reason}")
+                    return True, reason
             except ValueError:
                 pass
 
@@ -83,13 +90,18 @@ class StalenessChecker:
                 commits_behind = self._count_commits_since(last_commit)
                 if commits_behind > 0:
                     if commits_behind >= self.commit_threshold:
-                        return True, f"{commits_behind} commits since last scan (threshold: {self.commit_threshold})"
+                        reason = f"{commits_behind} commits since last scan (threshold: {self.commit_threshold})"
+                        logger.info(f"Staleness result: is_stale=True, reason={reason}")
+                        return True, reason
 
                     # Even with fewer commits, check if there are significant changes
                     changed_files = self.get_changed_paths()
                     if len(changed_files) > 20:
-                        return True, f"{len(changed_files)} files changed in {commits_behind} commits"
+                        reason = f"{len(changed_files)} files changed in {commits_behind} commits"
+                        logger.info(f"Staleness result: is_stale=True, reason={reason}")
+                        return True, reason
 
+        logger.info("Staleness result: is_stale=False, reason=Knowledge is current")
         return False, "Knowledge is current"
 
     def get_changed_paths(self) -> list[str]:

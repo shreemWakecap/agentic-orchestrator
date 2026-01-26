@@ -296,7 +296,7 @@ class BuildingWorkflow(Workflow):
         for agent_name in required + optional:
             try:
                 self.register_agent(Agent.load(agent_name, self.project_root))
-            except FileNotFoundError:
+            except ValueError:
                 if agent_name in required:
                     self.console.print(f"[yellow]Warning: Agent '{agent_name}' not found[/yellow]")
 

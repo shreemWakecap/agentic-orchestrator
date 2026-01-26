@@ -62,7 +62,7 @@ class SyncingWorkflow(Workflow):
         """Load the syncer agent."""
         try:
             self.register_agent(Agent.load("syncer", self.project_root))
-        except FileNotFoundError:
+        except ValueError:
             self.console.print(f"[yellow]{WARNING} Agent 'syncer' not found - will use fallback messages[/yellow]")
 
     def _run_git(self, cmd: list[str], capture: bool = True, check: bool = True) -> str:

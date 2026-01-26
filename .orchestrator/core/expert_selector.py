@@ -96,7 +96,7 @@ class ExpertSelector:
             index.experts.append(ExpertIndexEntry(
                 name=expert.name,
                 type=expert.expert_type.value,
-                file=str(expert.file_path.relative_to(self.project_root)),
+                file=expert.name,
                 triggers=triggers,
                 weight=weight,
             ))

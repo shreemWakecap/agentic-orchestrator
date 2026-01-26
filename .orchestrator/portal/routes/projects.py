@@ -8,6 +8,7 @@ Provides REST endpoints for managing projects:
 - Archive/restore/remove projects
 - Git operations (fetch, pull, status)
 """
+from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -83,6 +84,20 @@ class MessageResponse(BaseModel):
     success: bool = True
 
 
+class ValidatePathRequest(BaseModel):
+    """Request to validate a file system path."""
+    path: str = Field(..., description="Path to validate")
+
+
+class ValidatePathResponse(BaseModel):
+    """Response for path validation."""
+    valid: bool = Field(..., description="Whether the path is valid for use as a project")
+    exists: bool = Field(..., description="Whether the path exists on the filesystem")
+    is_directory: bool = Field(..., description="Whether the path is a directory")
+    already_registered: bool = Field(..., description="Whether this path is already registered as a project")
+    error: Optional[str] = Field(None, description="Error message if validation failed")
+
+
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
@@ -145,6 +160,93 @@ def _entry_to_response(entry) -> ProjectResponse:
 # =============================================================================
 # ROUTES
 # =============================================================================
+
+@router.post("/validate-path", response_model=ValidatePathResponse)
+async def validate_path(request: ValidatePathRequest):
+    """
+    Validate a file system path for use as a project.
+
+    Checks if the path exists, is a directory, and whether it's
+    already registered as a project.
+
+    Args:
+        request: Path validation request.
+
+    Returns:
+        Validation result with status flags.
+    """
+    path_str = request.path.strip()
+
+    # Handle empty path
+    if not path_str:
+        return ValidatePathResponse(
+            valid=False,
+            exists=False,
+            is_directory=False,
+            already_registered=False,
+            error="Path cannot be empty"
+        )
+
+    try:
+        path = Path(path_str)
+        exists = path.exists()
+        is_directory = path.is_dir() if exists else False
+
+        # Check if already registered as a project
+        already_registered = False
+        try:
+            _check_multi_project_mode()
+            service = _get_project_service()
+            # Resolve to absolute path for comparison
+            resolved_path = str(path.resolve()) if exists else path_str
+            projects = service.list_projects(include_archived=True)
+            for project in projects:
+                project_path = project.get('path') if isinstance(project, dict) else project.path
+                if project_path:
+                    try:
+                        if Path(project_path).resolve() == Path(resolved_path).resolve():
+                            already_registered = True
+                            break
+                    except Exception:
+                        # Path resolution failed, do string comparison
+                        if project_path == resolved_path:
+                            already_registered = True
+                            break
+        except HTTPException:
+            # Multi-project mode not enabled, can't check registration
+            pass
+        except Exception:
+            # Service unavailable, continue without registration check
+            pass
+
+        # Determine if valid (exists, is directory, not already registered)
+        valid = exists and is_directory and not already_registered
+
+        error = None
+        if not exists:
+            error = "Path does not exist"
+        elif not is_directory:
+            error = "Path is not a directory"
+        elif already_registered:
+            error = "Path is already registered as a project"
+
+        return ValidatePathResponse(
+            valid=valid,
+            exists=exists,
+            is_directory=is_directory,
+            already_registered=already_registered,
+            error=error
+        )
+
+    except Exception as e:
+        return ValidatePathResponse(
+            valid=False,
+            exists=False,
+            is_directory=False,
+            already_registered=False,
+            error=f"Invalid path: {str(e)}"
+        )
+
 
 @router.get("/", response_model=ProjectListResponse)
 async def list_projects(include_archived: bool = False):

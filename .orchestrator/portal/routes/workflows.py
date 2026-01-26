@@ -468,7 +468,7 @@ def _run_improve_request_task(draft: str) -> dict:
             "success": True,
         }
 
-    except FileNotFoundError:
+    except ValueError:
         # Agent not found - return original
         return {
             "improved": draft,

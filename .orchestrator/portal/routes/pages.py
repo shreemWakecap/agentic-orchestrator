@@ -16,6 +16,7 @@ from portal.dependencies import (
 from portal.services.plan_service import PlanService
 from portal.services.knowledge_service import KnowledgeService
 from portal.services.token_usage_service import TokenUsageService
+from portal.services.run_management_service import get_run_management_service
 
 # Setup templates
 PORTAL_DIR = Path(__file__).parent.parent
@@ -164,7 +165,20 @@ async def runs_page(
 ):
     """Render runs history page."""
     runs = _transform_runs_for_template(run_repo.list_active())
-    return templates.TemplateResponse(request, "runs.html", {"runs": runs})
+
+    # Get stuck runs for force-stop management
+    run_management_service = get_run_management_service()
+    stuck_runs_raw = run_management_service.get_stuck_runs(stale_minutes=30)
+    stuck_runs = _transform_runs_for_template(stuck_runs_raw)
+    # Preserve enriched fields (can_force_stop, stuck_duration_minutes)
+    for i, stuck_run in enumerate(stuck_runs):
+        if i < len(stuck_runs_raw):
+            stuck_run["can_force_stop"] = stuck_runs_raw[i].get("can_force_stop", False)
+            stuck_run["stuck_duration_minutes"] = stuck_runs_raw[i].get("stuck_duration_minutes", 0)
+
+    return templates.TemplateResponse(
+        request, "runs.html", {"runs": runs, "stuck_runs": stuck_runs}
+    )
 
 
 @router.get("/runs/{run_id}", response_class=HTMLResponse)

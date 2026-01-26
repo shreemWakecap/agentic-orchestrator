@@ -38,6 +38,7 @@ from portal.services.recovery_service import RecoveryService, get_recovery_servi
 from portal.services.plan_status_service import PlanStatusService
 from portal.services.token_usage_service import TokenUsageService
 from portal.services.experts_service import ExpertsService
+from portal.services.run_management_service import RunManagementService
 
 # Project paths
 PORTAL_DIR = Path(__file__).parent
@@ -185,4 +186,15 @@ def get_recovery_service_with_di() -> RecoveryService:
         build_state_repo=get_build_state_repo(),
         plan_repo=get_plan_repo(),
         plan_status_service=get_plan_status_service(),
+    )
+
+
+def get_run_management_service() -> RunManagementService:
+    """Get RunManagementService instance for dependency injection.
+
+    This service handles force stopping stuck workflow runs and
+    cleaning up associated resources (background tasks).
+    """
+    return RunManagementService(
+        run_repo=get_run_repo(),
     )

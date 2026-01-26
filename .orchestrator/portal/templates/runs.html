@@ -73,6 +73,36 @@
     .run-item:nth-child(8) { animation-delay: 350ms; }
     .run-item:nth-child(9) { animation-delay: 400ms; }
     .run-item:nth-child(10) { animation-delay: 450ms; }
+
+    /* Stuck runs warning alert */
+    .stuck-runs-alert {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.05) 100%);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-left: 4px solid var(--color-danger-500, #ef4444);
+        animation: alertPulse 3s ease-in-out infinite;
+    }
+
+    @keyframes alertPulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+        50% { box-shadow: 0 0 12px 2px rgba(239, 68, 68, 0.15); }
+    }
+
+    .stuck-runs-alert:hover {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.08) 100%);
+        border-color: rgba(239, 68, 68, 0.5);
+    }
+
+    .stuck-run-link {
+        transition: all var(--transition-base);
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .stuck-run-link:hover {
+        background: rgba(239, 68, 68, 0.2);
+        border-color: rgba(239, 68, 68, 0.4);
+        transform: translateY(-1px);
+    }
 </style>
 {% endblock %}
 
@@ -99,6 +129,63 @@
             {% endif %}
         </div>
     </div>
+
+    <!-- Stuck Runs Warning Section -->
+    {% set stuck_runs = [] %}
+    {% for run in runs %}
+        {% if run.status == 'running' and run.is_stuck %}
+            {% set _ = stuck_runs.append(run) %}
+        {% endif %}
+    {% endfor %}
+
+    {% if stuck_runs %}
+    <div class="stuck-runs-alert rounded-xl p-5 mb-6 animate-fade-in-down">
+        <div class="flex items-start gap-4">
+            <!-- Warning Icon -->
+            <div class="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1">
+                <h3 class="text-base font-semibold text-red-700 dark:text-red-400 flex items-center gap-2">
+                    <span>Stuck Runs Detected</span>
+                    <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-600 text-white text-xs font-bold">
+                        {{ stuck_runs|length }}
+                    </span>
+                </h3>
+                <p class="mt-1 text-sm text-red-600 dark:text-red-300 opacity-90">
+                    The following runs have been in "running" status for more than 30 minutes and may require attention.
+                    These could be stuck due to an unexpected system shutdown.
+                </p>
+
+                <!-- Stuck Runs Links -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                    {% for stuck_run in stuck_runs %}
+                    <a href="/runs/{{ stuck_run.id }}"
+                       class="stuck-run-link inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-red-700 dark:text-red-300">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <span>{{ stuck_run.workflow|title }}</span>
+                        <span class="text-xs opacity-75">#{{ stuck_run.id }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+
+                <!-- Help Text -->
+                <p class="mt-3 text-xs text-red-500 dark:text-red-400 opacity-80">
+                    <svg class="w-3.5 h-3.5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Click on a run to view details and use "Force Stop" to terminate stuck runs.
+                </p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     {% if runs %}
     <!-- Runs List -->

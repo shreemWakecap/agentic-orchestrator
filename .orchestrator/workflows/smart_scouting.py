@@ -99,7 +99,7 @@ class SmartScoutingWorkflow(Workflow):
         for name in agent_names:
             try:
                 self.register_agent(Agent.load(name, self.project_root))
-            except FileNotFoundError:
+            except ValueError:
                 pass  # Agent not available, will use fallback
 
     def _extract_json(self, response: str) -> Optional[dict]:

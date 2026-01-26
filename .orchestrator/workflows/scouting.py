@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Optional
 
 from core import Agent, Workflow, WorkflowResult, get_agent_config
+from db import get_knowledge_repository
 from core.knowledge_store import (
     KnowledgeStore,
     CodebaseKnowledge,
@@ -61,6 +62,7 @@ class ScoutingWorkflow(Workflow):
 
         # Knowledge store
         self.knowledge_store = KnowledgeStore(project_root)
+        self._knowledge_repo = get_knowledge_repository()
 
         # Output dir for any artifacts
         output_dir = project_root / ".orchestrator" / "knowledge"
@@ -75,9 +77,35 @@ class ScoutingWorkflow(Workflow):
         """Load required agents."""
         try:
             self.register_agent(Agent.load("scout", self.project_root))
-        except FileNotFoundError:
+        except ValueError:
             self.console.print("[red]Error: scout agent not found[/red]")
             raise
+
+    def _get_git_state(self) -> dict:
+        """Get current git state (commit hash, branch)."""
+        import subprocess
+        git_state = {"commit_hash": None, "branch": None}
+
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.project_root,
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                git_state["commit_hash"] = result.stdout.strip()
+
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=self.project_root,
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode == 0:
+                git_state["branch"] = result.stdout.strip()
+        except Exception:
+            pass
+
+        return git_state
 
     def _get_exclude_paths(self) -> list[str]:
         """Get paths to exclude from scanning from config."""
@@ -260,6 +288,17 @@ Remember: Focus on the SOLUTION code, not the orchestration tooling.
 
         self.knowledge_store.save_meta(meta)
 
+        # Also save to ExtendedScanMetadata for staleness checker
+        git_state = self._get_git_state()
+        self._knowledge_repo.save_scan_metadata({
+            "git_commit_hash": git_state.get("commit_hash"),
+            "git_branch": git_state.get("branch"),
+            "scanned_paths": [],
+            "trigger": meta.trigger,
+            "scan_time": meta.completed_at,
+            "mode": meta.scan_type
+        })
+
         # Print summary
         self.console.print(f"\n[green]{CHECK}[/green] Scouting complete!")
         self.console.print(f"  [dim]Duration: {duration:.1f}s | Files: {files_scanned}[/dim]")
@@ -287,7 +326,6 @@ Remember: Focus on the SOLUTION code, not the orchestration tooling.
 
         return WorkflowResult(
             success=True,
-            output_file=self.knowledge_store.codebase_file,
             data={
                 "scan_id": scan_id,
                 "duration": duration,

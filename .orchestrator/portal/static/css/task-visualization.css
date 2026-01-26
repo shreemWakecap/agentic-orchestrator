@@ -1,0 +1,454 @@
+/**
+ * Task Visualization Styles
+ *
+ * Styles for Claude Task tool integration visualization:
+ * - Task nodes with status colors
+ * - Dependency edges
+ * - Wave indicators
+ * - DAG layout
+ */
+
+/* =============================================================================
+   Task Graph Container
+   ============================================================================= */
+
+.task-graph-container {
+    position: relative;
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+}
+
+.task-graph-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.task-graph-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.task-graph-title svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #6366f1;
+}
+
+/* =============================================================================
+   Task Status Summary
+   ============================================================================= */
+
+.task-status-summary {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.task-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.task-status-pill:hover {
+    transform: translateY(-1px);
+}
+
+.task-status-pill-pending {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+.task-status-pill-in-progress {
+    background: #dbeafe;
+    color: #1d4ed8;
+    border: 1px solid #93c5fd;
+}
+
+.task-status-pill-completed {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+}
+
+.task-status-pill-failed {
+    background: #fee2e2;
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+}
+
+.task-status-pill-blocked {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fcd34d;
+}
+
+.task-status-count {
+    font-weight: 700;
+    font-size: 0.875rem;
+}
+
+/* =============================================================================
+   Wave Indicators
+   ============================================================================= */
+
+.task-waves-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.task-wave {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.task-wave-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+}
+
+.task-wave-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.375rem;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    font-size: 0.625rem;
+    font-weight: 700;
+}
+
+.task-wave-tasks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-left: 2rem;
+}
+
+/* =============================================================================
+   Task Nodes
+   ============================================================================= */
+
+.task-node {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: white;
+    border-radius: 0.75rem;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    min-width: 200px;
+    max-width: 300px;
+}
+
+.task-node:hover {
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
+}
+
+.task-node-pending {
+    border-left: 3px solid #94a3b8;
+}
+
+.task-node-in-progress {
+    border-left: 3px solid #3b82f6;
+    background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+    animation: task-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.task-node-completed {
+    border-left: 3px solid #22c55e;
+    background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+}
+
+.task-node-failed {
+    border-left: 3px solid #ef4444;
+    background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+}
+
+.task-node-blocked {
+    border-left: 3px solid #f59e0b;
+    opacity: 0.7;
+}
+
+@keyframes task-pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
+    }
+}
+
+/* Task Node Icon */
+.task-node-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+}
+
+.task-node-icon-pending {
+    background: #f1f5f9;
+    color: #94a3b8;
+}
+
+.task-node-icon-in-progress {
+    background: #dbeafe;
+    color: #3b82f6;
+}
+
+.task-node-icon-in-progress svg {
+    animation: spin 1s linear infinite;
+}
+
+.task-node-icon-completed {
+    background: #dcfce7;
+    color: #22c55e;
+}
+
+.task-node-icon-failed {
+    background: #fee2e2;
+    color: #ef4444;
+}
+
+.task-node-icon-blocked {
+    background: #fef3c7;
+    color: #f59e0b;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Task Node Content */
+.task-node-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.task-node-subject {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1e293b;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.task-node-id {
+    font-size: 0.625rem;
+    font-family: monospace;
+    color: #94a3b8;
+    margin-top: 0.25rem;
+}
+
+.task-node-active-form {
+    font-size: 0.75rem;
+    color: #3b82f6;
+    font-style: italic;
+    margin-top: 0.25rem;
+}
+
+/* =============================================================================
+   Dependency Lines (SVG)
+   ============================================================================= */
+
+.task-dependency-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.task-dependency-line {
+    fill: none;
+    stroke: #cbd5e1;
+    stroke-width: 2;
+    stroke-dasharray: 5, 5;
+    transition: stroke 0.3s ease;
+}
+
+.task-dependency-line-active {
+    stroke: #3b82f6;
+    stroke-dasharray: none;
+    animation: flow 1s linear infinite;
+}
+
+.task-dependency-line-completed {
+    stroke: #22c55e;
+    stroke-dasharray: none;
+}
+
+@keyframes flow {
+    from {
+        stroke-dashoffset: 20;
+    }
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+.task-dependency-arrow {
+    fill: #cbd5e1;
+}
+
+.task-dependency-arrow-active {
+    fill: #3b82f6;
+}
+
+.task-dependency-arrow-completed {
+    fill: #22c55e;
+}
+
+/* =============================================================================
+   Task Graph Grid Layout (Fallback for no-SVG)
+   ============================================================================= */
+
+.task-grid {
+    display: grid;
+    gap: 0.75rem;
+    position: relative;
+    z-index: 1;
+}
+
+.task-grid-wave {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+}
+
+/* =============================================================================
+   Loading State
+   ============================================================================= */
+
+.task-graph-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: #64748b;
+}
+
+.task-graph-loading-spinner {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 3px solid #e2e8f0;
+    border-top-color: #6366f1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1rem;
+}
+
+.task-graph-loading-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* =============================================================================
+   Empty State
+   ============================================================================= */
+
+.task-graph-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: #94a3b8;
+}
+
+.task-graph-empty svg {
+    width: 3rem;
+    height: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.task-graph-empty-text {
+    font-size: 0.875rem;
+    text-align: center;
+}
+
+/* =============================================================================
+   Critical Path Highlight
+   ============================================================================= */
+
+.task-node-critical-path {
+    box-shadow: 0 0 0 2px #f59e0b;
+}
+
+.task-dependency-line-critical {
+    stroke: #f59e0b;
+    stroke-width: 3;
+}
+
+/* =============================================================================
+   Responsive Adjustments
+   ============================================================================= */
+
+@media (max-width: 640px) {
+    .task-graph-container {
+        padding: 1rem;
+    }
+
+    .task-node {
+        min-width: 100%;
+        max-width: 100%;
+    }
+
+    .task-status-summary {
+        justify-content: center;
+    }
+
+    .task-wave-tasks {
+        padding-left: 0;
+    }
+}

@@ -49,6 +49,10 @@ from .event_collector import (
     init_event_collector,
     shutdown_event_collector,
 )
+from .task_sync_service import (
+    TaskSyncService,
+    get_task_sync_service,
+)
 
 __all__ = [
     "PlanService",
@@ -94,4 +98,7 @@ __all__ = [
     "get_event_collector",
     "init_event_collector",
     "shutdown_event_collector",
+    # Task sync service
+    "TaskSyncService",
+    "get_task_sync_service",
 ]

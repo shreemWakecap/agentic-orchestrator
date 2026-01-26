@@ -5,7 +5,8 @@ from typing import Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 
 from db import PlanRepository, BuildStateRepository, RunRepository, IProjectContextProvider
-from portal.dependencies import get_plan_repo, get_build_state_repo, get_run_repo, get_recovery_service, get_project_context_provider
+from portal.dependencies import get_plan_repo, get_build_state_repo, get_run_repo, get_recovery_service, get_project_context_provider, get_task_mapping_repo
+from db.repositories import TaskMappingRepository
 from portal.schemas.requests import MovePlanRequest, ResumeBuildRequest, RecoverPlanRequest, UpdatePlanRequest
 from portal.schemas.responses import (
     PlanResponse,
@@ -24,6 +25,12 @@ from portal.schemas.responses import (
     StuckPlanInfo,
     CancelBuildResponse,
     UpdatePlanResponse,
+    # Task tracking responses
+    PlanTaskStatusResponse,
+    TaskGraphResponse,
+    TaskNode,
+    TaskEdge,
+    TaskStatusCounts,
 )
 from portal.services.recovery_service import RecoveryService
 from portal.services.plan_service import PlanService
@@ -926,3 +933,207 @@ async def start_plan_review(
     background_tasks.add_task(run_review_workflow, run_id, plan_id)
 
     return WorkflowStartResponse(run_id=run_id, status="started", plan_id=plan_id)
+
+
+# =============================================================================
+# Task Tracking Endpoints (Claude Task tool integration)
+# =============================================================================
+
+@router.get("/{plan_id}/task-status", response_model=PlanTaskStatusResponse)
+async def get_plan_task_status(
+    plan_id: str,
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+    build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
+    task_mapping_repo: TaskMappingRepository = Depends(get_task_mapping_repo),
+) -> PlanTaskStatusResponse:
+    """Get real-time task execution status for a plan.
+
+    Returns task status counts, current task, next ready tasks,
+    and dependency information for monitoring build progress.
+    """
+    import json
+
+    plan = plan_repo.get_by_id(plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    # Get task mappings for this plan
+    task_mappings = task_mapping_repo.get_by_plan(plan_id)
+
+    # Get build state for status info
+    build_state = build_state_repo.get(plan_id)
+    step_states = build_state_repo.get_step_states(plan_id) if build_state else []
+    step_states_dict = {s["step_id"]: s for s in step_states}
+
+    # Build task nodes
+    tasks: List[TaskNode] = []
+    status_counts = {"pending": 0, "in_progress": 0, "completed": 0, "failed": 0, "blocked": 0}
+    blocked_by_map: Dict[str, List[str]] = {}  # task_id -> list of blockers
+
+    for mapping in task_mappings:
+        step_id = mapping.get("step_id", "")
+        step_state = step_states_dict.get(step_id, {})
+
+        # Determine status from step state
+        status = step_state.get("status", "pending")
+        if status not in status_counts:
+            status = "pending"
+        status_counts[status] += 1
+
+        # Parse blocked_by from JSON
+        blocked_by_json = mapping.get("blocked_by_json", "[]")
+        try:
+            blocked_by = json.loads(blocked_by_json) if blocked_by_json else []
+        except (json.JSONDecodeError, TypeError):
+            blocked_by = []
+        blocked_by_map[step_id] = blocked_by
+
+        tasks.append(TaskNode(
+            id=step_id,
+            subject=mapping.get("task_subject", step_id),
+            status=status,
+            step_id=step_id,
+            active_form=mapping.get("task_active_form"),
+            description=mapping.get("task_description"),
+            session_task_id=mapping.get("session_task_id"),
+        ))
+
+    # Calculate blocked tasks (tasks whose blockers aren't completed)
+    completed_tasks = {t.id for t in tasks if t.status == "completed"}
+    for task in tasks:
+        blockers = blocked_by_map.get(task.id, [])
+        if blockers and task.status == "pending":
+            if not all(b in completed_tasks for b in blockers):
+                status_counts["blocked"] += 1
+
+    # Find next ready tasks (pending with all blockers completed)
+    next_ready = []
+    for task in tasks:
+        if task.status == "pending":
+            blockers = blocked_by_map.get(task.id, [])
+            if not blockers or all(b in completed_tasks for b in blockers):
+                next_ready.append(task.id)
+
+    # Get current task from build state
+    current_task = build_state.get("current_step") if build_state else None
+
+    # Get session ID from first mapping with session_id
+    session_id = None
+    for mapping in task_mappings:
+        if mapping.get("session_id"):
+            session_id = mapping.get("session_id")
+            break
+
+    # Get last updated timestamp
+    last_updated = build_state.get("updated_at") if build_state else None
+
+    return PlanTaskStatusResponse(
+        plan_id=plan_id,
+        session_id=session_id,
+        status_counts=TaskStatusCounts(
+            total=len(tasks),
+            **status_counts
+        ),
+        current_task=current_task,
+        next_ready=next_ready,
+        critical_path=[],  # TODO: Calculate critical path
+        tasks=tasks,
+        last_updated=last_updated,
+    )
+
+
+@router.get("/{plan_id}/task-graph", response_model=TaskGraphResponse)
+async def get_plan_task_graph(
+    plan_id: str,
+    plan_repo: PlanRepository = Depends(get_plan_repo),
+    build_state_repo: BuildStateRepository = Depends(get_build_state_repo),
+    task_mapping_repo: TaskMappingRepository = Depends(get_task_mapping_repo),
+) -> TaskGraphResponse:
+    """Get task dependency graph for visualization.
+
+    Returns nodes (tasks) and edges (blockedBy relationships) suitable
+    for rendering a DAG visualization in the UI.
+    """
+    import json
+
+    plan = plan_repo.get_by_id(plan_id)
+    if not plan:
+        raise HTTPException(status_code=404, detail=f"Plan '{plan_id}' not found")
+
+    # Get task mappings
+    task_mappings = task_mapping_repo.get_by_plan(plan_id)
+
+    # Get build state for status
+    build_state = build_state_repo.get(plan_id)
+    step_states = build_state_repo.get_step_states(plan_id) if build_state else []
+    step_states_dict = {s["step_id"]: s for s in step_states}
+
+    # Build nodes and edges
+    nodes: List[TaskNode] = []
+    edges: List[TaskEdge] = []
+    blocked_by_map: Dict[str, List[str]] = {}
+
+    for mapping in task_mappings:
+        step_id = mapping.get("step_id", "")
+        step_state = step_states_dict.get(step_id, {})
+        status = step_state.get("status", "pending")
+
+        # Parse blocked_by
+        blocked_by_json = mapping.get("blocked_by_json", "[]")
+        try:
+            blocked_by = json.loads(blocked_by_json) if blocked_by_json else []
+        except (json.JSONDecodeError, TypeError):
+            blocked_by = []
+        blocked_by_map[step_id] = blocked_by
+
+        nodes.append(TaskNode(
+            id=step_id,
+            subject=mapping.get("task_subject", step_id),
+            status=status,
+            step_id=step_id,
+            active_form=mapping.get("task_active_form"),
+            description=mapping.get("task_description"),
+            session_task_id=mapping.get("session_task_id"),
+        ))
+
+        # Create edges for blockedBy relationships
+        for blocker in blocked_by:
+            edges.append(TaskEdge(
+                from_task=blocker,
+                to_task=step_id,
+                relation="blocks",
+            ))
+
+    # Calculate waves (tasks grouped by dependency depth)
+    waves: List[List[str]] = []
+    task_ids = {n.id for n in nodes}
+    assigned = set()
+
+    # Wave 0: tasks with no dependencies
+    wave_0 = [tid for tid in task_ids if not blocked_by_map.get(tid)]
+    if wave_0:
+        waves.append(wave_0)
+        assigned.update(wave_0)
+
+    # Subsequent waves
+    while len(assigned) < len(task_ids):
+        next_wave = []
+        for tid in task_ids - assigned:
+            blockers = blocked_by_map.get(tid, [])
+            if all(b in assigned for b in blockers if b in task_ids):
+                next_wave.append(tid)
+        if not next_wave:
+            # Remaining tasks have circular deps or missing blockers
+            remaining = list(task_ids - assigned)
+            waves.append(remaining)
+            break
+        waves.append(next_wave)
+        assigned.update(next_wave)
+
+    return TaskGraphResponse(
+        plan_id=plan_id,
+        nodes=nodes,
+        edges=edges,
+        waves=waves,
+        root_tasks=waves[0] if waves else [],
+    )

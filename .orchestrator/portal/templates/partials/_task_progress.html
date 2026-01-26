@@ -1,0 +1,99 @@
+{# Task Progress Visualization Partial
+
+   Displays Claude Task tool integration visualization:
+   - Task status summary (counts by status)
+   - Wave-based task grouping
+   - Task nodes with status badges
+   - Dependency relationships
+
+   Parameters:
+     plan_id: string - Plan ID to fetch task data for
+
+   Required data attributes:
+     data-plan-id - For JavaScript initialization
+
+   Usage:
+     {% with plan_id=plan.id %}
+     {% include 'partials/_task_progress.html' %}
+     {% endwith %}
+#}
+
+<div class="mb-8 bg-white shadow-lg sm:rounded-2xl overflow-hidden border border-gray-100 animate-fade-in-up" style="animation-delay: 0.13s;">
+    <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-indigo-100 rounded-lg">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Task Progress</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Claude Task tool execution status</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="TaskVisualization.refresh()"
+                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        title="Refresh task data">
+                    <svg class="w-3.5 h-3.5 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                </button>
+                <button onclick="toggleTaskProgress()"
+                        class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        title="Toggle view">
+                    <svg id="task-progress-chevron" class="w-3.5 h-3.5 mr-1.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                    </svg>
+                    <span id="task-progress-toggle-text">Collapse</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Visualization Container -->
+    <div id="task-progress-content" class="px-6 py-5">
+        <div id="task-visualization-container" data-plan-id="{{ plan_id }}">
+            <!-- Loading state -->
+            <div class="task-graph-loading">
+                <div class="task-graph-loading-spinner"></div>
+                <div class="task-graph-loading-text">Loading task data...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Toggle task progress section visibility
+function toggleTaskProgress() {
+    var content = document.getElementById('task-progress-content');
+    var chevron = document.getElementById('task-progress-chevron');
+    var toggleText = document.getElementById('task-progress-toggle-text');
+
+    if (content && chevron && toggleText) {
+        content.classList.toggle('hidden');
+        chevron.classList.toggle('rotate-180');
+        toggleText.textContent = content.classList.contains('hidden') ? 'Expand' : 'Collapse';
+    }
+}
+
+// Initialize task visualization when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    var container = document.getElementById('task-visualization-container');
+    if (container && window.TaskVisualization) {
+        var planId = container.dataset.planId;
+        if (planId) {
+            // Only enable polling for in-progress plans
+            var planState = window.PLAN_DATA ? window.PLAN_DATA.state : null;
+            var enablePolling = ['in-progress', 'building'].includes(planState);
+
+            TaskVisualization.init(planId, {
+                enablePolling: enablePolling,
+                pollInterval: 5000
+            });
+        }
+    }
+});
+</script>

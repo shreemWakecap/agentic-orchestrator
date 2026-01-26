@@ -5,6 +5,7 @@
 {% block head %}
 <link rel="stylesheet" href="/static/css/plan-recovery.css">
 <link rel="stylesheet" href="/static/css/status-theme.css">
+<link rel="stylesheet" href="/static/css/task-visualization.css">
 <style>
     /* Modern gradient progress bar animation */
     .progress-gradient {
@@ -965,6 +966,11 @@
         </div>
     </div>
 
+    <!-- Task Progress Visualization Section -->
+    {% with plan_id=plan.id %}
+    {% include 'partials/_task_progress.html' %}
+    {% endwith %}
+
     <!-- Build Actions & Progress Section -->
     <div id="build-section" class="mb-8 bg-white shadow-lg sm:rounded-2xl overflow-hidden border border-gray-100 animate-fade-in-up" style="animation-delay: 0.15s;">
         <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-gray-50 to-white">
@@ -1273,6 +1279,7 @@
 <script src="/static/js/plan-detail.js"></script>
 <script src="/static/js/plan-edit-dialog.js"></script>
 <script src="/static/js/plan-delete-dialog.js"></script>
+<script src="/static/js/task-visualization.js"></script>
 <script>
     // Toggle cost breakdown details
     function toggleCostBreakdown() {

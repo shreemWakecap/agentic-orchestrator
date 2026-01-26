@@ -33,6 +33,7 @@ from db import (
     IProjectContextProvider,
     DatabaseProjectProvider,
 )
+from db.repositories import get_task_mapping_repository, TaskMappingRepository
 from portal.services.task_manager import TaskManager, get_task_manager as _get_task_manager
 from portal.services.recovery_service import RecoveryService, get_recovery_service as _get_recovery_service
 from portal.services.plan_status_service import PlanStatusService
@@ -74,6 +75,15 @@ def get_knowledge_repo() -> KnowledgeRepository:
 def get_file_knowledge_repo() -> FileKnowledgeRepository:
     """Get file knowledge repository instance for dependency injection."""
     return get_file_knowledge_repository()
+
+
+def get_task_mapping_repo() -> TaskMappingRepository:
+    """Get task mapping repository instance for dependency injection.
+
+    This repository manages Claude Task ID to PlanStep ID mappings
+    for session persistence and resumability.
+    """
+    return get_task_mapping_repository()
 
 
 def get_project_root() -> Path:

@@ -25,6 +25,8 @@ from typing import Optional
 from core import Agent, Workflow, WorkflowResult, get_agent_config
 from core.plan_parser import PlanParser, ParseResult
 from db import get_plan_repository, get_build_state_repository
+from db.repositories.task_mapping import get_task_mapping_repository
+from portal.services.task_sync_service import TaskSyncService
 from portal.services.token_usage_signal import get_token_usage_signal, TokenUsageSignal
 from portal.services.token_usage_service import TokenUsageService
 
@@ -283,6 +285,15 @@ class BuildingWorkflow(Workflow):
         self._token_usage_service: TokenUsageService = TokenUsageService()
         self._job_id: Optional[str] = None
         self._total_input_tokens: int = 0
+
+        # Task sync service for Claude Task tool integration
+        self._task_sync_service = TaskSyncService(
+            self._plan_repo,
+            self._build_state_repo,
+            get_task_mapping_repository()
+        )
+        self._session_id: str = str(uuid.uuid4())
+        self._task_context: str = ""  # Generated per-execution in execute()
         self._total_output_tokens: int = 0
         self._estimated_input_tokens: int = 0
         self._estimated_output_tokens: int = 0
@@ -1102,6 +1113,189 @@ STEPS:
 
         return result
 
+    # =========================================================================
+    # Task Sync Service Integration (Claude Native Task Tools)
+    # =========================================================================
+
+    def _format_task_creation_prompt(self, task_instructions: list[dict]) -> str:
+        """
+        Format task creation instructions for the builder agent.
+
+        Args:
+            task_instructions: List of task instruction dicts from TaskSyncService
+
+        Returns:
+            Formatted string with TaskCreate instructions
+        """
+        lines = ["## TASKS TO CREATE\n"]
+        lines.append("Create these tasks using TaskCreate, then set dependencies with TaskUpdate:\n")
+
+        for i, task in enumerate(task_instructions, 1):
+            blocked_by_list = task.get('blocked_by', [])
+            blocked_by_str = ", ".join(f'"{b}"' for b in blocked_by_list) if blocked_by_list else "none"
+
+            lines.append(f"""
+### Task {i}: {task['subject']}
+
+**Step ID:** {task['step_id']}
+
+```
+TaskCreate(
+  subject="{task['subject']}",
+  description=\"\"\"{task['description']}\"\"\",
+  activeForm="{task['activeForm']}"
+)
+```
+
+**Depends on:** {blocked_by_str}
+""")
+
+        lines.append("""
+## After Creating All Tasks
+
+Set dependencies using TaskUpdate:
+```
+TaskUpdate(taskId="<task_id>", addBlockedBy=["<dependency_task_id>"])
+```
+
+## Execution
+
+Then execute tasks in dependency order:
+1. TaskList() to see ready tasks (pending + no blockedBy)
+2. For each ready task:
+   - TaskUpdate(taskId, status="in_progress")
+   - Implement the step
+   - Verify DONE criteria
+   - TaskUpdate(taskId, status="completed")
+3. Repeat until all tasks completed
+""")
+
+        return "\n".join(lines)
+
+    def _build_task_aware_prompt(self, plan: dict, task_context: str) -> str:
+        """
+        Build the full prompt with task context.
+
+        Args:
+            plan: Plan data dict from repository
+            task_context: Task creation or resume context string
+
+        Returns:
+            Full prompt string for the builder agent
+        """
+        goal = plan.get('goal', '')
+        context_items = plan.get('context', [])
+        verify_items = plan.get('verify', [])
+
+        context_str = "\n".join(f"- {c}" for c in context_items) if context_items else "- No additional context"
+        verify_str = "\n".join(f"- {v}" for v in verify_items) if verify_items else "- Run tests to verify"
+
+        return f"""## GOAL
+
+{goal}
+
+## CONTEXT
+
+{context_str}
+
+{task_context}
+
+## VERIFICATION COMMANDS
+
+After all tasks complete, run these to verify:
+{verify_str}
+
+## IMPORTANT
+
+- Use TaskCreate to create each task (if not resuming)
+- Use TaskUpdate to set blockedBy dependencies
+- Execute tasks in dependency order
+- Only mark completed when VERIFIED: yes
+- Output TASK_STATUS in your response
+"""
+
+    def _sync_final_state(self, plan_id: str, result) -> None:
+        """
+        Sync final task state to database after execution.
+
+        Args:
+            plan_id: The plan ID
+            result: AgentResult from builder execution
+        """
+        # Parse task states from result output
+        output = result.content if hasattr(result, 'content') else str(result)
+        task_states = self._parse_task_states(output)
+
+        if task_states:
+            self._task_sync_service.sync_task_state_to_db(plan_id, task_states)
+
+    def _parse_task_states(self, output: str) -> list[dict]:
+        """
+        Parse task states from agent output.
+
+        Looks for patterns like:
+        - "Task 1: completed"
+        - "TASK_STATUS: completed"
+        - "#1 [completed]"
+
+        Args:
+            output: Agent output string
+
+        Returns:
+            List of task state dicts with 'id' and 'status'
+        """
+        states = []
+
+        # Pattern 1: Task X: status
+        pattern1 = r'Task\s+(\d+):\s*(completed|in_progress|pending|failed)'
+        matches1 = re.findall(pattern1, output, re.IGNORECASE)
+        for task_id, status in matches1:
+            states.append({"id": task_id, "status": status.lower()})
+
+        # Pattern 2: #X [status]
+        pattern2 = r'#(\d+)\s*\[(completed|in_progress|pending|failed)\]'
+        matches2 = re.findall(pattern2, output, re.IGNORECASE)
+        for task_id, status in matches2:
+            if not any(s["id"] == task_id for s in states):
+                states.append({"id": task_id, "status": status.lower()})
+
+        # Pattern 3: TASK_STATUS: status (global status)
+        pattern3 = r'TASK_STATUS:\s*(completed|in_progress|pending|failed)'
+        match3 = re.search(pattern3, output, re.IGNORECASE)
+        if match3 and not states:
+            # If no individual tasks found but global status exists
+            # This is a single-task scenario
+            states.append({"id": "1", "status": match3.group(1).lower()})
+
+        return states
+
+    def _generate_task_context(self, plan_id: str, plan_data: dict) -> str:
+        """
+        Generate task context for a build, handling resume scenarios.
+
+        Args:
+            plan_id: The plan ID
+            plan_data: Plan data dict from repository
+
+        Returns:
+            Task context string (either creation instructions or resume context)
+        """
+        # Check for resume scenario
+        existing_state = self._build_state_repo.get(plan_id)
+        is_resume = existing_state and existing_state.get("status") == "paused"
+
+        if is_resume:
+            # Generate resume context
+            return self._task_sync_service.restore_tasks_for_resume(
+                plan_id, self._session_id
+            )
+        else:
+            # Generate fresh task creation instructions
+            task_instructions = self._task_sync_service.create_tasks_from_plan(
+                plan_id, self._session_id
+            )
+            return self._format_task_creation_prompt(task_instructions)
+
     def _validate_parsed_structure(self, parsed_data: dict) -> tuple[bool, str]:
         """
         Validate that parser output has the expected structure.
@@ -1213,7 +1407,18 @@ STEPS:
         if step.inputs:
             inputs_section = f"\nIN: {', '.join(step.inputs)}"
 
-        full_context = f"""{goal_section}## Phase Context
+        # Include task context if available (for Task tool integration)
+        task_context_section = ""
+        if hasattr(self, '_task_context') and self._task_context:
+            task_context_section = f"""## Task Tracking
+
+Use TaskUpdate to track progress:
+- TaskUpdate(taskId="{step.id}", status="in_progress") at start
+- TaskUpdate(taskId="{step.id}", status="completed") after verification
+
+"""
+
+        full_context = f"""{goal_section}{task_context_section}## Phase Context
 {phase_context[:1500]}
 
 ## Step Context
@@ -2419,6 +2624,10 @@ Ensure all features work together correctly.""",
         self.build_state.total_steps = total_steps
         self._save_state()
 
+        # Generate task context for Claude Task tool integration
+        # This generates either fresh task creation instructions or resume context
+        self._task_context = self._generate_task_context(plan_id, plan_data)
+
         # Estimate tokens and emit execution_started signal
         self._estimated_input_tokens, self._estimated_output_tokens = self._estimate_tokens_for_building(
             total_steps, plan_content
@@ -2492,6 +2701,9 @@ Ensure all features work together correctly.""",
         else:
             # Simple sequential build
             result = self._run_simple_build(plan, plan_id)
+
+        # Sync task state to database for session resumability
+        self._sync_final_state(plan_id, result)
 
         # Handle result - only archive on full completion
         if result.success:

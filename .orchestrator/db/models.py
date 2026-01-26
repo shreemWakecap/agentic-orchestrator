@@ -156,6 +156,7 @@ class Plan(Base):
     phases = relationship("PlanPhase", back_populates="plan", cascade="all, delete-orphan")
     steps = relationship("PlanStep", back_populates="plan", cascade="all, delete-orphan")
     build_state = relationship("BuildState", back_populates="plan", cascade="all, delete-orphan", uselist=False)
+    task_mappings = relationship("TaskMapping", back_populates="plan", cascade="all, delete-orphan")
 
 
 class PlanPhase(Base):
@@ -241,12 +242,87 @@ class StepState(Base):
     full_output = Column(Text)
     retry_history_json = Column(Text, default="[]")
 
+    # Task integration fields (Claude Native Task Tools)
+    task_session_id = Column(String(255), index=True)  # Which Claude session
+    task_id_in_session = Column(String(50))            # Task ID like "1", "2"
+    task_owner = Column(String(100))                   # For future parallel execution
+    blocked_by_steps_json = Column(Text, default="[]") # Step IDs this depends on
+    blocks_steps_json = Column(Text, default="[]")     # Step IDs that depend on this
+
     __table_args__ = (
         UniqueConstraint('plan_id', 'step_id', name='uq_step_states_plan_step'),
     )
 
     # Relationships
     build_state = relationship("BuildState", back_populates="step_states")
+
+
+# =============================================================================
+# TASK MAPPING (Claude Native Task Tools Integration)
+# =============================================================================
+
+class TaskMapping(Base):
+    """
+    Maps Claude Task IDs to PlanStep IDs for session persistence.
+
+    Enables:
+    - Resume from crash (recreate Tasks from DB state)
+    - Multi-session continuity
+    - Portal progress tracking
+    """
+    __tablename__ = "task_mappings"
+
+    id = Column(Integer, primary_key=True)
+    plan_id = Column(String(255), ForeignKey("plans.plan_id", ondelete="CASCADE"),
+                     nullable=False, index=True)
+    step_id = Column(String(255), nullable=False, index=True)
+
+    # Task metadata (for reconstruction)
+    task_subject = Column(String(500), nullable=False)
+    task_description = Column(Text)
+    task_active_form = Column(String(255))
+
+    # Dependency info (stored for reconstruction)
+    blocked_by_json = Column(Text, default="[]")  # List of step_ids
+    blocks_json = Column(Text, default="[]")      # List of step_ids
+
+    # Session tracking
+    session_id = Column(String(255), index=True)  # UUID of the Claude session
+    session_task_id = Column(String(50))          # Task ID within that session
+
+    # Status tracking (synced from Tasks)
+    status = Column(String(50), default="pending", index=True)  # pending/in_progress/completed
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    synced_at = Column(DateTime)  # Last sync from Task state
+
+    __table_args__ = (
+        UniqueConstraint('plan_id', 'step_id', name='uq_task_mapping_plan_step'),
+        Index('ix_task_mapping_session', 'session_id'),
+    )
+
+    # Relationships
+    plan = relationship("Plan", back_populates="task_mappings")
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary."""
+        import json
+        return {
+            "id": self.id,
+            "plan_id": self.plan_id,
+            "step_id": self.step_id,
+            "task_subject": self.task_subject,
+            "task_description": self.task_description,
+            "task_active_form": self.task_active_form,
+            "blocked_by": json.loads(self.blocked_by_json or "[]"),
+            "blocks": json.loads(self.blocks_json or "[]"),
+            "session_id": self.session_id,
+            "session_task_id": self.session_task_id,
+            "status": self.status,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "synced_at": self.synced_at.isoformat() if self.synced_at else None,
+        }
 
 
 class GoalVerificationState(Base):

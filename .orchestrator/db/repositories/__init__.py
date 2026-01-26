@@ -20,6 +20,7 @@ from .cost import CostRepository
 from .runs import RunRepository
 from .file_knowledge import FileKnowledgeRepository
 from .token_usage import TokenUsageRepository
+from .task_mapping import TaskMappingRepository, get_task_mapping_repository
 from .agent_definition import AgentDefinitionRepository, get_agent_definition_repository
 from .expert_definition import ExpertDefinitionRepository, get_expert_definition_repository
 from .config_repository import OrchestratorConfigRepository, get_config_repository
@@ -41,6 +42,8 @@ __all__ = [
     "RunRepository",
     "FileKnowledgeRepository",
     "TokenUsageRepository",
+    "TaskMappingRepository",
+    "get_task_mapping_repository",
     # Agent/Expert/Config definitions (global, not project-scoped)
     "AgentDefinitionRepository",
     "ExpertDefinitionRepository",

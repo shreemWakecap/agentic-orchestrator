@@ -421,3 +421,56 @@ class TokenAnalyticsResponse(BaseModel):
     error_metrics: ErrorRateMetrics = Field(..., description="Error rate metrics")
     recent_records: List[TokenUsageRecord] = Field(default_factory=list, description="Recent usage records")
     date_range: Dict[str, str] = Field(default_factory=dict, description="Applied date range filter")
+
+
+# =============================================================================
+# Task Tracking Models (for Claude Task tool integration)
+# =============================================================================
+
+class TaskNode(BaseModel):
+    """A single task node in the dependency graph."""
+    id: str = Field(..., description="Task ID (same as step_id)")
+    subject: str = Field(..., description="Task subject/title")
+    status: str = Field("pending", description="Task status: pending, in_progress, completed, failed")
+    step_id: str = Field(..., description="Associated plan step ID")
+    active_form: Optional[str] = Field(None, description="Present continuous form for spinner display")
+    description: Optional[str] = Field(None, description="Full task description")
+    session_task_id: Optional[str] = Field(None, description="Claude Task ID in current session")
+
+
+class TaskEdge(BaseModel):
+    """An edge representing a dependency between tasks."""
+    from_task: str = Field(..., description="Source task ID (the blocking task)")
+    to_task: str = Field(..., description="Target task ID (the blocked task)")
+    relation: str = Field("blocks", description="Relation type: blocks, blockedBy")
+
+
+class TaskStatusCounts(BaseModel):
+    """Counts of tasks by status."""
+    total: int = Field(0, description="Total number of tasks")
+    pending: int = Field(0, description="Number of pending tasks")
+    in_progress: int = Field(0, description="Number of in-progress tasks")
+    completed: int = Field(0, description="Number of completed tasks")
+    failed: int = Field(0, description="Number of failed tasks")
+    blocked: int = Field(0, description="Number of tasks blocked by incomplete dependencies")
+
+
+class PlanTaskStatusResponse(BaseModel):
+    """Real-time task execution status for a plan with dependency information."""
+    plan_id: str = Field(..., description="Plan ID")
+    session_id: Optional[str] = Field(None, description="Current execution session ID")
+    status_counts: TaskStatusCounts = Field(..., description="Task counts by status")
+    current_task: Optional[str] = Field(None, description="Currently executing task ID")
+    next_ready: List[str] = Field(default_factory=list, description="Tasks ready to execute (no blockers)")
+    critical_path: List[str] = Field(default_factory=list, description="Longest dependency chain")
+    tasks: List[TaskNode] = Field(default_factory=list, description="All tasks with their status")
+    last_updated: Optional[str] = Field(None, description="ISO timestamp of last status update")
+
+
+class TaskGraphResponse(BaseModel):
+    """Task dependency graph for visualization (DAG format)."""
+    plan_id: str = Field(..., description="Plan ID")
+    nodes: List[TaskNode] = Field(default_factory=list, description="Task nodes")
+    edges: List[TaskEdge] = Field(default_factory=list, description="Dependency edges (blockedBy relationships)")
+    waves: List[List[str]] = Field(default_factory=list, description="Tasks grouped by execution wave/depth")
+    root_tasks: List[str] = Field(default_factory=list, description="Tasks with no dependencies (wave 0)")

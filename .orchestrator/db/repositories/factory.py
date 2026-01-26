@@ -23,6 +23,7 @@ from .build_state import BuildStateRepository
 from .cost import CostRepository
 from .file_knowledge import FileKnowledgeRepository
 from .token_usage import TokenUsageRepository
+from .task_mapping import TaskMappingRepository
 
 
 class RepositoryFactory:
@@ -90,6 +91,14 @@ class RepositoryFactory:
     def create_token_usage_repository(self) -> TokenUsageRepository:
         """Create a token usage repository scoped to current project."""
         return TokenUsageRepository(self.db, self.project_id)
+
+    def create_task_mapping_repository(self) -> TaskMappingRepository:
+        """Create a task mapping repository.
+
+        Note: TaskMapping is scoped by plan_id (which is already project-scoped),
+        so explicit project_id is optional but passed for consistency.
+        """
+        return TaskMappingRepository(self.db, self.project_id)
 
 
 def get_repository_factory(

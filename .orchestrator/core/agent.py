@@ -57,7 +57,13 @@ AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
     "scout": ["OUTPUT_JSON:", '"project":', '"technologies":'],
     # Other agents use KEY: VALUE text format
     "architect": ["APPROACH:", "FILES_TO_"],
-    "planner": ["GOAL:", "STEPS:", "DO:"],
+    # Task-enabled agents (use Claude's native Task tools)
+    "planner": ["GOAL:", "STEPS:", "TASK_ID:"],
+    "builder": ["SUMMARY:", "FILES:", "VERIFIED:", "TASK_STATUS:"],
+    "coordinator": ["CURRENT_STATUS:", "NEXT_WAVE:", "WAVE_"],
+    "goal-verifier": ["ACHIEVED:", "COMPLETION:", "TASK_STATUS:"],
+    "integrator": ["STATUS:", "TASKS_REVIEWED:", "INTEGRATIONS:"],
+    # Other text-output agents
     "synthesizer": ["GOAL:", "STEPS:"],
     "validator": ["STATUS:", "SCORE:"],
     "analyzer": ["COMPLEXITY:", "STRATEGY:"],
@@ -67,10 +73,8 @@ AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
     # Markdown-output agents
     "fixer": ["## Fix", "##"],
     "reviewer": ["## Goals", "## Summary"],
-    # Agentic agents (use tools, not text output)
-    "builder": [],
+    # Agentic agents (use tools, may have minimal text output)
     "tester": [],
-    "integrator": [],
     # Expert agents (KEY: VALUE output for code review)
     "python": ["FINDINGS:", "SUMMARY:", "SCORE:"],
 }

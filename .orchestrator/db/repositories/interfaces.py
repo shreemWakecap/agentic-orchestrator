@@ -108,6 +108,30 @@ class IRunRepository(ABC):
         """Get events for a run since a given event ID."""
         ...
 
+    @abstractmethod
+    def force_stop(self, run_id: str) -> bool:
+        """Force stop a stuck run and clean up resources.
+
+        Args:
+            run_id: The ID of the run to force stop.
+
+        Returns:
+            True if the run was successfully stopped, False otherwise.
+        """
+        ...
+
+    @abstractmethod
+    def list_stuck(self, stale_minutes: int) -> List[Dict]:
+        """List runs that have been in progress longer than the specified time.
+
+        Args:
+            stale_minutes: Number of minutes after which a run is considered stuck.
+
+        Returns:
+            List of run dictionaries that are considered stuck.
+        """
+        ...
+
 
 class IKnowledgeRepository(ABC):
     """Interface for knowledge repository operations."""

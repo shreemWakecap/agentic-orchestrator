@@ -514,14 +514,12 @@ class KnowledgeStore:
             self._context_token = None
 
     @property
-    def codebase_file(self) -> Path:
-        """Return path to the knowledge database file.
+    def codebase_file(self) -> Optional[Path]:
+        """Deprecated: Knowledge is now stored in PostgreSQL database.
 
-        This property provides backward compatibility for code that
-        expects a file path for the knowledge storage.
+        Returns None since PostgreSQL has no file path.
         """
-        from db import get_db_path
-        return get_db_path()
+        return None
 
     def exists(self) -> bool:
         """Check if codebase knowledge exists."""

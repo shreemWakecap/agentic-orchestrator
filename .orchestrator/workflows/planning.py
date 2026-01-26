@@ -71,7 +71,7 @@ class PlanningWorkflow(Workflow):
         """Load required agents."""
         try:
             self.register_agent(Agent.load("planner", self.project_root))
-        except FileNotFoundError:
+        except ValueError:
             self.console.print("[red]Error: planner agent not found[/red]")
             raise
 

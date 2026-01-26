@@ -53,8 +53,9 @@ TRANSIENT_ERRORS = (
 # Expected output markers for each agent type - used to validate responses
 # If an agent's output doesn't contain these markers, it's likely a placeholder
 AGENT_OUTPUT_MARKERS: dict[str, list[str]] = {
-    # All agents use KEY: VALUE text format
-    "scout": ["PROJECT_TYPE:", "STRUCTURE:"],
+    # Scout uses JSON output format
+    "scout": ["OUTPUT_JSON:", '"project":', '"technologies":'],
+    # Other agents use KEY: VALUE text format
     "architect": ["APPROACH:", "FILES_TO_"],
     "planner": ["GOAL:", "STEPS:", "DO:"],
     "synthesizer": ["GOAL:", "STEPS:"],

@@ -2,6 +2,113 @@
 
 {% block title %}Projects - SDLC Orchestrator{% endblock %}
 
+{% block head %}
+<style>
+/* Folder Drop Zone States */
+#path-drop-zone {
+    position: relative;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Default state */
+#path-drop-zone.drop-zone-default {
+    border-color: var(--color-secondary-300, #d1d5db);
+    background-color: transparent;
+}
+
+/* Drag-over state - highlight when dragging over */
+#path-drop-zone.drop-zone-dragover {
+    border-color: var(--color-primary-500, #6366f1);
+    background-color: rgba(99, 102, 241, 0.08);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Validation pending state - while checking path */
+#path-drop-zone.drop-zone-validating {
+    border-color: var(--color-secondary-400, #9ca3af);
+    background-color: rgba(156, 163, 175, 0.05);
+}
+
+/* Valid path state - path exists and is valid */
+#path-drop-zone.drop-zone-valid {
+    border-color: var(--color-success-500, #22c55e);
+    background-color: rgba(34, 197, 94, 0.08);
+}
+
+/* Invalid path state - path doesn't exist or is invalid */
+#path-drop-zone.drop-zone-invalid {
+    border-color: var(--color-danger-500, #ef4444);
+    background-color: rgba(239, 68, 68, 0.08);
+}
+
+/* Drag overlay styling */
+#drag-overlay {
+    transition: opacity 0.15s ease-in-out;
+    opacity: 0;
+}
+
+#drag-overlay.active {
+    opacity: 1;
+}
+
+/* Validation message styling */
+#path-validation-message {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+#path-validation-message.validation-success {
+    color: var(--color-success-600, #16a34a);
+}
+
+#path-validation-message.validation-error {
+    color: var(--color-danger-600, #dc2626);
+}
+
+#path-validation-message.validation-loading {
+    color: var(--color-secondary-500, #6b7280);
+}
+
+/* Loading spinner for validation */
+.validation-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--color-secondary-300, #d1d5db);
+    border-top-color: var(--color-primary-500, #6366f1);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Success/Error icons in validation messages */
+.validation-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+/* Transition for input border when inside different drop zone states */
+#path-drop-zone.drop-zone-valid #local-path-input {
+    border-color: var(--color-success-400, #4ade80);
+}
+
+#path-drop-zone.drop-zone-invalid #local-path-input {
+    border-color: var(--color-danger-400, #f87171);
+}
+
+/* Smooth transitions for all interactive states */
+#local-path-input {
+    transition: border-color 0.2s ease-in-out;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="space-y-6">
     <!-- Page Header -->
@@ -161,7 +268,44 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-secondary-700 mb-1">Project Path</label>
-                    <input type="text" name="path" required class="input" placeholder="C:\path\to\project">
+                    <!-- Drop zone container with visual feedback states -->
+                    <div id="path-drop-zone"
+                         class="relative border-2 border-dashed border-secondary-300 rounded-lg p-3 transition-all duration-200 hover:border-primary-400 hover:bg-primary-50/30"
+                         ondragover="ProjectsPage.handleDragOver(event)"
+                         ondragleave="ProjectsPage.handleDragLeave(event)"
+                         ondrop="ProjectsPage.handleDrop(event)">
+                        <!-- Flex container for input and Browse button -->
+                        <div class="flex items-center gap-2">
+                            <input type="text"
+                                   id="local-path-input"
+                                   name="path"
+                                   required
+                                   class="input flex-1"
+                                   placeholder="C:\path\to\project or drag folder here">
+                            <button type="button"
+                                    onclick="ProjectsPage.browseFolder()"
+                                    class="btn btn-secondary whitespace-nowrap flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+                                </svg>
+                                Browse
+                            </button>
+                        </div>
+                        <!-- Drag overlay indicator -->
+                        <div id="drag-overlay" class="hidden absolute inset-0 bg-primary-100/80 border-2 border-primary-500 rounded-lg flex items-center justify-center pointer-events-none">
+                            <div class="text-primary-700 font-medium flex items-center gap-2">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                                Drop folder here
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Validation message area -->
+                    <div id="path-validation-message" class="mt-1.5 text-sm hidden">
+                        <!-- Populated dynamically: success or error message -->
+                    </div>
+                    <p class="text-xs text-secondary-500 mt-1.5">Drag a folder here, click Browse, or type the path manually</p>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-secondary-700 mb-1">Name (optional)</label>
@@ -232,12 +376,181 @@
 {% endblock %}
 
 {% block scripts %}
+<!-- Folder Picker Module - must load before ProjectsPage script -->
+<script src="/static/js/folder-picker.js"></script>
 <script>
 var ProjectsPage = (function() {
     var openMenu = null;
+    var folderPickerInitialized = false;
+
+    /**
+     * Initialize the folder picker for the path input
+     * Called once when the Add Local dialog is first opened
+     */
+    function initFolderPicker() {
+        if (folderPickerInitialized) return;
+
+        var pathInput = document.getElementById('local-path-input');
+        var dropZone = document.getElementById('path-drop-zone');
+        var validationMsg = document.getElementById('path-validation-message');
+        var dragOverlay = document.getElementById('drag-overlay');
+
+        if (!pathInput || !dropZone) {
+            console.error('ProjectsPage: Required elements for folder picker not found');
+            return;
+        }
+
+        FolderPicker.init({
+            input: pathInput,
+            dropzone: dropZone,
+            feedback: validationMsg,
+            validationEndpoint: '/api/projects/validate-path',
+            debounceDelay: 300,
+            cssClasses: {
+                loading: 'drop-zone-validating',
+                valid: 'drop-zone-valid',
+                invalid: 'drop-zone-invalid',
+                dropzone: 'drop-zone-default',
+                dragover: 'drop-zone-dragover'
+            },
+            onPathSelected: function(path, handle) {
+                // Path was selected via browse or drag-drop
+                console.log('Folder selected:', path);
+            },
+            onValidationChange: function(result) {
+                // Update the dropzone visual state based on validation
+                updateDropZoneState(result.valid, result.error);
+            },
+            onError: function(err) {
+                showToast('Folder picker error: ' + err.message, 'error');
+            }
+        });
+
+        folderPickerInitialized = true;
+    }
+
+    /**
+     * Update drop zone visual state based on validation result
+     */
+    function updateDropZoneState(isValid, errorMessage) {
+        var dropZone = document.getElementById('path-drop-zone');
+        var validationMsg = document.getElementById('path-validation-message');
+
+        if (!dropZone) return;
+
+        // Remove all state classes
+        dropZone.classList.remove('drop-zone-default', 'drop-zone-validating', 'drop-zone-valid', 'drop-zone-invalid');
+
+        if (isValid === true) {
+            dropZone.classList.add('drop-zone-valid');
+            if (validationMsg) {
+                validationMsg.classList.remove('hidden', 'validation-error', 'validation-loading');
+                validationMsg.classList.add('validation-success');
+                validationMsg.innerHTML = '<svg class="validation-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><span>Valid folder path</span>';
+            }
+        } else if (isValid === false) {
+            dropZone.classList.add('drop-zone-invalid');
+            if (validationMsg) {
+                validationMsg.classList.remove('hidden', 'validation-success', 'validation-loading');
+                validationMsg.classList.add('validation-error');
+                validationMsg.innerHTML = '<svg class="validation-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg><span>' + escapeHtml(errorMessage || 'Invalid path') + '</span>';
+            }
+        } else {
+            dropZone.classList.add('drop-zone-default');
+            if (validationMsg) {
+                validationMsg.classList.add('hidden');
+                validationMsg.innerHTML = '';
+            }
+        }
+    }
+
+    /**
+     * Handle drag over event for the drop zone
+     */
+    function handleDragOver(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        var dropZone = document.getElementById('path-drop-zone');
+        var dragOverlay = document.getElementById('drag-overlay');
+
+        if (dropZone) {
+            dropZone.classList.add('drop-zone-dragover');
+        }
+        if (dragOverlay) {
+            dragOverlay.classList.remove('hidden');
+            dragOverlay.classList.add('active');
+        }
+    }
+
+    /**
+     * Handle drag leave event for the drop zone
+     */
+    function handleDragLeave(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        var dropZone = document.getElementById('path-drop-zone');
+        var dragOverlay = document.getElementById('drag-overlay');
+
+        // Only remove highlight if leaving the dropzone entirely
+        if (dropZone && !dropZone.contains(event.relatedTarget)) {
+            dropZone.classList.remove('drop-zone-dragover');
+            if (dragOverlay) {
+                dragOverlay.classList.remove('active');
+                dragOverlay.classList.add('hidden');
+            }
+        }
+    }
+
+    /**
+     * Handle drop event for the drop zone
+     */
+    function handleDrop(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        var dropZone = document.getElementById('path-drop-zone');
+        var dragOverlay = document.getElementById('drag-overlay');
+
+        // Remove drag state
+        if (dropZone) {
+            dropZone.classList.remove('drop-zone-dragover');
+        }
+        if (dragOverlay) {
+            dragOverlay.classList.remove('active');
+            dragOverlay.classList.add('hidden');
+        }
+
+        // Delegate to FolderPicker for handling
+        FolderPicker.handleDrop(event);
+    }
+
+    /**
+     * Open the folder picker dialog
+     */
+    function browseFolder() {
+        FolderPicker.openPicker();
+    }
 
     function showAddLocalDialog() {
         document.getElementById('add-local-dialog').classList.remove('hidden');
+        // Initialize folder picker on first open
+        initFolderPicker();
+        // Reset validation state when dialog opens
+        resetLocalDialogState();
+    }
+
+    /**
+     * Reset the Add Local dialog to its initial state
+     */
+    function resetLocalDialogState() {
+        var form = document.querySelector('#add-local-dialog form');
+        if (form) {
+            form.reset();
+        }
+        FolderPicker.clearValidationState();
+        updateDropZoneState(null, '');
     }
 
     function showAddGitDialog() {
@@ -251,8 +564,55 @@ var ProjectsPage = (function() {
     function addLocal(e) {
         e.preventDefault();
         var form = e.target;
+        var pathValue = form.path.value.trim();
+
+        // Validate that a path has been entered
+        if (!pathValue) {
+            showToast('Please enter a folder path', 'error');
+            document.getElementById('local-path-input').focus();
+            return;
+        }
+
+        // Check if folder picker has validated the path
+        var validationState = FolderPicker.getValidationState();
+
+        // If validation is in progress, wait for it
+        if (FolderPicker.isValidating()) {
+            showToast('Please wait for path validation to complete', 'info');
+            return;
+        }
+
+        // If path has not been validated yet or validation failed
+        if (validationState.isValid === false) {
+            showToast('Please enter a valid folder path: ' + (validationState.lastError || 'Path does not exist'), 'error');
+            document.getElementById('local-path-input').focus();
+            return;
+        }
+
+        // If validation hasn't been done yet (isValid is null), validate first
+        if (validationState.isValid === null || validationState.lastPath !== pathValue) {
+            showToast('Validating path...', 'info');
+            FolderPicker.validatePath(pathValue).then(function(result) {
+                if (result.valid) {
+                    // Re-submit the form after successful validation
+                    submitLocalProject(form);
+                } else {
+                    showToast('Invalid folder path: ' + (result.error || 'Path does not exist'), 'error');
+                }
+            });
+            return;
+        }
+
+        // Path is valid, proceed with submission
+        submitLocalProject(form);
+    }
+
+    /**
+     * Submit the local project after validation passes
+     */
+    function submitLocalProject(form) {
         var data = {
-            path: form.path.value,
+            path: form.path.value.trim(),
             name: form.name.value || null,
             description: form.description.value || null,
             auto_index: false
@@ -586,7 +946,12 @@ var ProjectsPage = (function() {
         gitPull: gitPull,
         toggleMenu: toggleMenu,
         showInfo: showInfo,
-        closeInfo: closeInfo
+        closeInfo: closeInfo,
+        // Folder picker integration
+        browseFolder: browseFolder,
+        handleDragOver: handleDragOver,
+        handleDragLeave: handleDragLeave,
+        handleDrop: handleDrop
     };
 })();
 </script>

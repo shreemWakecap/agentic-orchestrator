@@ -63,7 +63,7 @@ class UnifiedScoutWorkflow(Workflow):
         """Load required agents."""
         try:
             self.register_agent(Agent.load("scout", self.project_root))
-        except FileNotFoundError:
+        except ValueError:
             self.console.print("[red]Error: scout agent not found[/red]")
             raise
 

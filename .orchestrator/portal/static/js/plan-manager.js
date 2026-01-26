@@ -395,9 +395,9 @@ const PlanManager = (function() {
         setLoadingState(buttonElement, true);
 
         try {
-            var result = await apiRequest(API_BASE + '/' + encodeURIComponent(planId) + '/state', {
+            var result = await apiRequest(API_BASE + '/' + encodeURIComponent(planId) + '/move', {
                 method: 'PUT',
-                body: JSON.stringify({ state: targetState })
+                body: JSON.stringify({ target_state: targetState })
             });
 
             showNotification('Plan moved to ' + targetState + ': ' + planId, 'success');

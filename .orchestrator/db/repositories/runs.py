@@ -10,7 +10,7 @@ SOLID Revamp:
 - Falls back to contextvar if project_id not provided
 """
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -219,6 +219,78 @@ class RunRepository(IRunRepository):
                 stats["by_workflow"][workflow] = stats["by_workflow"].get(workflow, 0) + 1
 
             return stats
+
+    def force_stop(self, run_id: str) -> bool:
+        """Force stop a stuck run.
+
+        Updates run status to 'force_stopped', sets completed_at timestamp,
+        clears any pending events, and adds a force_stop event.
+
+        Args:
+            run_id: The run identifier to force stop
+
+        Returns:
+            True if run was found and updated, False otherwise
+        """
+        project_id = self.project_id
+
+        with self.db.session() as session:
+            query = session.query(ActiveRun).filter_by(run_id=run_id)
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+            run = query.first()
+
+            if not run:
+                return False
+
+            # Update run status
+            run.status = 'force_stopped'
+            run.completed_at = datetime.now()
+            run.error = 'Run was force stopped by user'
+
+            # Delete any pending events for this run
+            session.query(RunEvent).filter(
+                RunEvent.run_id == run_id,
+                RunEvent.event_type == 'pending'
+            ).delete()
+
+            # Add force_stop event
+            force_stop_event = RunEvent(
+                run_id=run_id,
+                event_type='force_stop',
+                timestamp=datetime.now(),
+                data_json=json.dumps({
+                    'reason': 'User initiated force stop',
+                    'previous_status': run.status if run.status != 'force_stopped' else 'unknown'
+                })
+            )
+            session.add(force_stop_event)
+
+            return True
+
+    def list_stuck(self, stale_minutes: int = 30) -> List[dict]:
+        """Find runs stuck in running/pending status for longer than specified minutes.
+
+        Args:
+            stale_minutes: Number of minutes after which a run is considered stuck.
+                          Defaults to 30 minutes.
+
+        Returns:
+            List of run dicts that are stuck
+        """
+        project_id = self.project_id
+        cutoff_time = datetime.now() - timedelta(minutes=stale_minutes)
+
+        with self.db.session() as session:
+            query = session.query(ActiveRun).filter(
+                ActiveRun.status.in_(['running', 'pending']),
+                ActiveRun.started_at < cutoff_time
+            )
+            if project_id:
+                query = query.filter_by(project_id=project_id)
+
+            runs = query.order_by(ActiveRun.started_at.asc()).all()
+            return [self._run_to_dict(r) for r in runs]
 
     def _run_to_dict(self, run: ActiveRun) -> dict:
         """Convert ActiveRun model to dictionary."""

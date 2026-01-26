@@ -303,6 +303,30 @@ class CancelBuildResponse(BaseModel):
     steps_remaining: int = 0
 
 
+class StuckRunInfo(BaseModel):
+    """Information about a single stuck workflow run."""
+    run_id: str = Field(..., description="Unique identifier for the run")
+    workflow: str = Field(..., description="Workflow type: plan, build, sync, etc.")
+    status: str = Field(..., description="Current status: in_progress, running")
+    started_at: Optional[str] = Field(None, description="ISO timestamp when run started")
+    minutes_stuck: float = Field(..., description="Minutes since last activity")
+
+
+class StuckRunsResponse(BaseModel):
+    """Response for listing stuck workflow runs."""
+    runs: List[StuckRunInfo] = Field(default_factory=list, description="List of stuck runs")
+    count: int = Field(0, description="Total number of stuck runs")
+
+
+class ForceStopRunResponse(BaseModel):
+    """Response for force-stopping a stuck workflow run."""
+    status: str = Field(..., description="Operation status: stopped, deleted, error")
+    run_id: str = Field(..., description="ID of the run that was force-stopped")
+    previous_status: str = Field(..., description="Status before force-stop")
+    new_status: str = Field(..., description="Status after force-stop: force_stopped, deleted")
+    message: str = Field(..., description="Human-readable result message")
+
+
 class UpdatePlanResponse(BaseModel):
     """Response for plan update operation."""
     status: str = "updated"
